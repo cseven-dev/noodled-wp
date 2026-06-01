@@ -492,7 +492,9 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
 .anno-b { right: 4%; top: 38%; text-align: right; }
 
 @media (max-width: 880px) {
-  .app { grid-template-columns: 1fr; height: auto; }
+  /* Fixed height so the live typewriter doesn't grow the box and shove the rest
+     of the page down while scrolling. Editor clips via overflow:hidden. */
+  .app { grid-template-columns: 1fr; height: 480px; }
   .app__rail, .app__list { display: none; }
   .live__anno { display: none; }
 }
