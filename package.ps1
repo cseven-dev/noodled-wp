@@ -13,6 +13,22 @@ $pluginDir = $PSScriptRoot
 $pluginName = "noodled"
 $version = (Select-String -Path "$pluginDir\noodled.php" -Pattern "Version:\s+(.+)" | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() })
 
+# ── Sync landing page from lab ──
+$landingSrc = "D:\c7\lab\noodled.html"
+if (Test-Path $landingSrc) {
+    Copy-Item $landingSrc "$pluginDir\templates\landing.html" -Force
+    Write-Host "Synced landing page from lab" -ForegroundColor Green
+}
+
+# ── Auto-increment patch version ──
+$parts = $version.Split(".")
+$parts[2] = [int]$parts[2] + 1
+$newVersion = $parts -join "."
+
+# Update version in noodled.php (header and constant)
+(Get-Content "$pluginDir\noodled.php") -replace "Version:\s+$version", "Version:     $newVersion" -replace "NOODLED_VERSION', '$version'", "NOODLED_VERSION', '$newVersion'" | Set-Content "$pluginDir\noodled.php"
+$version = $newVersion
+
 Write-Host "Packaging noodled-wp v$version" -ForegroundColor Cyan
 
 # ── Build zip ──
@@ -51,6 +67,87 @@ Remove-Item $tempDir -Recurse -Force
 
 $size = [math]::Round((Get-Item $zipPath).Length / 1KB, 1)
 Write-Host "Created $zipName ($size KB)" -ForegroundColor Green
+
+# ── Copy to Versions and Production ──
+$versionsDir = "$env:USERPROFILE\Documents\GitHub\Versions\Noodled"
+$productionDir = "$env:USERPROFILE\Documents\GitHub\Production"
+
+if (!(Test-Path $versionsDir)) { New-Item -ItemType Directory -Path $versionsDir | Out-Null }
+if (!(Test-Path $productionDir)) { New-Item -ItemType Directory -Path $productionDir | Out-Null }
+
+# Versioned copy (e.g. noodled-1.1.1.zip)
+Copy-Item $zipPath "$versionsDir\$zipName"
+Write-Host "Stored version: $versionsDir\$zipName" -ForegroundColor Green
+
+# Production copy (always noodled.zip)
+Copy-Item $zipPath "$productionDir\noodled.zip" -Force
+Write-Host "Production: $productionDir\noodled.zip" -ForegroundColor Green
+
+# ── Update metadata.json version ──
+$metaFile = "$pluginDir\metadata.json"
+if (Test-Path $metaFile) {
+    (Get-Content $metaFile -Raw) -replace '"version":\s*"[^"]*"', "`"version`": `"$version`"" | Set-Content $metaFile
+    Write-Host "Updated metadata.json to v$version" -ForegroundColor Green
+}
+
+# ── Upload to c7.ca update server ──
+$c7Env = "$env:USERPROFILE\Documents\GitHub\C7\1 Base Plugin\.env"
+if (Test-Path $c7Env) {
+    $c7Host = ""; $c7User = ""; $c7Pass = ""
+    Get-Content $c7Env | ForEach-Object {
+        if ($_ -match "^FTP_HOST=(.+)") { $c7Host = $Matches[1].Trim() }
+        if ($_ -match "^FTP_USER=(.+)") { $c7User = $Matches[1].Trim() }
+        if ($_ -match "^FTP_PASS=(.+)") { $c7Pass = $Matches[1].Trim() }
+    }
+    if ($c7Host -and $c7User -and $c7Pass) {
+        Write-Host "Uploading to c7.ca update server..." -ForegroundColor Cyan
+        $c7Cred = New-Object System.Net.NetworkCredential($c7User, $c7Pass)
+        $c7Base = "ftp://$c7Host/noodled"
+
+        # Create directory
+        try {
+            $mkReq = [System.Net.FtpWebRequest]::Create($c7Base)
+            $mkReq.Method = [System.Net.WebRequestMethods+Ftp]::MakeDirectory
+            $mkReq.Credentials = $c7Cred
+            $mkReq.UsePassive = $true
+            $mkReq.GetResponse().Close()
+        } catch { }
+
+        # Upload metadata.json
+        try {
+            $ulReq = [System.Net.FtpWebRequest]::Create("$c7Base/metadata.json")
+            $ulReq.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+            $ulReq.Credentials = $c7Cred
+            $ulReq.UseBinary = $true
+            $ulReq.UsePassive = $true
+            $bytes = [System.IO.File]::ReadAllBytes($metaFile)
+            $s = $ulReq.GetRequestStream()
+            $s.Write($bytes, 0, $bytes.Length)
+            $s.Close()
+            $ulReq.GetResponse().Close()
+            Write-Host "  metadata.json uploaded" -ForegroundColor Green
+        } catch {
+            Write-Warning "Failed to upload metadata.json: $_"
+        }
+
+        # Upload zip
+        try {
+            $ulReq = [System.Net.FtpWebRequest]::Create("$c7Base/noodled.zip")
+            $ulReq.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+            $ulReq.Credentials = $c7Cred
+            $ulReq.UseBinary = $true
+            $ulReq.UsePassive = $true
+            $bytes = [System.IO.File]::ReadAllBytes($zipPath)
+            $s = $ulReq.GetRequestStream()
+            $s.Write($bytes, 0, $bytes.Length)
+            $s.Close()
+            $ulReq.GetResponse().Close()
+            Write-Host "  noodled.zip uploaded" -ForegroundColor Green
+        } catch {
+            Write-Warning "Failed to upload noodled.zip: $_"
+        }
+    }
+}
 
 # ── Deploy via FTP ──
 if ($Deploy) {

@@ -45,7 +45,7 @@ CREATE TABLE {$wpdb->prefix}noodled_users (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   email varchar(255) NOT NULL,
   display_name varchar(255) NOT NULL DEFAULT '',
-  role enum('admin','member') NOT NULL DEFAULT 'member',
+  role enum('admin','member','pending') NOT NULL DEFAULT 'member',
   token varchar(64) DEFAULT NULL,
   token_expiry datetime DEFAULT NULL,
   session_token varchar(64) DEFAULT NULL,
@@ -65,6 +65,16 @@ CREATE TABLE {$wpdb->prefix}noodled_permissions (
   UNIQUE KEY user_notebook (user_id, notebook_id)
 ) $charset;
 
+CREATE TABLE {$wpdb->prefix}noodled_note_permissions (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  note_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  can_write tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY note_user (note_id, user_id),
+  KEY idx_user (user_id)
+) $charset;
+
 CREATE TABLE {$wpdb->prefix}noodled_attachments (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   note_id bigint(20) unsigned NOT NULL,
@@ -82,18 +92,8 @@ CREATE TABLE {$wpdb->prefix}noodled_attachments (
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
 
-		// Create default notebooks
-		$general = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM {$wpdb->prefix}noodled_notebooks WHERE name = %s", 'General'
-		) );
-		if ( ! $general ) {
-			$wpdb->insert( "{$wpdb->prefix}noodled_notebooks", [
-				'name'       => 'General',
-				'sort_order' => 0,
-				'created_at' => current_time( 'mysql', true ),
-				'modified_at' => current_time( 'mysql', true ),
-			] );
-		}
+		// No shared default notebook: each user is seeded their own private
+		// "My Notes" notebook on signup (see Noodled_Auth::seed_new_user).
 
 		update_option( 'noodled_db_version', NOODLED_VERSION );
 	}

@@ -1,8 +1,9 @@
-const CACHE_NAME = 'noodled-v1';
+const CACHE_NAME = 'noodled-v4';
 const STATIC_ASSETS = [
   '/wp-content/plugins/noodled/assets/css/noodled.css',
   '/wp-content/plugins/noodled/assets/js/noodled.js',
   '/wp-content/plugins/noodled/assets/manifest.json',
+  '/wp-content/plugins/noodled/assets/icon-192.png',
 ];
 
 // Install: cache static assets
@@ -13,7 +14,7 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: purge ALL old caches (including the old per-user API cache)
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -23,27 +24,27 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: network-first for API, cache-first for static assets
+// Fetch handler
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // API calls: always network
-  if (url.pathname.includes('/wp-json/')) {
-    return;
-  }
+  // NEVER cache HTML page navigations — they depend on auth state
+  if (event.request.mode === 'navigate') return;
 
-  // Static assets: cache first, fallback to network
+  // NEVER cache the API: per-user data must always come fresh from the server,
+  // and caching it risks serving one user's notes to another. Network-only.
+  if (url.pathname.includes('/wp-json/')) return;
+
+  // Static assets: stale-while-revalidate
   if (STATIC_ASSETS.some(a => url.pathname.endsWith(a.split('/').pop()))) {
     event.respondWith(
-      caches.match(event.request).then(cached => cached || fetch(event.request))
-    );
-    return;
-  }
-
-  // HTML pages: network first, fallback to cache
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match('/'))
+      caches.match(event.request).then(cached => {
+        const fetched = fetch(event.request).then(response => {
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+          return response;
+        });
+        return cached || fetched;
+      })
     );
   }
 });

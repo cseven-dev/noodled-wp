@@ -126,21 +126,26 @@ class Noodled_Notes {
 		return true;
 	}
 
-	public static function get_trash(): array {
+	public static function get_trash( array $notebook_ids = [] ): array {
 		global $wpdb;
+		// Empty scope must match NOTHING, never all notes (cross-user leak guard).
+		$ids = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$where = "deleted_at IS NOT NULL AND (notebook_id IN ($ids) OR deleted_from IN ($ids))";
 		$rows = $wpdb->get_results(
-			"SELECT * FROM " . self::table() . " WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+			"SELECT * FROM " . self::table() . " WHERE $where ORDER BY deleted_at DESC",
 			ARRAY_A
 		);
 		return array_map( [ __CLASS__, 'format_row' ], $rows ?: [] );
 	}
 
-	public static function trash_count(): int {
+	public static function trash_count( array $notebook_ids = [] ): int {
 		global $wpdb;
-		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM " . self::table() . " WHERE deleted_at IS NOT NULL" );
+		$ids = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$where = "deleted_at IS NOT NULL AND (notebook_id IN ($ids) OR deleted_from IN ($ids))";
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM " . self::table() . " WHERE $where" );
 	}
 
-	public static function restore( int $id ): array {
+	public static function restore( int $id, int $owner_id = 0 ): array {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . self::table() . " WHERE id = %d", $id ), ARRAY_A );
 		if ( ! $row ) return [ 'error' => 'Note not found in trash' ];
@@ -148,9 +153,9 @@ class Noodled_Notes {
 		$target_id = $row['deleted_from'] ?: null;
 		if ( $target_id ) {
 			$nb = Noodled_Notebooks::get_by_id( (int) $target_id );
-			if ( ! $nb ) $target_id = Noodled_Notebooks::ensure( 'General' );
+			if ( ! $nb ) $target_id = Noodled_Notebooks::ensure( 'My Notes', $owner_id );
 		} else {
-			$target_id = Noodled_Notebooks::ensure( 'General' );
+			$target_id = Noodled_Notebooks::ensure( 'My Notes', $owner_id );
 		}
 
 		$wpdb->update( self::table(), [
@@ -170,15 +175,19 @@ class Noodled_Notes {
 		return true;
 	}
 
-	public static function empty_trash(): bool {
+	public static function empty_trash( array $notebook_ids = [] ): bool {
 		global $wpdb;
-		$wpdb->query( "DELETE FROM " . self::table() . " WHERE deleted_at IS NOT NULL" );
+		// Empty scope deletes NOTHING (never wipe all users' trash).
+		$ids = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$wpdb->query( "DELETE FROM " . self::table() . " WHERE deleted_at IS NOT NULL AND (notebook_id IN ($ids) OR deleted_from IN ($ids))" );
 		return true;
 	}
 
-	public static function move( int $id, string $to_notebook ): array {
+	public static function move( int $id, string $to_notebook, int $owner_id = 0 ): array {
 		global $wpdb;
-		$notebook_id = Noodled_Notebooks::ensure( $to_notebook );
+		// Scope the target notebook to the acting user so notes can't be moved
+		// into another tenant's notebook (or an orphaned owner_id=0 one).
+		$notebook_id = Noodled_Notebooks::ensure( $to_notebook, $owner_id );
 
 		$wpdb->update( self::table(), [
 			'notebook_id' => $notebook_id,
@@ -200,14 +209,26 @@ class Noodled_Notes {
 		return self::get_one( $id ) ?? [ 'error' => 'Note not found' ];
 	}
 
-	public static function search( string $query ): array {
+	public static function search( string $query, array $notebook_ids = [], array $extra_note_ids = [] ): array {
 		global $wpdb;
+		// Scope to the user's accessible notebooks plus any directly-shared notes.
+		// Empty scope matches nothing (never search all users' notes).
+		$ids       = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids  = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$where     = "deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids))";
+		// Try FULLTEXT first, fall back to LIKE for short queries
+		if ( strlen( $query ) >= 3 ) {
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM " . self::table() . " WHERE $where AND MATCH(title, body) AGAINST(%s IN BOOLEAN MODE) ORDER BY modified_at DESC",
+				'*' . $query . '*'
+			), ARRAY_A );
+			if ( $rows ) return array_map( [ __CLASS__, 'format_row' ], $rows );
+		}
 		$like = '%' . $wpdb->esc_like( $query ) . '%';
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM " . self::table() . " WHERE deleted_at IS NULL AND (title LIKE %s OR body LIKE %s) ORDER BY modified_at DESC",
+			"SELECT * FROM " . self::table() . " WHERE $where AND (title LIKE %s OR body LIKE %s) ORDER BY modified_at DESC",
 			$like, $like
 		), ARRAY_A );
-
 		return array_map( [ __CLASS__, 'format_row' ], $rows ?: [] );
 	}
 }

@@ -23,6 +23,13 @@
   --yellow:       #f1c40f;
   --editor-border:#3c3c3c;
   --transition:   0.2s ease;
+  --bg-card:      #1a1a1f;
+  --accent-glow:  rgba(0, 120, 212, 0.12);
+  --font-xs:      11px;
+  --font-sm:      12px;
+  --font-base:    13px;
+  --font-md:      14px;
+  --font-lg:      16px;
 }
 [data-theme="light"] {
   --bg:           #f5f5f5;
@@ -42,6 +49,8 @@
   --accent-hover: #005fa3;
   --border:       #cccccc;
   --editor-border:#bbb;
+  --bg-card:      #e8e8ec;
+  --accent-glow:  rgba(0, 102, 187, 0.1);
 }
 
 /* ================================================================
@@ -79,8 +88,15 @@ body {
   font-size: 15px;
   font-weight: 700;
   color: var(--accent);
-  margin-right: 8px;
   letter-spacing: -0.5px;
+}
+
+.toolbar .logo-version {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 0 10px 0 5px;
+  align-self: flex-end;
+  padding-bottom: 2px;
 }
 
 .toolbar .spacer { flex: 1; }
@@ -201,6 +217,7 @@ body {
 .search-box {
   padding: 8px;
   border-bottom: 1px solid var(--border);
+  position: relative;
 }
 .search-box input {
   width: 100%;
@@ -243,7 +260,7 @@ body {
 .note-item.loading { opacity: 0.6; }
 
 .note-item .title {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 500;
   color: var(--text-bright);
   white-space: nowrap;
@@ -253,14 +270,14 @@ body {
   align-items: center;
 }
 .note-item .meta {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   margin-top: 2px;
   display: flex;
   gap: 8px;
 }
 .note-item .preview {
-  font-size: 11px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   margin-top: 4px;
   display: -webkit-box;
@@ -317,6 +334,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-content);
+  height: 100%;
   transition: opacity 0.2s;
 }
 
@@ -326,6 +344,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -399,6 +421,11 @@ body {
   padding-left: 18px;
   margin-left: -2px;
 }
+.rendered-content[contenteditable="true"]:empty::before {
+  content: "Start typing\2026";
+  color: var(--text-muted);
+  pointer-events: none;
+}
 
 .rendered-content {
   font-size: 14px;
@@ -434,19 +461,6 @@ body {
   flex-shrink: 0;
 }
 .rendered-content .check-done { text-decoration: line-through; color: var(--text-muted); }
-
-/* ── Empty states ── */
-.empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-  font-size: 13px;
-  flex-direction: column;
-  gap: 10px;
-}
-.empty-state .icon { font-size: 40px; opacity: 0.3; }
 
 /* ── Toast ── */
 .toast {
@@ -635,11 +649,373 @@ body {
 }
 .offline-banner.show { display: block; }
 
-/* ── Skeleton loading ── */
-.skeleton { background: var(--bg-input); border-radius: 4px; animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
-.skeleton-line { height: 12px; margin: 8px 12px; }
-.skeleton-title { height: 16px; width: 60%; margin: 10px 12px 4px; }
+/* ── Search highlighting ── */
+mark { background: var(--accent); color: #fff; padding: 1px 2px; border-radius: 2px; }
+
+/* ── Sort button ── */
+.sort-btn {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-muted); font-size: 10px; padding: 2px 8px; cursor: pointer;
+}
+.sort-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
+/* ── Pull to refresh indicator ── */
+.pull-indicator {
+  text-align: center; font-size: 11px; color: var(--text-muted);
+  padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.2s, padding 0.2s;
+}
+.pull-indicator.show { max-height: 30px; padding: 6px 0; }
+
+/* ── Raw markdown editor ── */
+.raw-markdown {
+  width: 100%; height: 100%; border: none; background: var(--bg-editor, var(--bg-content));
+  color: var(--text); font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
+  line-height: 1.6; padding: 0; resize: none; outline: none;
+}
+
+/* ── Floating action button (mobile only) ── */
+.fab {
+  display: none; position: fixed; bottom: 24px; right: 24px; z-index: 50;
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: var(--accent); color: #fff; font-size: 28px; font-weight: 300;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3); cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.fab:active { transform: scale(0.92); }
+
+/* ── Notebook colors ── */
+.nb-color {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  margin-right: 6px; flex-shrink: 0;
+}
+
+/* ── Reading mode ── */
+body.reading-mode .toolbar,
+body.reading-mode .col-notebooks,
+body.reading-mode .col-notes,
+body.reading-mode .content-toolbar,
+body.reading-mode .editor-footer,
+body.reading-mode .fab { display: none !important; }
+body.reading-mode .col-content {
+  position: fixed !important; inset: 0 !important; z-index: 100 !important;
+  display: flex !important; transform: none !important;
+}
+body.reading-mode .content-body { max-width: 720px; margin: 0 auto; padding: 40px 24px; }
+body.reading-mode .rendered-content { cursor: default; }
+
+/* ── Bulk action bar ── */
+.bulk-bar {
+  display: none; padding: 8px 12px; background: var(--bg-content);
+  border-top: 1px solid var(--border); align-items: center; gap: 8px; font-size: 12px;
+}
+.bulk-bar.show { display: flex; }
+.bulk-cb { margin-right: 8px; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+/* ── Tables ── */
+.rendered-content table {
+  width: 100%; border-collapse: collapse; margin: 0.5em 0; font-size: 13px;
+}
+.rendered-content th, .rendered-content td {
+  border: 1px solid var(--border); padding: 6px 10px; text-align: left;
+}
+.rendered-content th { background: var(--bg-input); color: var(--text-bright); font-weight: 600; }
+.rendered-content tr:hover td { background: var(--bg-item-hover); }
+
+/* ── Tags ── */
+.tag {
+  color: var(--accent); cursor: pointer; font-size: 0.9em;
+  background: var(--accent-glow, rgba(59,130,246,0.1)); padding: 1px 5px; border-radius: 3px;
+}
+.tag:hover { text-decoration: underline; }
+.tag-chip {
+  display: inline-block; padding: 6px 12px; border-radius: 16px;
+  background: var(--bg-input); color: var(--accent); cursor: pointer;
+  font-size: 13px; border: 1px solid var(--border); transition: background 0.15s;
+}
+.tag-chip:hover { background: var(--bg-item-hover); }
+
+/* ── Template items ── */
+.template-item {
+  padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border);
+  font-size: 14px; transition: background 0.15s;
+}
+.template-item:hover { background: var(--bg-item-hover); }
+
+/* ── Focus timer ── */
+.focus-timer {
+  display: none; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.focus-timer.show { display: flex; }
+
+/* ── Quick capture ── */
+.quick-capture {
+  position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; padding: 10px 16px;
+  background: var(--bg-card, var(--bg-content)); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+  z-index: 80; transition: bottom 0.25s ease; width: 90%; max-width: 500px;
+}
+.quick-capture.show { bottom: 24px; }
+.quick-capture input {
+  flex: 1; border: none; background: transparent; color: var(--text);
+  font-size: 14px; outline: none;
+}
+
+/* ── Split view ── */
+.split-view {
+  display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 45%;
+  background: var(--bg-content); border-left: 2px solid var(--accent);
+  z-index: 45; flex-direction: column; overflow: hidden;
+}
+.split-view.show { display: flex; }
+.split-view .content-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+/* ── Voice recording indicator ── */
+.recording { background: var(--red) !important; color: #fff !important; animation: pulse-rec 1s infinite; }
+@keyframes pulse-rec { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+/* ── Dropdown menus ── */
+.toolbar-menu-wrap { position: relative; }
+.toolbar-dropdown {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  min-width: 180px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 200;
+  padding: 4px 0; overflow: hidden;
+}
+.toolbar-dropdown.show { display: block; }
+.dropdown-item {
+  padding: 8px 14px; font-size: var(--font-sm); color: var(--text);
+  cursor: pointer; transition: background 0.1s;
+}
+.dropdown-item:hover { background: var(--bg-item-hover); }
+.dropdown-item:active { background: var(--bg-item-active); }
+.dropdown-danger { color: var(--red); }
+.dropdown-danger:hover { background: rgba(231, 76, 60, 0.1); }
+.dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* ── Editor actions row ── */
+.editor-actions {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+
+/* ── Bottom navigation (mobile) ── */
+.bottom-nav {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--bg-toolbar); border-top: 1px solid var(--border);
+  z-index: 75; padding: 4px 0; padding-bottom: env(safe-area-inset-bottom, 4px);
+}
+.bottom-nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; background: none; border: none; color: var(--text-muted);
+  font-size: 10px; padding: 6px 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: color 0.15s;
+}
+.bottom-nav-item:active { color: var(--accent); transform: scale(0.92); }
+.bottom-nav-icon { font-size: 20px; line-height: 1; }
+.bottom-nav-label { font-size: 10px; }
+.bottom-nav-primary {
+  margin-top: -12px; background: var(--accent); color: #fff;
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.bottom-nav-primary:active { background: var(--accent-hover); }
+.bottom-nav-primary .bottom-nav-icon { font-size: 24px; font-weight: 300; }
+
+/* ── Touch feedback ── */
+.btn, .btn-sm, .btn-icon, .nb-item, .nb-all, .note-item {
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, transform 0.1s;
+}
+@media (hover: none) {
+  .btn:active, .btn-sm:active, .btn-icon:active { transform: scale(0.94); }
+  .nb-item:active, .nb-all:active, .note-item:active { background: var(--bg-item-active); }
+}
+
+/* ── Better empty states ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; color: var(--text-muted); text-align: center; padding: 40px;
+}
+.empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+.empty-title { font-size: var(--font-lg); color: var(--text); font-weight: 500; margin-bottom: 6px; }
+.empty-sub { font-size: var(--font-sm); color: var(--text-muted); }
+
+/* ── Toolbar dividers ── */
+.toolbar-divider {
+  width: 1px; height: 18px; background: var(--border); flex-shrink: 0; margin: 0 2px;
+}
+
+/* ── Note transition ── */
+.col-content.note-fade {
+  animation: noteFadeIn 0.2s ease;
+}
+@keyframes noteFadeIn {
+  from { opacity: 0.4; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Find highlights ── */
+.find-highlight { background: rgba(251, 191, 36, 0.4); border-radius: 2px; }
+.find-highlight-active { background: rgba(251, 191, 36, 0.8); }
+
+/* ── Attachment gallery ── */
+.attachment-gallery {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+.gallery-thumb {
+  width: 64px; height: 64px; border-radius: 6px; object-fit: cover;
+  border: 1px solid var(--border); cursor: pointer; transition: transform 0.15s;
+}
+.gallery-thumb:hover { transform: scale(1.1); }
+.gallery-file {
+  display: flex; align-items: center; gap: 4px; padding: 4px 10px;
+  background: var(--bg-input); border-radius: 6px; font-size: 11px;
+  color: var(--text); cursor: pointer; border: 1px solid var(--border);
+}
+.gallery-file:hover { border-color: var(--accent); }
+
+/* ── Save queue indicator ── */
+.save-queued { color: var(--yellow, #f59e0b) !important; }
+
+/* ── Tooltips ── */
+.has-tip {
+  position: relative;
+}
+.has-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: var(--bg-card, #1a1a1f);
+  color: var(--text-bright);
+  font-size: 11px;
+  font-weight: 400;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 100;
+  border: 1px solid var(--border);
+}
+.has-tip::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--bg-card, #1a1a1f);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.has-tip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+.has-tip:hover::before {
+  opacity: 1;
+}
+
+/* ── Delete button in editor toolbar ── */
+.btn-delete { color: var(--red) !important; }
+.btn-delete:hover { background: var(--red) !important; color: #fff !important; }
+
+/* ── Attachment overlay ── */
+.attach-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: #fff; flex-direction: column;
+}
+.attach-overlay.show { display: flex; }
+.attach-toolbar {
+  display: flex; gap: 8px; padding: 8px 16px;
+  background: #1a1a1f; border-bottom: 1px solid #333;
+}
+.attach-toolbar .btn { color: #fff; }
+
+/* ── TOC items ── */
+.toc-item {
+  padding: 8px 12px; cursor: pointer; font-size: 13px;
+  border-bottom: 1px solid var(--border); transition: background 0.15s;
+}
+.toc-item:hover { background: var(--bg-item-hover); }
+
+/* ── Embed containers ── */
+.embed-container { margin: 0.5em 0; }
+
+/* ── Typewriter mode ── */
+body.typewriter-mode .content-body { scroll-behavior: smooth; }
+
+/* ── Zen mode — fade non-focused paragraphs ── */
+body.zen-mode .rendered-content > *:not(:focus-within) { opacity: 0.3; transition: opacity 0.3s; }
+body.zen-mode .rendered-content > *:hover,
+body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
+
+/* ── Save indicator ── */
+.save-indicator {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-left: 4px; vertical-align: middle; transition: all 0.3s;
+}
+.save-indicator.saving { background: var(--accent); animation: pulse 0.8s ease-in-out infinite; }
+.save-indicator.saved { background: var(--green, #10b981); width: auto; height: auto; font-size: 11px; }
+
+/* ── Find and replace bar ── */
+.find-replace-bar {
+  display: flex; gap: 6px; padding: 6px 12px; background: var(--bg-input);
+  border-bottom: 1px solid var(--border); align-items: center;
+}
+.find-replace-bar input {
+  flex: 1; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg); color: var(--text); padding: 4px 8px; font-size: 12px; outline: none;
+}
+.find-replace-bar input:focus { border-color: var(--accent); }
+
+/* ── Backlinks ── */
+.backlinks-line { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.backlink { color: var(--accent); text-decoration: none; }
+.backlink:hover { text-decoration: underline; }
+
+/* ── Notebook cover ── */
+.nb-cover {
+  height: 120px; background-size: cover; background-position: center;
+  border-radius: 0; opacity: 0.7;
+}
+
+/* ── Stats cards ── */
+.stat-card {
+  background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;
+}
+.stat-num { font-size: 24px; font-weight: 700; color: var(--text-bright); }
+.stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Notebook dragging ── */
+.nb-item.dragging { opacity: 0.4; }
+.nb-item[draggable="true"] { cursor: grab; }
+.nb-item[draggable="true"]:active { cursor: grabbing; }
+
+/* ── History item hover ── */
+.history-item:hover { background: var(--bg-item-hover); }
+
+/* ── Skeleton loading with shimmer ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-input) 25%, var(--bg-item-hover) 50%, var(--bg-input) 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-line { height: 10px; margin: 8px 14px; border-radius: 4px; }
+.skeleton-title { height: 14px; width: 60%; margin: 12px 14px 6px; border-radius: 4px; }
 
 /* ── Responsive: mobile ── */
 @media (max-width: 768px) {
@@ -663,10 +1039,13 @@ body {
   }
   .sidebar-overlay.show { display: block; }
 
-  /* Note list: full width */
-  .col-notes { width: 100%; min-width: 0; border-right: none; flex: 1; }
+  /* Note list: full width, must constrain height for scroll */
+  .col-notes { width: 100%; min-width: 0; border-right: none; flex: 1; overflow: hidden; }
   .col-notes .search-box { padding: 10px; }
   .col-notes .search-box input { padding: 10px 14px; font-size: 14px; border-radius: 8px; }
+
+  /* Note list scroll */
+  .note-list { -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 
   /* Note items: bigger touch targets */
   .note-item { padding: 14px 14px; }
@@ -674,20 +1053,27 @@ body {
   .note-item .meta { font-size: 11px; margin-top: 4px; }
   .note-item .preview { font-size: 12px; margin-top: 6px; }
 
-  /* Content: full screen below toolbar */
+  /* Content: full screen slide-in */
   .col-content {
     position: fixed; top: 42px; left: 0; right: 0; bottom: 0; z-index: 40;
-    display: none; background: var(--bg-content);
+    background: var(--bg-content);
     flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    display: flex;
   }
-  .col-content.open { display: flex; }
+  .col-content.open { transform: translateX(0); }
 
   /* Editor: mobile-friendly */
-  .content-toolbar { padding: 10px 14px; gap: 8px; }
+  .content-toolbar { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
   .content-title-input { font-size: 16px; min-width: 0; }
   .content-body { padding: 14px 16px; }
   .rendered-content { font-size: 15px; line-height: 1.8; }
   .editor-footer { padding: 6px 14px; font-size: 11px; }
+
+  /* Editor toolbar: compact on mobile */
+  .editor-actions { gap: 2px; }
+  .editor-actions .toolbar-divider { display: none; }
 
   /* Toolbar: compact, always on top */
   .toolbar { padding: 8px 10px; gap: 8px; position: fixed; top: 0; left: 0; right: 0; z-index: 70; }
@@ -695,8 +1081,10 @@ body {
   .toolbar .logo { font-size: 16px; }
   .toolbar .hide-mobile { display: none; }
   .toolbar .spacer { flex: 1; }
-  .mobile-back { display: inline-block !important; font-size: 18px; }
-  .mobile-menu { display: inline-block !important; font-size: 18px; }
+  /* Back arrow only while viewing a note — never on the main list screen */
+  .mobile-back { display: none !important; font-size: 18px; }
+  body:has(.col-content.open) .mobile-back { display: inline-block !important; }
+  .mobile-menu { display: none !important; } /* replaced by bottom nav */
 
   /* User menu: compact */
   .user-menu .user-name { max-width: 60px; font-size: 10px; }
@@ -725,15 +1113,38 @@ body {
   /* Note count */
   .note-count { padding: 8px 14px; font-size: 11px; }
 
-  /* Swipe delete button */
-  .note-delete-btn { padding: 0 24px; font-size: 13px; }
+  /* Bottom nav: visible on mobile */
+  .bottom-nav { display: flex; }
+  .col-content.open ~ .bottom-nav { display: none; }
+  .fab { display: none; }
 
-  /* Toast: centered on mobile */
-  .toast { left: 16px; right: 16px; bottom: 20px; text-align: center; }
+  /* Adjust for bottom nav */
+  .main { height: calc(100vh - 42px - 60px); }
+  .col-notes { padding-bottom: 0; }
+
+
+  /* Toast: above bottom nav */
+  .toast { left: 16px; right: 16px; bottom: 80px; text-align: center; }
 }
 
 @media (min-width: 769px) {
   .mobile-back { display: none !important; }
   .mobile-menu { display: none !important; }
   .sidebar-overlay { display: none !important; }
+  .toolbar-toggle { display: none !important; }
+  .bottom-nav { display: none !important; }
+}
+
+/* iOS Safari auto-zooms (and won't zoom back out) when a focused field is
+   under 16px. Force every text-entry field to >=16px on mobile so tapping to
+   type never zooms the viewport. */
+@media (max-width: 768px) {
+  input, textarea, select,
+  [contenteditable="true"],
+  .rendered-content,
+  .search-box input,
+  .content-title-input,
+  #qcInput {
+    font-size: 16px !important;
+  }
 }

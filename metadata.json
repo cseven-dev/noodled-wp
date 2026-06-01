@@ -1,0 +1,48 @@
+{
+  "name": "Noodled",
+  "slug": "noodled",
+  "version": "1.1.49",
+  "download_url": "https://c7.ca/noodled/noodled.zip",
+  "author": "Simon",
+  "author_homepage": "https://cseven.ca",
+  "homepage": "https://noodled.ca",
+  "requires": "5.9",
+  "tested": "6.8",
+  "requires_php": "8.0",
+  "sections": {
+    "description": "A full web version of the noodled note-taking app. Markdown notes with rich editing, family sharing, PIN login, GitHub sync, Plaud voice import, and 50+ power tools. Install on any WordPress site.",
+    "changelog": "<h4>1.1.17</h4><ul><li>Security: IDOR fixes on all note/attachment endpoints</li><li>Security: File upload type blocking and size limits</li><li>Security: PIN brute force rate limiting</li><li>Performance: Autosave no longer reloads all notes</li><li>White-label branding (custom name, tagline, accent color)</li><li>First-run setup wizard</li><li>Self-registration with optional admin approval</li><li>Configurable app URL path</li><li>Cache busting for SiteGround/CDN</li><li>50+ editor and organization features</li></ul>"
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,1 +1,2 @@
-dist/\n.env\n
+dist/
+.env

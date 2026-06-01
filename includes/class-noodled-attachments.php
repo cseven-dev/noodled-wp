@@ -22,12 +22,33 @@ class Noodled_Attachments {
 		return $upload['baseurl'] . '/noodled';
 	}
 
+	private static $blocked_extensions = [ 'php', 'phtml', 'php3', 'php4', 'php5', 'phps', 'phar', 'cgi', 'pl', 'py', 'sh', 'bash', 'exe', 'bat', 'cmd', 'com', 'jsp', 'asp', 'aspx' ];
+	private static $max_upload_bytes = 10485760; // 10 MB
+
 	public static function save( int $note_id, string $filename, string $data_b64 ): array {
 		global $wpdb;
 
 		$filename = sanitize_file_name( $filename );
+
+		// Block dangerous file types
+		$ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+		if ( in_array( $ext, self::$blocked_extensions, true ) ) {
+			return [ 'error' => 'File type not allowed: .' . $ext ];
+		}
+
+		// Size limit (check base64 length before decoding — base64 is ~33% larger)
+		if ( strlen( $data_b64 ) > self::$max_upload_bytes * 1.34 ) {
+			return [ 'error' => 'File too large (max 10 MB)' ];
+		}
+
 		$dir = self::upload_dir() . '/' . $note_id;
 		wp_mkdir_p( $dir );
+
+		// Write .htaccess to prevent PHP execution in uploads dir
+		$htaccess = self::upload_dir() . '/.htaccess';
+		if ( ! file_exists( $htaccess ) ) {
+			file_put_contents( $htaccess, "# Prevent script execution\n<FilesMatch \"\\.(php|phtml|php3|php4|php5|phar|cgi|pl|py|sh|jsp|asp|aspx)$\">\n  Deny from all\n</FilesMatch>\nAddHandler default-handler .php .phtml .php3 .php4 .php5\n" );
+		}
 
 		$filepath = $dir . '/' . $filename;
 		$data = base64_decode( $data_b64 );

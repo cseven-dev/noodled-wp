@@ -27,12 +27,6 @@ class Noodled_Notebooks {
 		$nt = self::notes_table();
 		$pt = self::perms_table();
 
-		// Claim orphaned notebooks (owner_id=0) for the first user who loads
-		$orphans = $wpdb->get_var( "SELECT COUNT(*) FROM {$t} WHERE owner_id = 0" );
-		if ( $orphans > 0 ) {
-			$wpdb->update( $t, [ 'owner_id' => $user_id ], [ 'owner_id' => 0 ] );
-		}
-
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT n.*, COALESCE(c.cnt, 0) AS note_count,
 			        CASE WHEN n.owner_id = %d THEN 'owner'

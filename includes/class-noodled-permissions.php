@@ -9,13 +9,12 @@ class Noodled_Permissions {
 	}
 
 	/**
-	 * Check if a user can read a notebook.
-	 * Admins (WP or noodled) can always read all.
+	 * Check if a user has an explicit read grant on a notebook.
+	 * Privacy-first: there is NO admin god-view — access is by ownership
+	 * (checked by the caller) or an explicit share only.
 	 */
 	public static function can_read( ?array $user, int $notebook_id ): bool {
 		if ( ! $user ) return false;
-		if ( ( $user['role'] ?? '' ) === 'admin' ) return true;
-		if ( $user['wp'] ?? false ) return true;
 
 		global $wpdb;
 		return (bool) $wpdb->get_var( $wpdb->prepare(
@@ -25,12 +24,10 @@ class Noodled_Permissions {
 	}
 
 	/**
-	 * Check if a user can write to a notebook.
+	 * Check if a user has an explicit write grant on a notebook.
 	 */
 	public static function can_write( ?array $user, int $notebook_id ): bool {
 		if ( ! $user ) return false;
-		if ( ( $user['role'] ?? '' ) === 'admin' ) return true;
-		if ( $user['wp'] ?? false ) return true;
 
 		global $wpdb;
 		return (bool) $wpdb->get_var( $wpdb->prepare(
@@ -40,12 +37,11 @@ class Noodled_Permissions {
 	}
 
 	/**
-	 * Get notebook IDs accessible by a user (for filtering).
-	 * Returns null for admins (meaning all notebooks).
+	 * Get notebook IDs explicitly shared with a user (for filtering).
+	 * No admin shortcut — everyone, including admins, is scoped to their grants.
 	 */
-	public static function get_accessible_notebook_ids( ?array $user ): ?array {
+	public static function get_accessible_notebook_ids( ?array $user ): array {
 		if ( ! $user ) return [];
-		if ( ( $user['role'] ?? '' ) === 'admin' || ( $user['wp'] ?? false ) ) return null;
 
 		global $wpdb;
 		$ids = $wpdb->get_col( $wpdb->prepare(
@@ -89,6 +85,85 @@ class Noodled_Permissions {
 	public static function remove_all_for_user( int $user_id ): void {
 		global $wpdb;
 		$wpdb->delete( self::table(), [ 'user_id' => $user_id ] );
+		$wpdb->delete( self::note_table(), [ 'user_id' => $user_id ] );
+	}
+
+	// ── Note-level sharing ──
+
+	private static function note_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'noodled_note_permissions';
+	}
+
+	public static function note_can_read( int $user_id, int $note_id ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM " . self::note_table() . " WHERE user_id = %d AND note_id = %d",
+			$user_id, $note_id
+		) );
+	}
+
+	public static function note_can_write( int $user_id, int $note_id ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var( $wpdb->prepare(
+			"SELECT can_write FROM " . self::note_table() . " WHERE user_id = %d AND note_id = %d",
+			$user_id, $note_id
+		) );
+	}
+
+	public static function share_note( int $note_id, int $user_id, bool $can_write ): void {
+		global $wpdb;
+		$table = self::note_table();
+		$existing = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$table} WHERE note_id = %d AND user_id = %d", $note_id, $user_id
+		) );
+		if ( $existing ) {
+			$wpdb->update( $table, [ 'can_write' => $can_write ? 1 : 0 ], [ 'id' => $existing ] );
+		} else {
+			$wpdb->insert( $table, [
+				'note_id'   => $note_id,
+				'user_id'   => $user_id,
+				'can_write' => $can_write ? 1 : 0,
+			] );
+		}
+	}
+
+	public static function unshare_note( int $note_id, int $user_id ): void {
+		global $wpdb;
+		$wpdb->delete( self::note_table(), [ 'note_id' => $note_id, 'user_id' => $user_id ] );
+	}
+
+	/** Note IDs shared directly with a user. */
+	public static function shared_note_ids_for_user( int $user_id ): array {
+		global $wpdb;
+		$ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT note_id FROM " . self::note_table() . " WHERE user_id = %d", $user_id
+		) );
+		return array_map( 'intval', $ids );
+	}
+
+	/** Users a note is shared with: [ ['user_id','email','display_name','can_write'], ... ]. */
+	public static function note_shares( int $note_id ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT np.user_id, np.can_write, u.email, u.display_name
+			 FROM " . self::note_table() . " np
+			 JOIN {$wpdb->prefix}noodled_users u ON u.id = np.user_id
+			 WHERE np.note_id = %d ORDER BY u.email", $note_id
+		), ARRAY_A );
+		return $rows ?: [];
+	}
+
+	/** Users a notebook is shared with (via notebook permissions). */
+	public static function notebook_shares( int $notebook_id ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT p.user_id, p.can_read, p.can_write, u.email, u.display_name
+			 FROM " . self::table() . " p
+			 JOIN {$wpdb->prefix}noodled_users u ON u.id = p.user_id
+			 WHERE p.notebook_id = %d AND p.can_read = 1 ORDER BY u.email", $notebook_id
+		), ARRAY_A );
+		return $rows ?: [];
 	}
 
 	/**
