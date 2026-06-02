@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noodled-v4';
+const CACHE_NAME = 'noodled-v5';
 const STATIC_ASSETS = [
   '/wp-content/plugins/noodled/assets/css/noodled.css',
   '/wp-content/plugins/noodled/assets/js/noodled.js',
@@ -35,16 +35,16 @@ self.addEventListener('fetch', event => {
   // and caching it risks serving one user's notes to another. Network-only.
   if (url.pathname.includes('/wp-json/')) return;
 
-  // Static assets: stale-while-revalidate
+  // Static assets: network-first so a deploy is picked up immediately. We only
+  // fall back to the cache when offline. (Stale-while-revalidate served the old
+  // bundle on every load, so new releases never reached the browser.)
   if (STATIC_ASSETS.some(a => url.pathname.endsWith(a.split('/').pop()))) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        const fetched = fetch(event.request).then(response => {
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
-          return response;
-        });
-        return cached || fetched;
-      })
+      fetch(event.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return response;
+      }).catch(() => caches.match(event.request))
     );
   }
 });
