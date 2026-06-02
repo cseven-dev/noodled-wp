@@ -182,9 +182,21 @@ if ($Deploy) {
         exit 1
     }
 
+    $FtpPath = $FtpPath.TrimEnd("/")   # trailing slash → "noodled//file" double slash, which some FTP servers reject (553)
     Write-Host "Deploying to $FtpHost$FtpPath ..." -ForegroundColor Cyan
     $cred = New-Object System.Net.NetworkCredential($FtpUser, $FtpPass)
     $ftpBase = "ftp://$FtpHost$FtpPath"
+
+    # Ensure the base plugin directory exists — on a fresh install it won't,
+    # and the per-file loop below never creates the top-level folder.
+    try {
+        $baseReq = [System.Net.FtpWebRequest]::Create($ftpBase)
+        $baseReq.Method = [System.Net.WebRequestMethods+Ftp]::MakeDirectory
+        $baseReq.Credentials = $cred
+        $baseReq.UsePassive = $true
+        $baseReq.GetResponse().Close()
+        Write-Host "Created base directory" -ForegroundColor Green
+    } catch { }
 
     # Upload all plugin files
     $files = Get-ChildItem "$pluginDir" -Recurse -File | Where-Object {
