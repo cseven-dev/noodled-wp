@@ -56,6 +56,7 @@ const api = {
   trash_count()                          { return this._fetch('/trash/count'); },
   search(query)                          { return this._fetch('/search?q=' + encodeURIComponent(query)); },
   save_attachment(nb, noteId, name, b64) { return this._fetch('/attachments', { method: 'POST', body: JSON.stringify({ note_id: noteId, filename: name, data: b64 }) }); },
+  delete_attachment(id)                  { return this._fetch('/attachments/' + id, { method: 'DELETE' }); },
   import_evernote(formData)              { return fetch(this._base + '/import/evernote', { method: 'POST', headers: { 'X-WP-Nonce': this._nonce }, credentials: 'same-origin', body: formData }).then(r => r.json()); },
   admin_users()                          { return this._fetch('/admin/users'); },
   admin_invite(email, name, role, drop)  { return this._fetch('/admin/users', { method: 'POST', body: JSON.stringify({ email, name, role, drop }) }); },
@@ -607,7 +608,7 @@ function renderContent() {
         <button class="btn btn-sm" onclick="insertHeading()" title="Heading">H</button>
         <span class="toolbar-divider"></span>
         <button class="btn btn-sm" onclick="copyBody()" title="Copy">&#128203;</button>
-        <button class="btn btn-sm" onclick="uploadFile()" title="Upload">&#128206;</button>
+        <button class="btn btn-sm" onclick="uploadFiles()" title="Add files">&#128206;</button>
         <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="Dictate">&#127908;</button>
         <span class="toolbar-divider"></span>
         <div class="toolbar-menu-wrap">
@@ -629,7 +630,6 @@ function renderContent() {
           </div>
         </div>
       </div>
-      <input type="file" id="fileUploadInput" style="display:none" onchange="handleFileUpload(this)">
     </div>
     <div class="content-body" id="dropZone">
       ${showRawMarkdown
@@ -1035,38 +1035,34 @@ async function handleDrop(e) {
   for (const file of e.dataTransfer.files) await attachFile(file);
 }
 
-function uploadFile() {
-  const input = document.getElementById('fileUploadInput');
+// ── Add files: one flow for any document (images, PDFs, docs, HTML, …) ──
+function uploadFiles() {
+  const input = document.getElementById('filesInput');
   if (input) { input.value = ''; input.click(); }
 }
 
-async function handleFileUpload(input) {
-  if (!activeNote || !input.files.length) return;
-  for (const file of input.files) await attachFile(file);
-}
-
-// ── Photo upload: creates a new "Image Upload …" note, images shown in the gallery ──
-function uploadPhotos() {
-  const input = document.getElementById('photoUploadInput');
-  if (input) { input.value = ''; input.click(); }
-}
-
-async function handlePhotoUpload(input) {
-  const files = Array.from(input.files || []).filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(f.name));
+// Attach to the open note; if none is open, create a note to hold them.
+async function handleFiles(input) {
+  const files = Array.from(input.files || []);
   if (!files.length) return;
+
+  if (activeNote) {
+    let ok = 0;
+    for (const f of files) { await attachFile(f); ok++; }
+    showToast(`${ok} file${ok !== 1 ? 's' : ''} added`);
+    return;
+  }
+
   await doSave();
   const nb = activeNotebook || 'General';
-  const title = 'Image Upload ' + new Date().toLocaleString();
-  showToast(`Uploading ${files.length} photo${files.length !== 1 ? 's' : ''}…`);
+  const allImages = files.every(f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(f.name));
+  const title = (allImages ? 'Image Upload ' : 'Files ') + new Date().toLocaleString();
+  showToast(`Uploading ${files.length} file${files.length !== 1 ? 's' : ''}…`);
   const note = await api.create_note(nb, title, '');
   if (!note || note.error) { showToast('Could not create note'); return; }
   let ok = 0;
   for (const f of files) {
-    try {
-      const b64 = await fileToB64(f);
-      const r = await api.save_attachment(note.notebook, note.id, f.name, b64);
-      if (r && r.filename) ok++;
-    } catch (e) {}
+    try { const b64 = await fileToB64(f); const r = await api.save_attachment(note.notebook, note.id, f.name, b64); if (r && r.filename) ok++; } catch (e) {}
   }
   activeNote = await api.get_note(null, note.id);
   await loadNotebooks();
@@ -1075,7 +1071,17 @@ async function handlePhotoUpload(input) {
   renderContent();
   document.querySelector('.col-content')?.classList.add('open');
   closeSidebar();
-  showToast(`${ok} photo${ok !== 1 ? 's' : ''} added`);
+  showToast(`${ok} file${ok !== 1 ? 's' : ''} added`);
+}
+
+// Delete an attachment (from a gallery × or the lightbox trash button).
+async function deleteAttachment(id) {
+  if (!confirm('Delete this attachment?')) return;
+  try { await api.delete_attachment(id); }
+  catch (e) { showToast('Delete failed'); return; }
+  if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(a => a.id !== id);
+  renderAttachmentGallery();
+  showToast('Deleted');
 }
 
 // ── Evernote import (per-user, from the app) ──
@@ -2419,12 +2425,14 @@ function renderAttachmentGallery() {
   gallery.className = 'attachment-gallery';
   atts.forEach(a => {
     const name = a.filename || a.name;
+    const item = document.createElement('div');
+    item.className = 'gal-item';
     if (isImageAttachment(a)) {
       const img = document.createElement('img');
       img.className = 'gallery-thumb';
       img.src = a.url; img.alt = name; img.loading = 'lazy';
       img.onclick = () => openLightbox(images, images.indexOf(a));
-      gallery.appendChild(img);
+      item.appendChild(img);
     } else {
       // Non-image attachments (incl. HTML) show as an icon tile in the same bar.
       const div = document.createElement('div');
@@ -2437,8 +2445,14 @@ function renderAttachmentGallery() {
       div.title = name;
       // Open in the same window — mobile users just swipe back to return.
       div.onclick = () => { window.location.href = a.url; };
-      gallery.appendChild(div);
+      item.appendChild(div);
     }
+    // Intuitive delete: × on each item (always shown on touch, on hover on desktop).
+    const del = document.createElement('button');
+    del.className = 'gal-del'; del.type = 'button'; del.title = 'Delete'; del.innerHTML = '&#10005;';
+    del.onclick = (e) => { e.stopPropagation(); deleteAttachment(a.id); };
+    item.appendChild(del);
+    gallery.appendChild(item);
   });
   host.appendChild(gallery);
 }
@@ -2455,6 +2469,7 @@ function openLightbox(images, index) {
     lb.className = 'noodled-lightbox';
     lb.innerHTML = `
       <button class="lb-close" onclick="closeLightbox()" aria-label="Close">&#10005;</button>
+      <button class="lb-del" onclick="deleteLightboxImage()" aria-label="Delete">&#128465;&#65039;</button>
       <button class="lb-nav lb-prev" onclick="lightboxStep(-1)" aria-label="Previous">&#8249;</button>
       <div class="lb-stage"><img id="lbImg" alt=""><div class="lb-caption" id="lbCaption"></div></div>
       <button class="lb-nav lb-next" onclick="lightboxStep(1)" aria-label="Next">&#8250;</button>`;
@@ -2501,6 +2516,20 @@ function lightboxStep(d) {
 function closeLightbox() {
   const lb = document.getElementById('noodledLightbox');
   if (lb) lb.style.display = 'none';
+}
+async function deleteLightboxImage() {
+  const a = _lbImages[_lbIndex];
+  if (!a) return;
+  if (!confirm('Delete this image?')) return;
+  try { await api.delete_attachment(a.id); }
+  catch (e) { showToast('Delete failed'); return; }
+  if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(x => x.id !== a.id);
+  _lbImages.splice(_lbIndex, 1);
+  renderAttachmentGallery();
+  if (!_lbImages.length) { closeLightbox(); showToast('Deleted'); return; }
+  _lbIndex = _lbIndex % _lbImages.length;
+  renderLightbox();
+  showToast('Deleted');
 }
 function lightboxKey(e) {
   const lb = document.getElementById('noodledLightbox');
