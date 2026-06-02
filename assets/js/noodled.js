@@ -141,15 +141,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Theme ──
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  config.theme = theme;
+const _systemDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function effectiveTheme(mode) {
+  if (mode === 'auto') return (_systemDark && _systemDark.matches) ? 'dark' : 'light';
+  return mode === 'light' ? 'light' : 'dark';
 }
+function applyTheme(mode) {
+  config.theme = mode;
+  document.documentElement.setAttribute('data-theme', effectiveTheme(mode));
+  const btn = document.getElementById('themeBtn');
+  if (btn) { btn.title = 'Theme: ' + mode + ' (click to change)'; btn.innerHTML = mode === 'auto' ? '&#9681;' : (mode === 'light' ? '&#9728;' : '&#9680;'); }
+}
+// When in auto mode, follow live OS changes.
+if (_systemDark) { try { _systemDark.addEventListener('change', () => { if (config.theme === 'auto') applyTheme('auto'); }); } catch (e) {} }
 
 async function toggleTheme() {
-  const t = config.theme === 'dark' ? 'light' : 'dark';
-  applyTheme(t);
-  try { await api.set_config('theme', t); } catch (e) {}
+  const next = config.theme === 'dark' ? 'light' : (config.theme === 'light' ? 'auto' : 'dark');
+  applyTheme(next);
+  showToast('Theme: ' + next);
+  try { await api.set_config('theme', next); } catch (e) {}
 }
 
 // ── Notebooks ──
@@ -406,11 +416,43 @@ function highlightMatch(text, query) {
   return escaped.replace(re, '<mark>$1</mark>');
 }
 
+// Bucket a note's date into a list section label.
+function dateGroup(dateStr) {
+  if (!dateStr) return 'Earlier';
+  const d = new Date(dateStr.replace(' ', 'T') + (dateStr.length <= 16 ? 'Z' : ''));
+  if (isNaN(d)) return 'Earlier';
+  const now = new Date();
+  const day = 86400000;
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const t = d.getTime();
+  if (t >= startToday) return 'Today';
+  if (t >= startToday - day) return 'Yesterday';
+  if (t >= startToday - 7 * day) return 'This week';
+  if (t >= startToday - 30 * day) return 'This month';
+  return 'Earlier';
+}
+
 function renderNoteList() {
   const el = document.getElementById('noteList');
   const cover = activeNotebook ? getNotebookCover(activeNotebook) : '';
   const coverHtml = cover ? `<div class="nb-cover" style="background-image:url('${cover}')"></div>` : '';
-  el.innerHTML = coverHtml + filteredNotes.map(n => {
+  // Group by date when browsing (not searching, default sort, not trash).
+  const grouped = !searchQuery && sortMode === 'modified' && !viewingTrash;
+  let lastGroup = null;
+  const out = [];
+  filteredNotes.forEach(n => {
+    if (grouped) {
+      const g = n.pinned ? 'Pinned' : dateGroup(n.modified || n.created);
+      if (g !== lastGroup) { lastGroup = g; out.push(`<div class="note-group">${g}</div>`); }
+    }
+    out.push(renderNoteItem(n));
+  });
+  el.innerHTML = coverHtml + out.join('');
+  document.getElementById('noteCount').textContent = `${filteredNotes.length} note${filteredNotes.length !== 1 ? 's' : ''}`;
+}
+
+function renderNoteItem(n) {
+  {
     const preview = (n.body || '')
       .replace(/^---[\s\S]*?---\n?/, '')    // strip frontmatter
       .replace(/^#{1,3}\s+/gm, '')          // strip headings
@@ -431,6 +473,8 @@ function renderNoteList() {
     const star = isStarred(n.id) ? '<span style="margin-right:4px;font-size:11px;color:#f59e0b" title="Starred">&#9733;</span>' : '';
     const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="Shared with you">&#128279;</span>' : '';
     const attBadge = (n.att > 0) ? `<span class="att-badge" title="${n.att} attachment${n.att !== 1 ? 's' : ''}">&#128206; ${n.att}</span>` : '';
+    const tasks = checklistProgress(n.body);
+    const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${tasks.done} of ${tasks.total} tasks done">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
     const time = relativeTime(n.modified || n.created);
     const fullDate = n.modified || n.created || '';
     const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
@@ -445,13 +489,12 @@ function renderNoteList() {
           <span title="${escAttr(fullDate)}">${esc(time)}</span>
           <span>${esc(n.notebook)}</span>
           ${attBadge}
+          ${taskBadge}
         </div>
         <div class="preview">${highlightMatch(preview, searchQuery)}</div>
       </div>
     `;
-  }).join('');
-
-  document.getElementById('noteCount').textContent = `${filteredNotes.length} note${filteredNotes.length !== 1 ? 's' : ''}`;
+  }
 }
 
 async function selectNote(noteId) {
@@ -462,8 +505,17 @@ async function selectNote(noteId) {
 
   await doSave();
   activeNote = await api.get_note(null, noteId);
+  trackRecentNote(noteId);
   renderNoteList();
   renderContent();
+}
+
+// Recently-viewed note stack (for the Ctrl-E quick switcher).
+let _recentViewed = [];
+function trackRecentNote(id) {
+  _recentViewed = _recentViewed.filter(x => x !== id);
+  _recentViewed.unshift(id);
+  if (_recentViewed.length > 12) _recentViewed.length = 12;
 }
 
 async function createNote() {
@@ -546,6 +598,7 @@ async function deleteNote(noteId) {
   await loadNotebooks();
   await loadNotes();
   updateTrashCount();
+  showUndoToast('Note moved to trash', () => undoDelete(noteId));
 }
 
 async function moveNote(noteId, toNotebook) {
@@ -625,6 +678,8 @@ function renderContent() {
             <div class="dropdown-item" onclick="toggleFindReplace()">Find & replace</div>
             <div class="dropdown-item" onclick="showTOC()">Table of contents</div>
             <div class="dropdown-item" onclick="exportNote()">Export as HTML</div>
+            <div class="dropdown-item" onclick="downloadNoteMd()">Download as Markdown</div>
+            <div class="dropdown-item" onclick="printNote()">Print / Save as PDF</div>
             <div class="dropdown-sep"></div>
             <div class="dropdown-item" onclick="toggleReadingMode()">Reading mode</div>
             <div class="dropdown-item" onclick="toggleTypewriter()">Typewriter mode</div>
@@ -699,7 +754,31 @@ function updateWordCount() {
     const pct = Math.min(100, Math.round(wordCount / goal * 100));
     goalText = ` \u00b7 ${pct}% of ${goal} goal`;
   }
-  el.textContent = `${wordCount} words \u00b7 ${charCount} chars \u00b7 ${readTime} min read${goalText}`;
+  // Checklist progress \u2014 read checkboxes straight from the DOM when rendered
+  // (cheap on every keystroke), else fall back to parsing the markdown.
+  let prog = null;
+  const nb = document.getElementById('noteBody');
+  if (nb) {
+    const boxes = nb.querySelectorAll('.checklist input[type="checkbox"]');
+    if (boxes.length) prog = { total: boxes.length, done: [...boxes].filter(b => b.checked).length };
+  } else {
+    prog = checklistProgress(activeNote.body || '');
+  }
+  el.innerHTML = `${wordCount} words \u00b7 ${charCount} chars \u00b7 ${readTime} min read${goalText ? esc(goalText) : ''}`;
+  if (prog) {
+    el.innerHTML += ` <span class="footer-tasks">\u00b7 \u2713 ${prog.done}/${prog.total}<span class="ftbar"><span style="width:${Math.round(prog.done / prog.total * 100)}%"></span></span></span>`;
+  }
+}
+
+// Count checklist items in a markdown string \u2192 {done,total} or null.
+function checklistProgress(md) {
+  if (!md) return null;
+  let total = 0, done = 0;
+  (md.split('\n')).forEach(line => {
+    const m = line.trim().match(/^-\s+\[([ xX])\]/);
+    if (m) { total++; if (m[1].toLowerCase() === 'x') done++; }
+  });
+  return total ? { done, total } : null;
 }
 
 function setupDropZone() {
@@ -876,6 +955,7 @@ async function deleteCurrentNote() {
   if (!activeNote) return;
   if (typeof dictating !== 'undefined' && dictating) stopDictation();
   if (!confirm(`Delete "${activeNote.title}"?`)) return;
+  const deletedId = activeNote.id;
   await api.delete_note(activeNote.notebook, activeNote.id);
   activeNote = null;
   renderContent();
@@ -885,7 +965,7 @@ async function deleteCurrentNote() {
   updateTrashCount();
   // Push to GitHub so delete syncs across devices
   try { await api.git_push(); } catch (e) {}
-  showToast('Deleted');
+  showUndoToast('Note moved to trash', () => undoDelete(deletedId));
 }
 
 function toggleMarkdownView() {
@@ -1276,6 +1356,7 @@ function handleGlobalKey(e) {
   if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); document.getElementById('searchInput').focus(); return; }
   if (e.ctrlKey && e.key === 'p') { e.preventDefault(); showQuickOpen(); return; }
   if (e.ctrlKey && e.key === 'j') { e.preventDefault(); openDailyJournal(); return; }
+  if (e.ctrlKey && e.key === 'e') { e.preventDefault(); showRecentSwitcher(); return; }
   if (e.ctrlKey && e.key === '.') { e.preventDefault(); toggleQuickCapture(); return; }
   if (e.ctrlKey && e.key === 'h') { e.preventDefault(); toggleFindReplace(); return; }
   if (e.key === 'Escape' && readingMode) { toggleReadingMode(); return; }
@@ -1342,6 +1423,8 @@ function renderMarkdown(text) {
         return `<a href="#" class="wikilink broken" onclick="event.preventDefault()">${esc(title)}</a>`;
       })
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener">${txt}</a>`)
+      // Autolink bare URLs (not already inside a markdown link's href/text).
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${url}</a>`)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
@@ -2990,7 +3073,7 @@ async function swipeTrash(id) {
   try { await api.delete_note(n.notebook, id); } catch (e) { showToast('Delete failed'); return; }
   if (activeNote && activeNote.id === id) { activeNote = null; renderContent(); document.querySelector('.col-content')?.classList.remove('open'); }
   await loadNotebooks(); await loadNotes(); updateTrashCount();
-  showToast('Moved to trash');
+  showUndoToast('Note moved to trash', () => undoDelete(id));
 }
 async function swipePin(id) {
   const n = notes.find(x => x.id === id); if (!n) return;
@@ -3154,6 +3237,195 @@ function noodledPolishInit() {
   if (status) status.setAttribute('aria-live', 'polite');
   window.addEventListener('online', () => setOnline(true));
   window.addEventListener('offline', () => setOnline(false));
+  // Editor slash-commands + autocomplete (delegated so they survive rerenders).
+  document.addEventListener('keydown', editorSlashKey);
+  document.addEventListener('keydown', acNav, true); // capture: handle before the editor's own Enter
+  document.addEventListener('input', editorAutocomplete);
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', noodledPolishInit);
 else noodledPolishInit();
+
+/* ── Undo-delete toast ─────────────────────────────────────── */
+function showUndoToast(msg, onUndo) {
+  let t = document.getElementById('undoToast');
+  if (!t) { t = document.createElement('div'); t.id = 'undoToast'; t.className = 'undo-toast'; document.body.appendChild(t); }
+  t.innerHTML = `<span class="ut-msg"></span><button type="button" class="ut-btn">Undo</button>`;
+  t.querySelector('.ut-msg').textContent = msg;
+  let done = false;
+  t.querySelector('.ut-btn').onclick = async () => { if (done) return; done = true; t.classList.remove('show'); try { await onUndo(); } catch (e) {} };
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 6000);
+}
+async function undoDelete(id) {
+  try { await api.restore_note(id); } catch (e) { showToast('Undo failed'); return; }
+  await loadNotebooks(); await loadNotes(); updateTrashCount();
+  showToast('Restored');
+}
+
+/* ── Recent-note quick switcher (Ctrl-E) ───────────────────── */
+function showRecentSwitcher() {
+  const ids = _recentViewed.filter(id => !activeNote || id !== activeNote.id);
+  const items = ids.map(id => notes.find(n => n.id === id)).filter(Boolean).slice(0, 8);
+  if (!items.length) { showToast('No recent notes yet'); return; }
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp"><div class="cmdp-head">Recent notes</div><div class="cmdp-list" id="rsList">${items.map((n, i) => `<div class="cmdp-i ${i === 0 ? 'on' : ''}" data-id="${n.id}">📄 ${esc(n.title)}<span class="cmdp-sub">${esc(n.notebook || '')}</span></div>`).join('')}</div></div></div>`;
+  const list = el.querySelector('#rsList');
+  let hi = 0;
+  const rows = [...list.querySelectorAll('.cmdp-i')];
+  function paint() { rows.forEach((r, i) => r.classList.toggle('on', i === hi)); }
+  function go(i) { const r = rows[i]; document.getElementById('modalContainer').innerHTML = ''; if (r) selectNote(+r.dataset.id); }
+  list.addEventListener('mousedown', e => { const it = e.target.closest('.cmdp-i'); if (it) go(rows.indexOf(it)); });
+  const onKey = e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); hi = Math.min(hi + 1, rows.length - 1); paint(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); hi = Math.max(hi - 1, 0); paint(); }
+    else if (e.key === 'Enter') { e.preventDefault(); document.removeEventListener('keydown', onKey, true); go(hi); }
+    else if (e.key === 'Escape') { document.removeEventListener('keydown', onKey, true); }
+  };
+  document.addEventListener('keydown', onKey, true);
+}
+
+/* ── Editor slash commands ─────────────────────────────────── */
+function editorSlashKey(e) {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const el = document.getElementById('noteBody');
+  if (!el || document.activeElement !== el) return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  const node = r.startContainer;
+  const before = node.nodeType === 3 ? node.textContent.slice(0, r.startOffset) : '';
+  if (before.trim() !== '') return; // only at the start of an empty line
+  e.preventDefault();
+  let rect; try { rect = r.getBoundingClientRect(); } catch (_) {}
+  const x = (rect && rect.left) || 120, y = (rect && rect.bottom) || 160;
+  openSlashMenu(x, y);
+}
+function appendBlock(md) {
+  const el = document.getElementById('noteBody');
+  if (!el || !activeNote) return;
+  const body = htmlToMarkdown(el);
+  activeNote.body = (body ? body.replace(/\s+$/, '') + '\n\n' : '') + md + '\n';
+  saveAndRerender();
+}
+function openSlashMenu(x, y) {
+  const opts = [
+    { label: 'Heading', icon: 'H', run: () => insertHeading() },
+    { label: 'Checklist', icon: '☑', run: () => insertChecklistItem() },
+    { label: 'Bullet list', icon: '•', run: () => insertBullet() },
+    { label: 'Divider', icon: '―', run: () => appendBlock('---') },
+    { label: 'Table', icon: '▦', run: () => appendBlock('| Column | Column |\n| --- | --- |\n|  |  |') },
+    { label: 'Today\'s date', icon: '🗓', run: () => appendBlock(new Date().toLocaleDateString()) },
+  ];
+  let menu = document.getElementById('slashMenu');
+  if (menu) menu.remove();
+  menu = document.createElement('div');
+  menu.id = 'slashMenu'; menu.className = 'slash-menu';
+  menu.innerHTML = opts.map((o, i) => `<div class="slash-i ${i === 0 ? 'on' : ''}" data-i="${i}"><span class="slash-ic">${o.icon}</span>${o.label}</div>`).join('');
+  document.body.appendChild(menu);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  menu.style.left = Math.min(x, vw - menu.offsetWidth - 12) + 'px';
+  menu.style.top = Math.min(y + 6, vh - menu.offsetHeight - 12) + 'px';
+  let hi = 0;
+  const rows = [...menu.querySelectorAll('.slash-i')];
+  const paint = () => rows.forEach((r, i) => r.classList.toggle('on', i === hi));
+  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey, true); };
+  const pick = i => { close(); opts[i] && opts[i].run(); };
+  const onKey = e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); hi = Math.min(hi + 1, rows.length - 1); paint(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); hi = Math.max(hi - 1, 0); paint(); }
+    else if (e.key === 'Enter') { e.preventDefault(); pick(hi); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key.length === 1 || e.key === 'Backspace') { close(); } // typing dismisses it
+  };
+  document.addEventListener('keydown', onKey, true);
+  menu.addEventListener('mousedown', e => { const it = e.target.closest('.slash-i'); if (it) { e.preventDefault(); pick(+it.dataset.i); } });
+}
+
+/* ── Editor [[wikilink]] / #tag autocomplete ───────────────── */
+let _acState = null;
+function allTags() {
+  const set = new Set();
+  notes.forEach(n => { const m = (n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []; m.forEach(t => set.add(t.trim().slice(1))); });
+  return [...set];
+}
+function editorAutocomplete() {
+  const el = document.getElementById('noteBody');
+  if (!el || document.activeElement !== el) { hideAutocomplete(); return; }
+  const sel = window.getSelection();
+  if (!sel.rangeCount) { hideAutocomplete(); return; }
+  const r = sel.getRangeAt(0);
+  const node = r.startContainer;
+  if (node.nodeType !== 3) { hideAutocomplete(); return; }
+  const before = node.textContent.slice(0, r.startOffset);
+  let m;
+  if ((m = before.match(/\[\[([^\]]*)$/))) {
+    const q = m[1].toLowerCase();
+    const matches = notes.map(n => n.title).filter(t => t && t.toLowerCase().includes(q)).slice(0, 6);
+    showAutocomplete('link', m[1], matches, r);
+  } else if ((m = before.match(/(?:^|\s)#([a-zA-Z][\w-]*)$/))) {
+    const q = m[1].toLowerCase();
+    const matches = allTags().filter(t => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q).slice(0, 6);
+    showAutocomplete('tag', m[1], matches, r);
+  } else { hideAutocomplete(); }
+}
+function showAutocomplete(type, typed, matches, range) {
+  if (!matches.length) { hideAutocomplete(); return; }
+  let box = document.getElementById('acBox');
+  if (!box) { box = document.createElement('div'); box.id = 'acBox'; box.className = 'ac-box'; document.body.appendChild(box); }
+  _acState = { type, typed, matches, hi: 0 };
+  box.innerHTML = matches.map((mtext, i) => `<div class="ac-i ${i === 0 ? 'on' : ''}" data-i="${i}">${type === 'link' ? '🔗' : '#'} ${esc(mtext)}</div>`).join('');
+  let rect; try { rect = range.getBoundingClientRect(); } catch (_) {}
+  const x = (rect && rect.left) || 120, y = (rect && rect.bottom) || 160;
+  box.style.left = Math.min(x, window.innerWidth - box.offsetWidth - 12) + 'px';
+  box.style.top = (y + 6) + 'px';
+  box.classList.add('show');
+  box.onmousedown = e => { const it = e.target.closest('.ac-i'); if (it) { e.preventDefault(); applyAutocomplete(+it.dataset.i); } };
+}
+function hideAutocomplete() { const box = document.getElementById('acBox'); if (box) box.classList.remove('show'); _acState = null; }
+function applyAutocomplete(i) {
+  if (!_acState) return;
+  const choice = _acState.matches[i != null ? i : _acState.hi];
+  if (choice == null) { hideAutocomplete(); return; }
+  // Insert the missing suffix so "[[Dish" → "[[Dishwasher]]" / "#dro" → "#drones ".
+  const suffix = _acState.type === 'link'
+    ? choice.slice(_acState.typed.length) + ']]'
+    : choice.slice(_acState.typed.length) + ' ';
+  try { document.execCommand('insertText', false, suffix); } catch (_) {}
+  hideAutocomplete();
+  if (typeof schedSave === 'function') schedSave();
+}
+// Capture-phase nav so the editor's own Enter handler doesn't fire while the
+// autocomplete popup is open.
+function acNav(e) {
+  if (!_acState) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); _acState.hi = Math.min(_acState.hi + 1, _acState.matches.length - 1); paintAc(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); _acState.hi = Math.max(_acState.hi - 1, 0); paintAc(); }
+  else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); applyAutocomplete(_acState.hi); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hideAutocomplete(); }
+}
+function paintAc() {
+  const box = document.getElementById('acBox'); if (!box || !_acState) return;
+  [...box.querySelectorAll('.ac-i')].forEach((r, i) => r.classList.toggle('on', i === _acState.hi));
+}
+
+/* ── Print / Save as PDF a single note ─────────────────────── */
+function printNote() {
+  if (!activeNote) { showToast('Open a note first'); return; }
+  let area = document.getElementById('printArea');
+  if (!area) { area = document.createElement('div'); area.id = 'printArea'; document.body.appendChild(area); }
+  area.innerHTML = `<h1 class="print-title">${esc(activeNote.title || 'Untitled')}</h1><div class="print-body">${renderMarkdown(activeNote.body || '')}</div>`;
+  window.print();
+}
+
+/* ── Download the current note as a .md file ───────────────── */
+function downloadNoteMd() {
+  if (!activeNote) { showToast('Open a note first'); return; }
+  const fm = ['---', 'title: ' + (activeNote.title || ''), 'created: ' + (activeNote.created || ''), 'modified: ' + (activeNote.modified || ''), '---', '', activeNote.body || ''].join('\n');
+  const blob = new Blob([fm], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (activeNote.slug || activeNote.title || 'note').replace(/[^\w.-]+/g, '-') + '.md';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}

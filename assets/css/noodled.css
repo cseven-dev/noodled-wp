@@ -1290,3 +1290,64 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 
 /* ── Offline / pending banner gets a subtle accent when changes are queued ── */
 .offline-banner.show { display: block; }
+
+/* ── Undo-delete toast ── */
+.undo-toast {
+  position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%) translateY(16px);
+  z-index: 12000; display: none; align-items: center; gap: 14px;
+  background: var(--bg-panel, #1c1f26); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px 10px 16px; box-shadow: 0 16px 44px rgba(0,0,0,.5);
+  font-size: 13px;
+}
+.undo-toast.show { display: inline-flex; animation: undoIn .2s ease forwards; }
+@keyframes undoIn { to { transform: translateX(-50%) translateY(0); } }
+.undo-toast .ut-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 6px 12px; font-weight: 600; font-size: 12px; cursor: pointer;
+}
+
+/* ── Note-list date group headers ── */
+.note-group {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
+  color: var(--text-muted); padding: 12px 12px 4px; position: sticky; top: 0;
+  background: var(--bg-panel, #16181c); z-index: 2;
+}
+.note-group:first-child { padding-top: 4px; }
+
+/* ── Checklist progress badges ── */
+.att-badge.task-badge { background: rgba(59,130,246,.16); }
+.att-badge.task-badge.all-done { background: rgba(16,185,129,.2); color: var(--text); }
+.footer-tasks .ftbar { display: inline-block; width: 46px; height: 5px; border-radius: 3px;
+  background: var(--border); margin-left: 6px; vertical-align: middle; overflow: hidden; }
+.footer-tasks .ftbar > span { display: block; height: 100%; background: var(--accent); }
+
+/* ── Slash command menu ── */
+.slash-menu, .ac-box {
+  position: fixed; z-index: 12000; min-width: 190px;
+  background: var(--bg-panel, #1c1f26); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 16px 44px rgba(0,0,0,.5); padding: 6px; font-size: 14px;
+}
+.ac-box { display: none; }
+.ac-box.show { display: block; }
+.slash-i, .ac-i {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px;
+  cursor: pointer; color: var(--text);
+}
+.slash-i.on, .slash-i:hover, .ac-i.on, .ac-i:hover { background: var(--accent); color: #fff; }
+.slash-ic { display: inline-flex; width: 18px; justify-content: center; opacity: .85; }
+
+.cmdp-head { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); padding: 12px 14px 4px; }
+
+/* ── Print / Save as PDF a single note ── */
+#printArea { display: none; }
+@media print {
+  body * { visibility: hidden !important; }
+  #printArea, #printArea * { visibility: visible !important; }
+  #printArea {
+    display: block !important; position: absolute; inset: 0; padding: 24px;
+    color: #000; background: #fff; font-family: Georgia, 'Times New Roman', serif;
+  }
+  #printArea .print-title { font-size: 26px; margin: 0 0 16px; }
+  #printArea .print-body { font-size: 14px; line-height: 1.6; }
+  #printArea img { max-width: 100%; }
+}
