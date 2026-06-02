@@ -426,6 +426,7 @@ function renderNoteList() {
     const pin = n.pinned ? '<span style="margin-right:4px;font-size:11px" title="Pinned">&#128204;</span>' : '';
     const star = isStarred(n.id) ? '<span style="margin-right:4px;font-size:11px;color:#f59e0b" title="Starred">&#9733;</span>' : '';
     const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="Shared with you">&#128279;</span>' : '';
+    const attBadge = (n.att > 0) ? `<span class="att-badge" title="${n.att} attachment${n.att !== 1 ? 's' : ''}">&#128206; ${n.att}</span>` : '';
     const time = relativeTime(n.modified || n.created);
     const fullDate = n.modified || n.created || '';
     const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
@@ -439,6 +440,7 @@ function renderNoteList() {
         <div class="meta">
           <span title="${escAttr(fullDate)}">${esc(time)}</span>
           <span>${esc(n.notebook)}</span>
+          ${attBadge}
         </div>
         <div class="preview">${highlightMatch(preview, searchQuery)}</div>
       </div>

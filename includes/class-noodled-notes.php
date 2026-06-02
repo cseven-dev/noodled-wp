@@ -20,6 +20,7 @@ class Noodled_Notes {
 			'pinned'   => (bool) $r['pinned'],
 			'created'  => $r['created_at'] ? substr( $r['created_at'], 0, 16 ) : '',
 			'modified' => $r['modified_at'] ? substr( $r['modified_at'], 0, 16 ) : '',
+			'att'      => isset( $r['att_count'] ) ? (int) $r['att_count'] : 0,
 		];
 	}
 
@@ -32,16 +33,18 @@ class Noodled_Notes {
 
 	public static function get_all( ?int $notebook_id = null ): array {
 		global $wpdb;
-		$t = self::table();
+		$t  = self::table();
+		$at = $wpdb->prefix . 'noodled_attachments';
+		$cnt = "(SELECT COUNT(*) FROM {$at} a WHERE a.note_id = t.id) AS att_count";
 
 		if ( $notebook_id ) {
 			$rows = $wpdb->get_results( $wpdb->prepare(
-				"SELECT * FROM {$t} WHERE notebook_id = %d AND deleted_at IS NULL ORDER BY pinned DESC, modified_at DESC, created_at DESC",
+				"SELECT t.*, {$cnt} FROM {$t} t WHERE t.notebook_id = %d AND t.deleted_at IS NULL ORDER BY t.pinned DESC, t.modified_at DESC, t.created_at DESC",
 				$notebook_id
 			), ARRAY_A );
 		} else {
 			$rows = $wpdb->get_results(
-				"SELECT * FROM {$t} WHERE deleted_at IS NULL ORDER BY pinned DESC, modified_at DESC, created_at DESC",
+				"SELECT t.*, {$cnt} FROM {$t} t WHERE t.deleted_at IS NULL ORDER BY t.pinned DESC, t.modified_at DESC, t.created_at DESC",
 				ARRAY_A
 			);
 		}

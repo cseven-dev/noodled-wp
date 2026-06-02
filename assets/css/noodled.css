@@ -274,7 +274,14 @@ body {
   color: var(--text-muted);
   margin-top: 2px;
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+.att-badge {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 999px; padding: 1px 8px;
 }
 .note-item .preview {
   font-size: var(--font-xs);

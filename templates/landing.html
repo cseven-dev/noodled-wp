@@ -422,6 +422,33 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
 .type-card__foot { margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--rule); display: flex; gap: 16px; font-size: 12.5px; color: var(--slate); }
 .type-card__foot b { color: var(--n-blue); font-weight: 700; font-variant-numeric: tabular-nums; }
 
+.type-body code { font-family: var(--font-mono); font-size: .86em; background: var(--paper-alt); border: 1px solid var(--rule); padding: 1px 6px; border-radius: 5px; }
+/* demo note attachments — a fake photo / file / Plaud capture under the typed text */
+.tc-attach { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; }
+.tc-attach:empty { display: none; }
+.tc-photo {
+  width: 96px; height: 72px; border-radius: 10px; flex-shrink: 0; position: relative; overflow: hidden;
+  border: 1px solid var(--rule); box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, #7cc6ff 0%, #5b8def 45%, #b58bff 100%);
+}
+.tc-photo.cam2 { background: linear-gradient(135deg, #ffb36b, #ff7e7e 55%, #8a5cff); }
+.tc-photo.cam3 { background: linear-gradient(135deg, #5be1c1, #3a9bd8 55%, #5b6cff); }
+.tc-photo::after { content: '\1F5BC'; position: absolute; right: 6px; bottom: 3px; font-size: 13px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+.tc-file, .tc-plaud {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 10px;
+  border: 1px solid var(--rule); background: var(--paper-alt); font-size: 12.5px; color: var(--ink-soft); font-weight: 600;
+}
+.tc-file .ic { font-size: 16px; }
+.tc-plaud { background: var(--n-blue-soft); border-color: transparent; color: var(--n-blue-deep); }
+html.dark .tc-plaud { color: var(--n-blue-hi); }
+.tc-plaud .wave { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
+.tc-plaud .wave i { width: 3px; height: 10px; background: currentColor; border-radius: 2px; opacity: .8; animation: tcwave 1s ease-in-out infinite; }
+.tc-plaud .wave i:nth-child(2){ height: 16px; animation-delay: .15s; }
+.tc-plaud .wave i:nth-child(3){ height: 8px;  animation-delay: .30s; }
+.tc-plaud .wave i:nth-child(4){ height: 14px; animation-delay: .45s; }
+@keyframes tcwave { 0%,100% { transform: scaleY(.55); } 50% { transform: scaleY(1); } }
+@media (max-width: 600px) { .tc-photo { width: 88px; height: 66px; } }
+
 .noodle-word svg path {
   fill: none;
   stroke: var(--n-blue);
@@ -780,9 +807,10 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
             <span class="tdot" style="background:#ff5f57"></span>
             <span class="tdot" style="background:#febc2e"></span>
             <span class="tdot" style="background:#28c840"></span>
-            <span class="type-card__title">general / friday-brain-dump.md</span>
+            <span class="type-card__title" id="heroFile">general / friday-brain-dump.md</span>
           </div>
           <div class="type-body" id="heroType"></div>
+          <div class="tc-attach" id="heroAttach"></div>
           <div class="type-card__foot">
             <span><b id="heroWords">0</b> words</span>
             <span><b id="heroChars">0</b> chars</span>
@@ -1280,22 +1308,70 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
      ============================================================ */
   function runHeroNote() {
     const body = document.getElementById("heroType");
+    const fileEl = document.getElementById("heroFile");
+    const attachEl = document.getElementById("heroAttach");
     const wc = document.getElementById("heroWords");
     const cc = document.getElementById("heroChars");
     if (!body) return;
-    const content =
-      `<h3>Friday brain-dump</h3>` +
-      `Half-formed thought I don't want to lose: what if the <span class="wlink">[[onboarding flow]]</span> started with a single question? ` +
-      `\n<span class="tt">#idea</span> <span class="tt">#product</span>\n\n` +
-      `<span class="chk">\u25A2</span> sketch it before standup\n` +
-      `<span class="chk done">\u25A3 tell Dana so she keeps me honest</span>`;
-    const update = (buf) => {
-      const { w, c } = countWords(buf);
-      if (wc) wc.textContent = w;
-      if (cc) cc.textContent = c;
-    };
-    const go = () => typeHTML(body, content, { speed: 30, onUpdate: update }).then(() => setTimeout(go, 5200));
-    whenVisible(body.closest(".type-card") || body, () => setTimeout(go, 400), { ratio: 0.2 });
+
+    const PHOTO = (c) => `<div class="tc-photo ${c || ''}"></div>`;
+    const FILE  = (n) => `<div class="tc-file"><span class="ic">\uD83D\uDCC4</span> ${n}</div>`;
+    const PLAUD = (t) => `<div class="tc-plaud"><span class="wave"><i></i><i></i><i></i><i></i></span> from Plaud \u00B7 ${t}</div>`;
+
+    const NOTES = [
+      { file: "skate / saturday-session.md", steps: [
+          { type: `Today I\u2019m gonna land that kickflip\u2026`, speed: 36 },
+          { erase: true },
+          { type: `Yeah. Right. \uD83D\uDE0C Filmed the kids\u2019 lines instead \u2014 way safer on the knees. <span class="tt">#skate</span>`, speed: 26 } ] },
+      { file: "voice / from-plaud.md", attach: PLAUD("0:38"), steps: [
+          { type: `<h3>Voice memo \u2014 at the park</h3>\u201CNote to self: stretch <em>before</em> skating, not in the ER waiting room. Also we\u2019re out of grip tape.\u201D Transcribed one-handed between runs.` } ] },
+      { file: "home / parenting.md", steps: [
+          { type: `<h3>11:47pm search history</h3>\u201Chow to discipline kids in 2026 without screens, sugar, raising your voice, bribery, or eye contact.\u201D <span class="tt">#kids</span>\n\n0 useful results. Closed 14 tabs. We move.` } ] },
+      { file: "drones / repair-log.md", attach: PHOTO("cam2"), steps: [
+          { type: `<h3>Drone down. Again.</h3>A brand-new failure mode this time \u2014 genuinely impressed. Soldering the <span class="wlink">[[motor lead]]</span> back on for the third time. Before/after for the shame wall: <span class="tt">#drones</span>` } ] },
+      { file: "dev / wtf.md", attach: FILE("build-error.log"), steps: [
+          { type: `<h3>It\u2019s 2026, why</h3>Build died with <code>PC LOAD LETTER</code>.\n\n\u2026 what the actual f does that even mean. Attaching the log so future-me can also have no idea. <span class="tt">#programming</span>` } ] },
+      { file: "home / dishwasher.md", attach: PHOTO("cam3"), steps: [
+          { type: `<h3>The dishwasher is dying</h3>Death rattle is back. Manual says check the <span class="wlink">[[drain pump]]</span>. Reality: hand-wash duty till further notice \u2014 no skipping the dishes in this house. \u270B <span class="tt">#fixit</span>` } ] },
+      { file: "home / dinner.md", steps: [
+          { type: `<h3>The 5pm crisis</h3>Tonight\u2019s contenders: tacos (again), \u201CI don\u2019t care, you pick,\u201D or a noble surrender to takeout. Leaning takeout. Guilt: <span class="tt">#pending</span>` } ] },
+      { file: "ideas / shower-thoughts.md", attach: PHOTO(""), steps: [
+          { type: `<h3>Don\u2019t lose this one</h3>Half-formed idea I refuse to forget. Snapped the whiteboard before the kids \u201Cimprove\u201D it: <span class="tt">#idea</span>` } ] },
+      { file: "home / fix-it.md", steps: [
+          { type: `<h3>I\u2019ve got this</h3>Watched 3 YouTube videos. Now confident <em>and</em> wrong. Parts ordered. Told the family \u201CI\u2019ve got it.\u201D <span class="wlink">[[I do not got it]]</span> <span class="tt">#fixit</span>` } ] },
+      { file: "dev / shipped-it.md", steps: [
+          { type: `<h3>Famous last words</h3>\u201CIt works on my machine.\u201D Shipped it. It did not, in fact, work on the machine. A memoir \u2014 in production. <span class="tt">#programming</span>` } ] },
+    ];
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const setCounts = (buf) => { const { w, c } = countWords(buf); if (wc) wc.textContent = w; if (cc) cc.textContent = c; };
+
+    function eraseAll(speed) {
+      return new Promise(resolve => {
+        (function step() {
+          const txt = body.textContent || "";
+          if (!txt.length) { body.innerHTML = ""; setCounts(""); return resolve(); }
+          body.textContent = txt.slice(0, -1);
+          setCounts(body.textContent);
+          setTimeout(step, speed);
+        })();
+      });
+    }
+
+    async function runNote(n) {
+      if (attachEl) attachEl.innerHTML = "";
+      body.innerHTML = ""; setCounts("");
+      if (fileEl) fileEl.textContent = n.file;
+      for (const s of n.steps) {
+        if (s.erase) { await sleep(650); await eraseAll(26); await sleep(220); }
+        else { await typeHTML(body, s.type, { speed: s.speed || 28, onUpdate: setCounts }); }
+      }
+      if (n.attach && attachEl) attachEl.innerHTML = n.attach;
+      await sleep(n.attach ? 4400 : 3700);
+    }
+
+    async function cycle() { for (;;) { for (const n of NOTES) await runNote(n); } }
+    whenVisible(body.closest(".type-card") || body, () => setTimeout(cycle, 400), { ratio: 0.2 });
   }
 
   /* ============================================================
