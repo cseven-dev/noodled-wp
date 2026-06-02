@@ -73,6 +73,8 @@
       <div class="dropdown-item" onclick="toggleQuickCapture()">Quick capture</div>
       <div class="dropdown-item" onclick="uploadFiles()">Add files</div>
       <div class="dropdown-item" onclick="importEvernote()">Import from Evernote</div>
+      <div class="dropdown-item" onclick="exportBackup()">Export backup (.zip)</div>
+      <div class="dropdown-item" onclick="importBackup()">Import backup (.zip)</div>
       <div class="dropdown-sep"></div>
       <div class="dropdown-item" onclick="showShortcutsHelp()">Keyboard shortcuts</div>
       <div class="dropdown-item" onclick="toggleTheme()">Toggle theme</div>

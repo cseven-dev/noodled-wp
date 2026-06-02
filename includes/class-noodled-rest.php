@@ -91,6 +91,14 @@ class Noodled_REST {
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_evernote' ], ] + $auth,
 		] );
 
+		// Full backup: export the user's own notes + attachments as a zip; import a zip back.
+		register_rest_route( $ns, '/export', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'export_backup' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/import/zip', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_zip' ], ] + $auth,
+		] );
+
 		// Private file proxy: streams an attachment only to users who can read its
 		// note. Cookie-authenticated (so it works in <img src>); files are never
 		// served from a public URL. Internal access check, not check_auth.
@@ -450,6 +458,81 @@ class Noodled_REST {
 	}
 
 	/**
+	 * Stream a zip backup of the caller's own notebooks → markdown (with frontmatter)
+	 * plus each note's attachments under {slug}_files/, matching the desktop layout.
+	 */
+	public static function export_backup() {
+		if ( ! class_exists( 'ZipArchive' ) ) { status_header( 500 ); echo 'Zip support unavailable on this server.'; exit; }
+		$uid = self::current_user_id();
+		if ( ! $uid ) { status_header( 403 ); exit; }
+
+		$tmp = wp_tempnam( 'noodled-export' );
+		$zip = new \ZipArchive();
+		if ( $zip->open( $tmp, \ZipArchive::OVERWRITE ) !== true ) { status_header( 500 ); echo 'Could not build archive.'; exit; }
+
+		$used = [];
+		foreach ( Noodled_Notebooks::get_for_user( $uid ) as $nb ) {
+			$folder = Noodled_Frontmatter::safe_filename( $nb['name'] ) ?: ( 'Notebook-' . $nb['id'] );
+			foreach ( Noodled_Notes::get_all( (int) $nb['id'] ) as $row ) {
+				$note = Noodled_Notes::get_one( (int) $row['id'] );
+				if ( ! $note ) continue;
+				$slug  = Noodled_Frontmatter::safe_filename( $note['slug'] ?: $note['title'] ) ?: ( 'note-' . $note['id'] );
+				$key   = $folder . '/' . $slug;
+				if ( isset( $used[ $key ] ) ) { $slug .= '-' . $note['id']; $key = $folder . '/' . $slug; }
+				$used[ $key ] = true;
+				$zip->addFromString( $folder . '/' . $slug . '.md', Noodled_Frontmatter::to_markdown( $note ) );
+				foreach ( Noodled_Attachments::get_for_note( (int) $note['id'] ) as $att ) {
+					$raw = Noodled_Attachments::get_raw( (int) $att['id'] );
+					if ( $raw && ! empty( $raw['path'] ) && is_file( $raw['path'] ) ) {
+						$zip->addFile( $raw['path'], $folder . '/' . $slug . '_files/' . Noodled_Frontmatter::safe_filename( $att['filename'] ) );
+					}
+				}
+			}
+		}
+		$zip->close();
+		$data = file_get_contents( $tmp );
+		@unlink( $tmp );
+
+		while ( ob_get_level() ) { ob_end_clean(); }
+		nocache_headers();
+		header( 'Content-Type: application/zip' );
+		header( 'Content-Disposition: attachment; filename="noodled-backup-' . gmdate( 'Y-m-d' ) . '.zip"' );
+		header( 'Content-Length: ' . strlen( $data ) );
+		echo $data;
+		exit;
+	}
+
+	/** Restore notes from a backup/zip of .md files (folder name → notebook). */
+	public static function import_zip( \WP_REST_Request $req ): \WP_REST_Response {
+		if ( ! class_exists( 'ZipArchive' ) ) return new \WP_REST_Response( [ 'error' => 'Zip support unavailable' ], 500 );
+		$files = $req->get_file_params();
+		$f = $files['file'] ?? null;
+		if ( ! $f || empty( $f['tmp_name'] ) || ( $f['error'] ?? 1 ) !== UPLOAD_ERR_OK ) {
+			return new \WP_REST_Response( [ 'error' => 'No file uploaded' ], 400 );
+		}
+		$uid = self::current_user_id();
+		$zip = new \ZipArchive();
+		if ( $zip->open( $f['tmp_name'] ) !== true ) return new \WP_REST_Response( [ 'error' => 'Not a valid zip' ], 400 );
+
+		$imported = 0;
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$name = $zip->getNameIndex( $i );
+			if ( ! $name || strtolower( substr( $name, -3 ) ) !== '.md' ) continue;
+			$content = $zip->getFromIndex( $i );
+			if ( $content === false ) continue;
+			$parts  = explode( '/', str_replace( '\\', '/', $name ) );
+			$folder = count( $parts ) > 1 ? $parts[0] : 'Imported';
+			$parsed = Noodled_Frontmatter::from_markdown( $content );
+			$title  = $parsed['title'] ?: pathinfo( $name, PATHINFO_FILENAME );
+			$body   = $parsed['body'] ?: '';
+			$res    = Noodled_Notes::create( $folder, $title, $body, $uid );
+			if ( empty( $res['error'] ) ) $imported++;
+		}
+		$zip->close();
+		return new \WP_REST_Response( [ 'imported' => $imported ] );
+	}
+
+	/**
 	 * Stream a private attachment to a user who can read its note. The browser
 	 * loads this in <img>/navigation with the session cookie; an attacker with
 	 * the URL but no access (or no session) gets 403. Files are stored under a
@@ -505,6 +588,18 @@ class Noodled_REST {
 	public static function update_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_write( (int) $req['id'] ) ) {
 			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+		}
+		// Optimistic-concurrency guard: if the caller tells us which version it
+		// last saw and the stored note has moved on (another device/tab saved),
+		// don't silently clobber — hand the current server copy back so the client
+		// can ask the user. `force` overrides (the "keep mine" path).
+		$base  = (string) $req->get_param( 'base_modified' );
+		$force = (bool) $req->get_param( 'force' );
+		if ( $base !== '' && ! $force ) {
+			$cur = Noodled_Notes::get_one( (int) $req['id'] );
+			if ( $cur && substr( (string) ( $cur['modified'] ?? '' ), 0, 16 ) !== substr( $base, 0, 16 ) ) {
+				return new \WP_REST_Response( [ 'conflict' => true, 'server' => $cur ] );
+			}
 		}
 		$data = [];
 		if ( $req->get_param( 'title' ) !== null ) $data['title'] = $req->get_param( 'title' );

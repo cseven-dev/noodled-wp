@@ -45,7 +45,7 @@ const api = {
   get_notes(notebook)                    { return this._fetch('/notes' + (notebook ? '?notebook=' + encodeURIComponent(notebook) : '')); },
   get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId); },
   create_note(notebook, title, body)     { return this._fetch('/notes', { method: 'POST', body: JSON.stringify({ notebook, title, body: body || '' }) }); },
-  save_note(notebook, noteId, title, body) { return this._fetch('/notes/' + noteId, { method: 'PUT', body: JSON.stringify({ title, body }) }); },
+  save_note(notebook, noteId, title, body, opts) { const p = { title, body }; if (opts && opts.base) p.base_modified = opts.base; if (opts && opts.force) p.force = true; return this._fetch('/notes/' + noteId, { method: 'PUT', body: JSON.stringify(p) }); },
   delete_note(notebook, noteId)          { return this._fetch('/notes/' + noteId, { method: 'DELETE' }); },
   move_note(from, noteId, to)            { return this._fetch('/notes/' + noteId + '/move', { method: 'POST', body: JSON.stringify({ notebook: to }) }); },
   toggle_pin(notebook, noteId)           { return this._fetch('/notes/' + noteId + '/pin', { method: 'POST' }); },
@@ -367,11 +367,15 @@ async function loadNotes() {
 
 function filterNotes() {
   searchQuery = document.getElementById('searchInput').value.toLowerCase();
-  if (searchQuery) {
-    filteredNotes = notes.filter(n =>
-      n.title.toLowerCase().includes(searchQuery) ||
-      n.body.toLowerCase().includes(searchQuery)
-    );
+  const q = searchQuery.trim();
+  if (q) {
+    // Token-AND: every word must appear somewhere (title, body, or notebook),
+    // so "dish pump" matches a note containing both words in any order.
+    const toks = q.split(/\s+/);
+    filteredNotes = notes.filter(n => {
+      const hay = ((n.title || '') + ' ' + (n.body || '') + ' ' + (n.notebook || '')).toLowerCase();
+      return toks.every(t => hay.includes(t));
+    });
   } else {
     filteredNotes = [...notes];
   }
@@ -906,7 +910,7 @@ function schedSave() {
 }
 
 async function doSave() {
-  if (!activeNote || viewingTrash) return;
+  if (!activeNote || viewingTrash || _conflictOpen) return;
   saveHistory(activeNote);
   const title = document.getElementById('titleInput')?.value || activeNote.title;
   let body;
@@ -920,7 +924,11 @@ async function doSave() {
     body = htmlToMarkdown(el);
   }
   activeNote.body = body;
-  const result = await queuedSave(activeNote.notebook, activeNote.id, title, body);
+  // Pass the version we last saw so the server can flag a clobber (another
+  // device edited this note since we loaded it).
+  const base = activeNote.modified || '';
+  const result = await queuedSave(activeNote.notebook, activeNote.id, title, body, base);
+  if (result && result.conflict) { showConflict(result.server, { title, body }); return; }
   if (!result.error) {
     adoptSaved(result);
     // Update local note in array instead of full reload
@@ -1007,21 +1015,58 @@ function fileToB64(file) {
   });
 }
 
+// Shrink big phone photos client-side before upload: faster, smaller, and well
+// under the 10 MB cap. (Re-encoding drops EXIF, so we only touch large rasters.)
+async function compressImage(file) {
+  if (!/^image\//.test(file.type) || /svg|gif/i.test(file.type)) return file;
+  if (file.size < 1.2 * 1024 * 1024) return file; // small enough — keep original + EXIF
+  try {
+    const bitmap = await createImageBitmap(file);
+    const max = 1800;
+    let { width, height } = bitmap;
+    if (width > max || height > max) {
+      const s = Math.min(max / width, max / height);
+      width = Math.round(width * s); height = Math.round(height * s);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+    if (bitmap.close) bitmap.close();
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.82));
+    if (!blob || blob.size >= file.size) return file; // never inflate
+    const name = file.name.replace(/\.(png|webp|bmp|heic|heif|tiff?|jpeg)$/i, '.jpg');
+    return new File([blob], name, { type: 'image/jpeg' });
+  } catch (e) { return file; }
+}
+
+let _tmpAttSeq = 0;
 async function attachFile(file) {
   if (!activeNote) return;
+  const note = activeNote;
+  // Optimistic tile with a spinner so multi-file adds feel instant.
+  const placeholder = { id: 'tmp-' + (++_tmpAttSeq), name: file.name, filename: file.name, _pending: true };
+  (note.attachments = note.attachments || []).push(placeholder);
+  if (activeNote === note) renderAttachmentGallery();
   try {
-    const b64 = await fileToB64(file);
-    const result = await api.save_attachment(activeNote.notebook, activeNote.id, file.name, b64);
+    const f = await compressImage(file);
+    const b64 = await fileToB64(f);
+    const result = await api.save_attachment(note.notebook, note.id, f.name, b64);
+    const i = note.attachments.indexOf(placeholder);
     if (result && result.filename) {
-      // Attachments stay out of the text — they render in the gallery below.
-      (activeNote.attachments = activeNote.attachments || []).push(result);
-      renderAttachmentGallery();
-      syncAttBadge();
+      if (i >= 0) note.attachments[i] = result; else note.attachments.push(result);
+      if (activeNote === note) { renderAttachmentGallery(); syncAttBadge(); }
       showToast(`Attached: ${result.filename}`);
-    } else if (result && result.error) {
-      showToast(result.error);
+    } else {
+      if (i >= 0) note.attachments.splice(i, 1);
+      if (activeNote === note) renderAttachmentGallery();
+      showToast((result && result.error) || 'Upload failed');
     }
-  } catch (e) { showToast('Upload failed'); }
+  } catch (e) {
+    const i = note.attachments.indexOf(placeholder);
+    if (i >= 0) note.attachments.splice(i, 1);
+    if (activeNote === note) renderAttachmentGallery();
+    showToast('Upload failed');
+  }
 }
 
 async function handleDrop(e) {
@@ -1056,7 +1101,7 @@ async function handleFiles(input) {
   if (!note || note.error) { showToast('Could not create note'); return; }
   let ok = 0;
   for (const f of files) {
-    try { const b64 = await fileToB64(f); const r = await api.save_attachment(note.notebook, note.id, f.name, b64); if (r && r.filename) ok++; } catch (e) {}
+    try { const cf = await compressImage(f); const b64 = await fileToB64(cf); const r = await api.save_attachment(note.notebook, note.id, cf.name, b64); if (r && r.filename) ok++; } catch (e) {}
   }
   activeNote = await api.get_note(null, note.id);
   await loadNotebooks();
@@ -1227,7 +1272,8 @@ function handleGlobalKey(e) {
   const isEditable = e.target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA';
   if (e.ctrlKey && e.key === 'n') { e.preventDefault(); createNote(); return; }
   if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); showToast('Saved'); return; }
-  if ((e.ctrlKey && e.shiftKey && e.key === 'F') || (e.ctrlKey && e.key === 'k')) { e.preventDefault(); document.getElementById('searchInput').focus(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K') && !e.shiftKey) { e.preventDefault(); showCommandPalette(); return; }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); document.getElementById('searchInput').focus(); return; }
   if (e.ctrlKey && e.key === 'p') { e.preventDefault(); showQuickOpen(); return; }
   if (e.ctrlKey && e.key === 'j') { e.preventDefault(); openDailyJournal(); return; }
   if (e.ctrlKey && e.key === '.') { e.preventDefault(); toggleQuickCapture(); return; }
@@ -1440,9 +1486,41 @@ function closeContextMenu() { document.getElementById('ctxContainer').innerHTML 
 document.addEventListener('scroll', closeContextMenu, true);
 
 // ── Offline indicator ──
+let _isOnline = true;
 function setOnline(online) {
+  const was = _isOnline;
+  _isOnline = online;
+  updateOfflineBanner();
+  // Coming back online with queued edits → flush them now.
+  if (online && !was && saveQueue.length) retrySaveQueue();
+}
+
+// Single source of truth for the banner: offline message, else pending-sync
+// count, else hidden.
+function updateOfflineBanner() {
   const el = document.getElementById('offlineBanner');
-  if (el) el.classList.toggle('show', !online);
+  if (!el) return;
+  const n = saveQueue.length;
+  if (!_isOnline) {
+    el.textContent = "You're offline — changes are saved on this device and will sync when you reconnect";
+    el.classList.add('show');
+  } else if (n) {
+    el.textContent = n + ' change' + (n > 1 ? 's' : '') + ' waiting to sync…';
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+const SAVE_QUEUE_KEY = 'noodled_save_queue';
+function persistSaveQueue() {
+  try { localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(saveQueue)); } catch (e) {}
+  updateOfflineBanner();
+}
+function loadSaveQueue() {
+  try { const q = JSON.parse(localStorage.getItem(SAVE_QUEUE_KEY) || '[]'); if (Array.isArray(q)) saveQueue = q; } catch (e) {}
+  if (saveQueue.length && !saveRetryTimer) saveRetryTimer = setInterval(retrySaveQueue, 15000);
+  updateOfflineBanner();
 }
 
 // ── Sync pull ──
@@ -2439,13 +2517,22 @@ function renderAttachmentGallery() {
   // scrolls with the content and isn't clipped to a sliver on mobile.
   const host = document.getElementById('dropZone');
   if (!host) return;
-  const images = atts.filter(isImageAttachment);
+  const images = atts.filter(a => !a._pending && isImageAttachment(a));
   const gallery = document.createElement('div');
   gallery.className = 'attachment-gallery';
   atts.forEach(a => {
     const name = a.filename || a.name;
     const item = document.createElement('div');
     item.className = 'gal-item';
+    if (a._pending) {
+      // Still uploading — show a spinner tile, no delete / no click.
+      item.classList.add('pending');
+      const sp = document.createElement('div'); sp.className = 'gal-spinner';
+      const label = document.createElement('div'); label.className = 'gf-name'; label.textContent = name;
+      item.appendChild(sp); item.appendChild(label);
+      gallery.appendChild(item);
+      return;
+    }
     if (isImageAttachment(a)) {
       const img = document.createElement('img');
       img.className = 'gallery-thumb';
@@ -2495,6 +2582,7 @@ function openLightbox(images, index) {
     lb.onclick = (e) => { if (e.target === lb) closeLightbox(); };
     document.body.appendChild(lb);
     document.addEventListener('keydown', lightboxKey);
+    setupLightboxGestures(lb);
   }
   lb.style.display = 'flex';
   renderLightbox();
@@ -2502,6 +2590,7 @@ function openLightbox(images, index) {
 function renderLightbox() {
   const a = _lbImages[_lbIndex];
   if (!a) return;
+  lbResetZoom();
   document.getElementById('lbImg').src = a.url;
   document.getElementById('lbCaption').innerHTML = lightboxCaption(a);
   const nav = _lbImages.length > 1;
@@ -2596,16 +2685,19 @@ function startAutoSync(minutes = 5) {
 let saveQueue = [];
 let saveRetryTimer = null;
 
-async function queuedSave(notebook, noteId, title, body) {
+async function queuedSave(notebook, noteId, title, body, base) {
   try {
     showSaveIndicator('saving');
-    const result = await api.save_note(notebook, noteId, title, body);
+    const result = await api.save_note(notebook, noteId, title, body, { base });
     showSaveIndicator('saved');
     hasUnsavedChanges = false;
     return result;
   } catch (e) {
+    // Offline / network error → persist the edit so it survives a reload and
+    // flushes on reconnect. Keep only the latest pending edit per note.
+    saveQueue = saveQueue.filter(q => q.noteId !== noteId);
     saveQueue.push({ notebook, noteId, title, body, time: Date.now() });
-    showToast('Save failed — will retry');
+    persistSaveQueue();
     const indicator = document.getElementById('saveIndicator');
     if (indicator) indicator.className = 'save-indicator save-queued';
     if (!saveRetryTimer) {
@@ -2619,17 +2711,21 @@ async function retrySaveQueue() {
   if (!saveQueue.length) {
     clearInterval(saveRetryTimer);
     saveRetryTimer = null;
+    updateOfflineBanner();
     return;
   }
   const item = saveQueue[0];
   try {
-    await api.save_note(item.notebook, item.noteId, item.title, item.body);
+    await api.save_note(item.notebook, item.noteId, item.title, item.body, { force: true });
     saveQueue.shift();
-    showToast('Queued save recovered');
+    persistSaveQueue();
     showSaveIndicator('saved');
     if (!saveQueue.length) {
       clearInterval(saveRetryTimer);
       saveRetryTimer = null;
+      showToast('Synced pending changes');
+    } else {
+      retrySaveQueue();
     }
   } catch (e) {}
 }
@@ -2750,3 +2846,314 @@ selectNotebook = async function(name) {
     }
   }, { passive: true });
 })();
+
+/* ============================================================
+   POLISH FEATURES
+   ============================================================ */
+
+// ── Command palette (⌘/Ctrl-K) ───────────────────────────────
+function fuzzyScore(q, text) {
+  q = (q || '').toLowerCase(); text = (text || '').toLowerCase();
+  if (!q) return 1;
+  let ti = 0, score = 0;
+  for (let qi = 0; qi < q.length; qi++) {
+    let found = -1;
+    for (let k = ti; k < text.length; k++) { if (text[k] === q[qi]) { found = k; break; } }
+    if (found < 0) return 0;
+    score += (found === ti) ? 2 : 1;
+    ti = found + 1;
+  }
+  return score;
+}
+
+function showCommandPalette() {
+  const el = document.getElementById('modalContainer');
+  const owner = !!(noodledConfig.user && noodledConfig.user.owner);
+  const cmds = [
+    { icon: '📝', label: 'New note', run: () => createNote() },
+    { icon: '📄', label: 'New from template', run: () => showTemplates() },
+    { icon: '📎', label: 'Add files', run: () => uploadFiles() },
+    { icon: '🔍', label: 'Search notes', run: () => document.getElementById('searchInput').focus() },
+    { icon: '🗓️', label: 'Daily journal', run: () => openDailyJournal() },
+    { icon: '⚡', label: 'Quick capture', run: () => toggleQuickCapture() },
+    { icon: '⏱️', label: 'Focus timer', run: () => showFocusOptions() },
+    { icon: '🔄', label: 'Sync now', run: () => syncPull() },
+    { icon: '🌓', label: 'Toggle theme', run: () => toggleTheme() },
+    { icon: '⬇️', label: 'Export backup', run: () => exportBackup() },
+    { icon: '⬆️', label: 'Import backup', run: () => importBackup() },
+    { icon: '⌨️', label: 'Keyboard shortcuts', run: () => showShortcutsHelp() },
+  ];
+  if (owner) cmds.splice(3, 0, { icon: '👥', label: 'Manage people', run: () => manageUsers() });
+
+  el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp">
+    <input id="cmdpInput" placeholder="Type a command or note…" autocomplete="off" aria-label="Command palette">
+    <div class="cmdp-list" id="cmdpList"></div></div></div>`;
+  const input = el.querySelector('#cmdpInput');
+  const list = el.querySelector('#cmdpList');
+  let results = [], hi = 0;
+
+  function build() {
+    const q = input.value.trim();
+    let cm = cmds.map(c => ({ type: 'cmd', item: c, score: q ? fuzzyScore(q, c.label) : 1 })).filter(x => x.score > 0);
+    cm.sort((a, b) => b.score - a.score);
+    let nm = [];
+    if (q) nm = notes.map(n => ({ type: 'note', item: n, score: fuzzyScore(q, n.title) }))
+      .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 6);
+    results = q ? [...cm.slice(0, 8), ...nm] : cm;
+    hi = 0; render();
+  }
+  function render() {
+    list.innerHTML = results.length ? results.map((r, i) => {
+      const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}` : `📄 ${esc(r.item.title)}`;
+      const sub = r.type === 'note' ? `<span class="cmdp-sub">${esc(r.item.notebook || '')}</span>` : '';
+      return `<div class="cmdp-i ${i === hi ? 'on' : ''}" data-i="${i}">${label}${sub}</div>`;
+    }).join('') : '<div class="cmdp-empty">No matches</div>';
+    const on = list.querySelector('.cmdp-i.on');
+    if (on) on.scrollIntoView({ block: 'nearest' });
+  }
+  function run(r) { document.getElementById('modalContainer').innerHTML = ''; if (!r) return; if (r.type === 'cmd') r.item.run(); else selectNote(r.item.id); }
+
+  input.addEventListener('input', build);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); hi = Math.min(hi + 1, results.length - 1); render(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); hi = Math.max(hi - 1, 0); render(); }
+    else if (e.key === 'Enter') { e.preventDefault(); run(results[hi]); }
+  });
+  list.addEventListener('mousedown', e => { const it = e.target.closest('.cmdp-i'); if (it) run(results[+it.dataset.i]); });
+  build();
+  setTimeout(() => input.focus(), 30);
+}
+
+// ── Conflict resolution (last-write-wins safety net) ─────────
+let _conflictOpen = false;
+function showConflict(server, mine) {
+  if (!server || _conflictOpen) return;
+  _conflictOpen = true;
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:460px">
+    <h3>This note changed elsewhere</h3>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.5">Another device or tab saved
+    "<b>${esc(server.title || '')}</b>" after you opened it. Which version do you want to keep?</p>
+    <div class="modal-buttons">
+      <button class="btn btn-sm" id="cfTheirs">Load theirs</button>
+      <button class="btn btn-sm btn-accent" id="cfMine">Keep mine</button>
+    </div></div></div>`;
+  el.querySelector('#cfMine').onclick = async () => {
+    el.innerHTML = ''; _conflictOpen = false;
+    const r = await api.save_note(activeNote.notebook, activeNote.id, mine.title, mine.body, { force: true });
+    if (r && !r.error) { adoptSaved(r); await loadNotes(); renderContent(); showToast('Kept your version'); }
+  };
+  el.querySelector('#cfTheirs').onclick = async () => {
+    el.innerHTML = ''; _conflictOpen = false;
+    try { activeNote = await api.get_note(null, server.id); } catch (e) {}
+    await loadNotes(); renderContent(); showToast('Loaded the other version');
+  };
+}
+
+// ── Note-list swipe gestures (left = trash, right = pin) ─────
+function setupNoteSwipe() {
+  const list = document.getElementById('noteList');
+  if (!list || list._swipeBound) return;
+  list._swipeBound = true;
+  let item = null, id = 0, sx = 0, sy = 0, dx = 0, active = false;
+  list.addEventListener('touchstart', e => {
+    if (bulkMode) return;
+    item = e.target.closest('.note-item'); if (!item) return;
+    id = +item.dataset.noteId; sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; active = true;
+    item.style.transition = 'none';
+  }, { passive: true });
+  list.addEventListener('touchmove', e => {
+    if (!active || !item) return;
+    dx = e.touches[0].clientX - sx;
+    const dy = Math.abs(e.touches[0].clientY - sy);
+    if (Math.abs(dx) < 8 && dy < 8) return;
+    if (dy > Math.abs(dx)) { active = false; item.style.transform = ''; item.classList.remove('swipe-del', 'swipe-pin'); return; }
+    item.style.transform = `translateX(${Math.max(-130, Math.min(130, dx))}px)`;
+    item.classList.toggle('swipe-del', dx < -45);
+    item.classList.toggle('swipe-pin', dx > 45);
+  }, { passive: true });
+  function end() {
+    if (!active || !item) { active = false; return; }
+    const el = item, nid = id, d = dx;
+    el.style.transition = 'transform .18s ease';
+    el.style.transform = '';
+    el.classList.remove('swipe-del', 'swipe-pin');
+    active = false; item = null;
+    if (d < -95) { _touchMoved = true; swipeTrash(nid); }
+    else if (d > 95) { _touchMoved = true; swipePin(nid); }
+  }
+  list.addEventListener('touchend', end);
+  list.addEventListener('touchcancel', end);
+}
+async function swipeTrash(id) {
+  const n = notes.find(x => x.id === id); if (!n) return;
+  try { await api.delete_note(n.notebook, id); } catch (e) { showToast('Delete failed'); return; }
+  if (activeNote && activeNote.id === id) { activeNote = null; renderContent(); document.querySelector('.col-content')?.classList.remove('open'); }
+  await loadNotebooks(); await loadNotes(); updateTrashCount();
+  showToast('Moved to trash');
+}
+async function swipePin(id) {
+  const n = notes.find(x => x.id === id); if (!n) return;
+  try { await api.toggle_pin(n.notebook, id); } catch (e) { return; }
+  showToast(n.pinned ? 'Unpinned' : 'Pinned');
+  await loadNotes();
+}
+
+// ── Modal accessibility: focus trap, ESC, restore focus ──────
+let _lastModalFocus = null;
+function setupModalA11y() {
+  const mc = document.getElementById('modalContainer');
+  if (!mc || mc._a11yBound) return;
+  mc._a11yBound = true;
+  const obs = new MutationObserver(() => {
+    const overlay = mc.querySelector('.modal-overlay');
+    if (overlay && !overlay._a11y) {
+      overlay._a11y = true;
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      _lastModalFocus = document.activeElement;
+      const f = overlay.querySelector('input,textarea,button,select,[tabindex]');
+      if (f) setTimeout(() => { try { f.focus(); } catch (e) {} }, 30);
+    } else if (!overlay && _lastModalFocus) {
+      try { _lastModalFocus.focus(); } catch (e) {}
+      _lastModalFocus = null;
+    }
+  });
+  obs.observe(mc, { childList: true });
+  document.addEventListener('keydown', e => {
+    const overlay = mc.querySelector('.modal-overlay');
+    if (!overlay) return;
+    if (e.key === 'Escape') { mc.innerHTML = ''; _conflictOpen = false; return; }
+    if (e.key !== 'Tab') return;
+    const f = [...overlay.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el => el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+}
+
+// ── Lightbox pinch-zoom / pan / swipe ────────────────────────
+let _lbZoom = { scale: 1, tx: 0, ty: 0 };
+function lbApply() { const img = document.getElementById('lbImg'); if (img) img.style.transform = `translate(${_lbZoom.tx}px,${_lbZoom.ty}px) scale(${_lbZoom.scale})`; }
+function lbResetZoom() { _lbZoom = { scale: 1, tx: 0, ty: 0 }; lbApply(); }
+function setupLightboxGestures(lb) {
+  const stage = lb.querySelector('.lb-stage');
+  const img = lb.querySelector('#lbImg');
+  if (!stage || !img || stage._gesturesBound) return;
+  stage._gesturesBound = true;
+  img.style.touchAction = 'none';
+  const pts = new Map();
+  let startDist = 0, startScale = 1, lastX = 0, lastY = 0, swipeX = 0, panning = false;
+  img.addEventListener('dblclick', () => { _lbZoom.scale = _lbZoom.scale > 1 ? 1 : 2; _lbZoom.tx = 0; _lbZoom.ty = 0; lbApply(); });
+  stage.addEventListener('pointerdown', e => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { img.setPointerCapture(e.pointerId); } catch (_) {}
+    if (pts.size === 2) { const a = [...pts.values()]; startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); startScale = _lbZoom.scale; }
+    else { lastX = e.clientX; lastY = e.clientY; swipeX = e.clientX; panning = _lbZoom.scale > 1; }
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const a = [...pts.values()]; const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+      if (startDist) { _lbZoom.scale = Math.max(1, Math.min(4, startScale * (d / startDist))); lbApply(); }
+    } else if (panning) {
+      _lbZoom.tx += e.clientX - lastX; _lbZoom.ty += e.clientY - lastY; lastX = e.clientX; lastY = e.clientY; lbApply();
+    }
+  });
+  function up(e) {
+    const had2 = pts.size === 2;
+    pts.delete(e.pointerId);
+    if (!had2 && _lbZoom.scale <= 1) {
+      const dx = e.clientX - swipeX;
+      if (Math.abs(dx) > 60) lightboxStep(dx < 0 ? 1 : -1);
+      _lbZoom.tx = 0; _lbZoom.ty = 0; lbApply();
+    }
+    if (pts.size < 2) startDist = 0;
+    if (pts.size === 0 && _lbZoom.scale <= 1) panning = false;
+  }
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', e => { pts.delete(e.pointerId); });
+}
+
+// ── Search depth: recent searches dropdown ───────────────────
+const RECENT_SEARCH_KEY = 'noodled_recent_searches';
+function getRecentSearches() { try { return JSON.parse(localStorage.getItem(RECENT_SEARCH_KEY) || '[]'); } catch (e) { return []; } }
+function addRecentSearch(q) {
+  q = (q || '').trim(); if (q.length < 2) return;
+  let r = getRecentSearches().filter(x => x.toLowerCase() !== q.toLowerCase());
+  r.unshift(q); r = r.slice(0, 6);
+  try { localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(r)); } catch (e) {}
+}
+function setupSearchRecents() {
+  const inp = document.getElementById('searchInput');
+  if (!inp || inp._recentsBound) return;
+  inp._recentsBound = true;
+  const box = inp.closest('.search-box') || inp.parentNode;
+  box.style.position = 'relative';
+  const dd = document.createElement('div'); dd.className = 'search-recent'; dd.id = 'searchRecent';
+  box.appendChild(dd);
+  function render() {
+    const r = getRecentSearches();
+    if (!r.length || inp.value) { dd.classList.remove('show'); return; }
+    dd.innerHTML = '<div class="sr-h">Recent searches</div>' + r.map(q => `<div class="sr-i" data-q="${escAttr(q)}">${esc(q)}</div>`).join('');
+    dd.classList.add('show');
+  }
+  inp.addEventListener('focus', render);
+  inp.addEventListener('input', () => dd.classList.remove('show'));
+  inp.addEventListener('blur', () => setTimeout(() => dd.classList.remove('show'), 160));
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') addRecentSearch(inp.value); });
+  dd.addEventListener('mousedown', e => {
+    const it = e.target.closest('.sr-i'); if (!it) return;
+    inp.value = it.dataset.q; filterNotes(); addRecentSearch(it.dataset.q); dd.classList.remove('show');
+  });
+}
+
+// ── Full backup export / import ──────────────────────────────
+function exportBackup() {
+  const url = api._base + '/export?_wpnonce=' + encodeURIComponent(api._nonce);
+  const a = document.createElement('a');
+  a.href = url; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('Preparing your backup…');
+}
+function importBackup() {
+  let inp = document.getElementById('backupImportInput');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.zip'; inp.id = 'backupImportInput'; inp.style.display = 'none';
+    inp.onchange = () => handleBackupImport(inp);
+    document.body.appendChild(inp);
+  }
+  inp.value = ''; inp.click();
+}
+async function handleBackupImport(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  showToast('Importing backup…');
+  const fd = new FormData(); fd.append('file', f);
+  try {
+    const res = await fetch(api._base + '/import/zip', { method: 'POST', headers: { 'X-WP-Nonce': api._nonce }, credentials: 'same-origin', body: fd }).then(r => r.json());
+    if (res && res.error) { showToast('Import failed: ' + res.error); return; }
+    await loadNotebooks(); await loadNotes();
+    const n = (res && res.imported) || 0;
+    showToast(`Imported ${n} note${n !== 1 ? 's' : ''}`);
+  } catch (e) { showToast('Import failed'); }
+}
+
+// ── Wire up the polish features once the DOM is ready ────────
+function noodledPolishInit() {
+  loadSaveQueue();
+  setupModalA11y();
+  setupNoteSwipe();
+  setupSearchRecents();
+  const toast = document.getElementById('toast');
+  if (toast) { toast.setAttribute('role', 'status'); toast.setAttribute('aria-live', 'polite'); }
+  const status = document.getElementById('status');
+  if (status) status.setAttribute('aria-live', 'polite');
+  window.addEventListener('online', () => setOnline(true));
+  window.addEventListener('offline', () => setOnline(false));
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', noodledPolishInit);
+else noodledPolishInit();
