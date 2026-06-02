@@ -598,7 +598,7 @@ function renderContent() {
         <span class="toolbar-divider"></span>
         <button class="btn btn-sm" onclick="copyBody()" title="Copy">&#128203;</button>
         <button class="btn btn-sm" onclick="uploadFile()" title="Upload">&#128206;</button>
-        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="Record">&#127908;</button>
+        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="Dictate">&#127908;</button>
         <span class="toolbar-divider"></span>
         <div class="toolbar-menu-wrap">
           <button class="btn btn-sm" onclick="toggleEditorMenu()" title="More tools">&#8943;</button>
@@ -1896,51 +1896,116 @@ async function openDailyJournal() {
   if (note && !note.error) selectNote(note.id);
 }
 
-// ── Voice memo ──
-let mediaRecorder = null;
-let audioChunks = [];
+// ── Dictation (speech-to-text) ──
+let recognition = null;
+let dictating = false;
 
-async function toggleVoiceMemo() {
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
-    mediaRecorder.stop();
+function setDictateBtn(on) {
+  const btn = document.getElementById('voiceBtn');
+  if (!btn) return;
+  if (on) { btn.textContent = 'Stop'; btn.classList.add('recording'); }
+  else { btn.innerHTML = '&#127908;'; btn.classList.remove('recording'); }
+}
+
+// Insert dictated text at the caret of whichever editor is active.
+function insertDictation(text) {
+  text = text.trim();
+  if (!text) return;
+  const chunk = text + ' ';
+
+  const raw = document.getElementById('noteBodyRaw');
+  if (raw) {
+    const start = raw.selectionStart != null ? raw.selectionStart : raw.value.length;
+    const end = raw.selectionEnd != null ? raw.selectionEnd : raw.value.length;
+    raw.value = raw.value.slice(0, start) + chunk + raw.value.slice(end);
+    const pos = start + chunk.length;
+    raw.setSelectionRange(pos, pos);
+    raw.focus();
+    if (typeof schedSave === 'function') schedSave();
+    if (typeof updateWordCount === 'function') updateWordCount();
     return;
   }
 
+  const el = document.getElementById('noteBody');
+  if (el) {
+    el.focus();
+    const sel = window.getSelection();
+    let range;
+    if (sel.rangeCount && el.contains(sel.anchorNode)) {
+      range = sel.getRangeAt(0);
+    } else {
+      range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+    }
+    range.deleteContents();
+    const node = document.createTextNode(chunk);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (typeof schedSave === 'function') schedSave();
+    if (typeof updateWordCount === 'function') updateWordCount();
+    return;
+  }
+
+  // Fallback: append to the note body directly.
+  activeNote.body = (activeNote.body || '') + chunk;
+  if (typeof saveAndRerender === 'function') saveAndRerender();
+}
+
+function toggleVoiceMemo() {
+  if (dictating) { stopDictation(); return; }
   if (!activeNote) { showToast('Select a note first'); return; }
 
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('Dictation is not supported in this browser'); return; }
+
+  recognition = new SR();
+  recognition.lang = navigator.language || 'en-US';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+
+  recognition.onresult = (event) => {
+    let finalText = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
+    }
+    if (finalText) insertDictation(finalText);
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      dictating = false;
+      showToast('Microphone access denied');
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      showToast('Dictation error: ' + e.error);
+    }
+  };
+
+  // continuous mode can still end on a long pause — restart unless the user stopped.
+  recognition.onend = () => {
+    if (dictating) { try { recognition.start(); return; } catch (_) {} }
+    dictating = false;
+    setDictateBtn(false);
+  };
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
-
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-
-    mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(audioChunks, { type: 'audio/webm' });
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const b64 = reader.result.split(',')[1];
-        const name = 'voice-' + Date.now() + '.webm';
-        const result = await api.save_attachment(activeNote.notebook, activeNote.id, name, b64);
-        if (result.filename) {
-          activeNote.body = (activeNote.body || '') + `\n[${result.filename}](${result.url || result.filename})\n`;
-          await saveAndRerender();
-          showToast('Voice memo saved');
-        }
-      };
-      reader.readAsDataURL(blob);
-      const btn = document.getElementById('voiceBtn');
-      if (btn) { btn.innerHTML = '&#127908;'; btn.classList.remove('recording'); }
-    };
-
-    mediaRecorder.start();
-    const btn = document.getElementById('voiceBtn');
-    if (btn) { btn.textContent = 'Stop'; btn.classList.add('recording'); }
-    showToast('Recording...');
+    recognition.start();
+    dictating = true;
+    setDictateBtn(true);
+    showToast('Listening…');
   } catch (e) {
-    showToast('Microphone access denied');
+    dictating = false;
+    showToast('Could not start dictation');
   }
+}
+
+function stopDictation() {
+  dictating = false;
+  if (recognition) { try { recognition.stop(); } catch (_) {} }
+  setDictateBtn(false);
 }
 
 // ── Bookmark sections / TOC ──
