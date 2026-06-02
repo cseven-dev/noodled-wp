@@ -44,19 +44,22 @@ class Noodled_Attachments {
 		$dir = self::upload_dir() . '/' . $note_id;
 		wp_mkdir_p( $dir );
 
-		// Write .htaccess to prevent PHP execution in uploads dir
-		$htaccess = self::upload_dir() . '/.htaccess';
-		if ( ! file_exists( $htaccess ) ) {
-			file_put_contents( $htaccess, "# Prevent script execution\n<FilesMatch \"\\.(php|phtml|php3|php4|php5|phar|cgi|pl|py|sh|jsp|asp|aspx)$\">\n  Deny from all\n</FilesMatch>\nAddHandler default-handler .php .phtml .php3 .php4 .php5\n" );
-		}
+		// Lock the whole noodled uploads tree to direct web access — files are
+		// only ever served through the access-checked proxy (REST file/{id}).
+		self::protect_dir();
 
-		$filepath = $dir . '/' . $filename;
+		// Store under a random, unguessable subfolder so the on-disk path can't be
+		// derived from the note id or filename even if the server ignores .htaccess.
+		$token   = wp_generate_password( 12, false );
+		$subdir  = $dir . '/' . $token;
+		wp_mkdir_p( $subdir );
+		$filepath = $subdir . '/' . $filename;
 		$data = base64_decode( $data_b64 );
 		if ( $data === false ) return [ 'error' => 'Invalid base64 data' ];
 
 		file_put_contents( $filepath, $data );
 
-		$relative = $note_id . '/' . $filename;
+		$relative = $note_id . '/' . $token . '/' . $filename;
 		$mime = wp_check_filetype( $filename )['type'] ?: '';
 		$exif = self::extract_exif( $filepath, $mime );
 
@@ -70,13 +73,41 @@ class Noodled_Attachments {
 			'created_at' => current_time( 'mysql', true ),
 		] );
 
+		$id = (int) $wpdb->insert_id;
 		return [
-			'id'       => (int) $wpdb->insert_id,
+			'id'       => $id,
 			'filename' => $filename,
-			'url'      => self::upload_url() . '/' . $relative,
+			'url'      => self::proxy_url( $id ),
 			'mime'     => $mime,
 			'exif'     => $exif ? json_decode( $exif, true ) : null,
 		];
+	}
+
+	/** Lock the noodled uploads tree against direct web access (served only via proxy). */
+	public static function protect_dir(): void {
+		$htaccess = self::upload_dir() . '/.htaccess';
+		$rules = "# Noodled: deny ALL direct web access — files are served only through the access-checked proxy.\n"
+			. "<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n"
+			. "<IfModule !mod_authz_core.c>\n  Order allow,deny\n  Deny from all\n</IfModule>\n";
+		if ( ! file_exists( $htaccess ) || @file_get_contents( $htaccess ) !== $rules ) {
+			@file_put_contents( $htaccess, $rules );
+		}
+	}
+
+	/** Access-checked proxy URL the browser loads instead of a public file URL. */
+	public static function proxy_url( int $id ): string {
+		return rest_url( 'noodled/v1/file/' . $id );
+	}
+
+	/** Row + absolute disk path for the file proxy, or null. */
+	public static function get_raw( int $id ): ?array {
+		global $wpdb;
+		$r = $wpdb->get_row( $wpdb->prepare(
+			"SELECT id, note_id, filename, file_path, mime_type FROM " . self::table() . " WHERE id = %d", $id
+		), ARRAY_A );
+		if ( ! $r ) return null;
+		$r['path'] = self::upload_dir() . '/' . $r['file_path'];
+		return $r;
 	}
 
 	/** Pull a clean, JSON-safe subset of EXIF from an image, stored for later use. */
@@ -157,12 +188,11 @@ class Noodled_Attachments {
 			$note_id
 		), ARRAY_A );
 
-		$base_url = self::upload_url();
-		return array_map( function ( $r ) use ( $base_url ) {
+		return array_map( function ( $r ) {
 			return [
 				'id'       => (int) $r['id'],
 				'filename' => $r['filename'],
-				'url'      => $base_url . '/' . $r['file_path'],
+				'url'      => self::proxy_url( (int) $r['id'] ),
 				'mime'     => $r['mime_type'],
 				'size'     => (int) $r['file_size'],
 				'exif'     => ! empty( $r['exif'] ) ? json_decode( $r['exif'], true ) : null,

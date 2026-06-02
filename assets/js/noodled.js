@@ -659,7 +659,8 @@ function setupLinkClicks() {
     if (a && !a.classList.contains('wikilink')) {
       e.preventDefault();
       if (/\.html?$/i.test(a.href)) {
-        viewAttachment(a.href, a.textContent);
+        // Open HTML attachments in the same window (no top bar) — swipe back to return.
+        window.location.href = a.href;
       } else {
         window.open(a.href, '_blank', 'noopener');
       }
@@ -2327,8 +2328,10 @@ function renderAttachmentGallery() {
   if (!activeNote) return;
   const atts = activeNote.attachments || [];
   if (!atts.length) return;
-  const footer = document.getElementById('editorFooter');
-  if (!footer) return;
+  // Render inside the scrollable note body (not after the footer) so the gallery
+  // scrolls with the content and isn't clipped to a sliver on mobile.
+  const host = document.getElementById('dropZone');
+  if (!host) return;
   const images = atts.filter(isImageAttachment);
   const gallery = document.createElement('div');
   gallery.className = 'attachment-gallery';
@@ -2341,14 +2344,21 @@ function renderAttachmentGallery() {
       img.onclick = () => openLightbox(images, images.indexOf(a));
       gallery.appendChild(img);
     } else {
+      // Non-image attachments (incl. HTML) show as an icon tile in the same bar.
       const div = document.createElement('div');
-      div.className = 'gallery-file';
-      div.textContent = name;
-      div.onclick = () => { if (/\.html?$/i.test(a.url)) viewAttachment(a.url, name); else window.open(a.url, '_blank'); };
+      div.className = 'gallery-file-tile';
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      const glyph = /^html?$/.test(ext) ? '🌐' : (ext === 'pdf' ? '📕' : (/^(docx?|odt|rtf|txt|md|pages)$/.test(ext) ? '📄' : '📎'));
+      const icon = document.createElement('div'); icon.className = 'gf-icon'; icon.textContent = glyph;
+      const label = document.createElement('div'); label.className = 'gf-name'; label.textContent = name;
+      div.appendChild(icon); div.appendChild(label);
+      div.title = name;
+      // Open in the same window — mobile users just swipe back to return.
+      div.onclick = () => { window.location.href = a.url; };
       gallery.appendChild(div);
     }
   });
-  footer.after(gallery);
+  host.appendChild(gallery);
 }
 
 // Lightbox for image attachments, captioned with stored EXIF.

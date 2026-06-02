@@ -91,6 +91,13 @@ class Noodled_REST {
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_evernote' ], ] + $auth,
 		] );
 
+		// Private file proxy: streams an attachment only to users who can read its
+		// note. Cookie-authenticated (so it works in <img src>); files are never
+		// served from a public URL. Internal access check, not check_auth.
+		register_rest_route( $ns, '/file/(?P<id>\d+)', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'serve_file' ], 'permission_callback' => '__return_true' ],
+		] );
+
 		// Config
 		register_rest_route( $ns, '/config', [
 			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'get_config' ], ] + $auth,
@@ -438,6 +445,35 @@ class Noodled_REST {
 			return new \WP_REST_Response( [ 'error' => 'Please choose an Evernote .enex export file.' ], 400 );
 		}
 		return new \WP_REST_Response( Noodled_Evernote::import( $f['tmp_name'], self::current_user_id() ) );
+	}
+
+	/**
+	 * Stream a private attachment to a user who can read its note. The browser
+	 * loads this in <img>/navigation with the session cookie; an attacker with
+	 * the URL but no access (or no session) gets 403. Files are stored under a
+	 * random subfolder and the uploads dir denies direct web access.
+	 */
+	public static function serve_file( \WP_REST_Request $req ) {
+		$att = Noodled_Attachments::get_raw( (int) $req['id'] );
+		if ( ! $att ) { status_header( 404 ); exit; }
+		if ( ! self::verify_note_access( (int) $att['note_id'] ) ) { status_header( 403 ); exit; }
+
+		$path = $att['path'];
+		if ( ! $path || ! is_file( $path ) ) { status_header( 404 ); exit; }
+
+		while ( ob_get_level() ) { ob_end_clean(); }
+		$mime = $att['mime_type'] ?: 'application/octet-stream';
+		nocache_headers();
+		header( 'Content-Type: ' . $mime );
+		header( 'Content-Length: ' . filesize( $path ) );
+		header( 'Content-Disposition: inline; filename="' . str_replace( '"', '', $att['filename'] ) . '"' );
+		header( 'X-Content-Type-Options: nosniff' );
+		// Neutralise stored HTML/SVG so an uploaded file can't run scripts in our origin.
+		if ( stripos( $mime, 'html' ) !== false || stripos( $mime, 'svg' ) !== false ) {
+			header( "Content-Security-Policy: sandbox allow-popups allow-top-navigation-by-user-activation; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src data:;" );
+		}
+		readfile( $path );
+		exit;
 	}
 
 	public static function create_note( \WP_REST_Request $req ): \WP_REST_Response {

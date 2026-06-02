@@ -3,7 +3,7 @@
  * Plugin Name: Noodled
  * Plugin URI:  https://github.com/cseven-dev/noodled-wp
  * Description: A full web version of the noodled note-taking app with family sharing, magic-link login, and GitHub sync.
- * Version:     1.1.61
+ * Version:     1.1.62
  * Author:      Simon
  * License:     GPL-2.0-or-later
  * Text Domain: noodled
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // "Cannot redeclare class" and a 500 on every page.
 if ( defined( 'NOODLED_VERSION' ) ) return;
 
-define( 'NOODLED_VERSION', '1.1.61' );
+define( 'NOODLED_VERSION', '1.1.62' );
 define( 'NOODLED_FILE', __FILE__ );
 define( 'NOODLED_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NOODLED_URL', plugin_dir_url( __FILE__ ) );
@@ -105,6 +105,12 @@ function noodled_init() {
 		if ( ! get_option( 'noodled_admin_grants_revoked' ) ) {
 			noodled_revoke_admin_grants();
 			update_option( 'noodled_admin_grants_revoked', 1 );
+		}
+
+		// Lock the uploads dir against direct web access (one-time, idempotent).
+		if ( ! get_option( 'noodled_uploads_protected' ) ) {
+			Noodled_Attachments::protect_dir();
+			update_option( 'noodled_uploads_protected', 1 );
 		}
 
 		Noodled_Settings::init();

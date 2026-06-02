@@ -878,6 +878,18 @@ body.reading-mode .rendered-content { cursor: default; }
   color: var(--text); cursor: pointer; border: 1px solid var(--border);
 }
 .gallery-file:hover { border-color: var(--accent); }
+.gallery-file-tile {
+  width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-input); cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px; padding: 8px; text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.gallery-file-tile:hover { transform: scale(1.05); box-shadow: 0 4px 14px rgba(0,0,0,0.25); border-color: var(--accent); }
+.gallery-file-tile .gf-icon { font-size: 30px; line-height: 1; }
+.gallery-file-tile .gf-name {
+  font-size: 10px; color: var(--text); line-height: 1.2; max-width: 84px; word-break: break-word;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
 
 /* ── Image lightbox ── */
 .noodled-lightbox {
