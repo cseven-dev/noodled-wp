@@ -30,7 +30,7 @@ body.toplevel_page_noodled .wrap { margin: 0; max-width: none; padding: 0; }
 /* ── Design tokens ── */
 .nood-admin {
   --n-blue: #0078D4; --n-blue-hi: #2E97F0; --n-blue-deep: #0A559E; --n-blue-soft: #E3F1FC;
-  --n-paper: #FAF6F0; --n-paper-alt: #F3ECE1; --n-card: #FFFFFF; --n-line: #E6E1DA;
+  --n-paper: #FAF6F0; --n-paper-alt: #F3ECE1; --n-card: #FFFFFF; --n-line: #E6E1DA; --n-input: #FBF8F3;
   --n-ink: #1A1A1A; --n-soft: #3A3A3A; --n-faint: #6B6B6B;
   --n-shadow: 0 14px 40px rgba(20,30,60,.10); --n-shadow-sm: 0 2px 8px rgba(20,12,0,.06);
   --font-display: 'Fraunces', Georgia, serif;
@@ -41,7 +41,7 @@ body.toplevel_page_noodled .wrap { margin: 0; max-width: none; padding: 0; }
 }
 .nood-admin[data-nood-theme="dark"] {
   --n-blue: #2E97F0; --n-blue-hi: #57ADF5; --n-blue-deep: #0A66B8; --n-blue-soft: rgba(46,151,240,.14);
-  --n-paper: #16181C; --n-paper-alt: #121419; --n-card: #1B1E24; --n-line: #2A2E36;
+  --n-paper: #16181C; --n-paper-alt: #121419; --n-card: #1B1E24; --n-line: #2A2E36; --n-input: #23272F;
   --n-ink: #E8EAED; --n-soft: #C2C7CF; --n-faint: #8B919C;
   --n-shadow: 0 18px 50px rgba(0,0,0,.45); --n-shadow-sm: 0 2px 10px rgba(0,0,0,.3);
 }
@@ -159,14 +159,14 @@ body.toplevel_page_noodled .wrap { margin: 0; max-width: none; padding: 0; }
 .nood-admin .button-small, .nood-admin .button.button-small { padding: 4px 11px !important; font-size: 12px !important; }
 
 /* ── Forms (override WP form-table) ── */
-.nood-admin .form-table { background: var(--n-card); border: 1px solid var(--n-line); border-radius: 18px; box-shadow: var(--n-shadow-sm); padding: 8px 22px; margin-top: 8px; }
-.nood-admin .form-table th { color: var(--n-ink); font-weight: 700; font-size: 14px; padding: 18px 10px 18px 0; width: 200px; }
+.nood-admin .form-table { background: var(--n-card); border: 1px solid var(--n-line); border-radius: 18px; box-shadow: var(--n-shadow-sm); padding: 8px 24px; margin-top: 8px; max-width: 680px; }
+.nood-admin .form-table th { color: var(--n-ink); font-weight: 700; font-size: 14px; padding: 18px 16px 18px 0; width: 170px; vertical-align: middle; }
 .nood-admin .form-table td { padding: 14px 0; }
 .nood-admin .form-table tr { border-bottom: 1px solid var(--n-line); }
 .nood-admin .form-table tr:last-child { border-bottom: none; }
 .nood-admin input[type=text], .nood-admin input[type=email], .nood-admin input[type=password],
 .nood-admin input[type=url], .nood-admin input[type=number], .nood-admin select, .nood-admin textarea {
-  background: var(--n-paper-alt) !important; border: 1px solid var(--n-line) !important;
+  background: var(--n-input) !important; border: 1px solid var(--n-line) !important;
   border-radius: 10px !important; color: var(--n-ink) !important; padding: 9px 13px !important;
   font-family: var(--font-sans) !important; box-shadow: none !important; min-height: 0 !important;
 }
