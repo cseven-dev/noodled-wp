@@ -69,6 +69,23 @@ class Noodled_Auth {
 			return [ 'error' => 'Email not found. Ask the admin to invite you.' ];
 		}
 
+		$r = self::generate_and_email_pin( $user );
+		if ( ! $r['sent'] ) {
+			return [ 'error' => 'Failed to send email. Check your mail settings.' ];
+		}
+
+		return [ 'success' => true, 'message' => 'Check your email for a login PIN.' ];
+	}
+
+	/**
+	 * Generate a fresh 6-digit PIN, store it (+15-min expiry), and email the user
+	 * a one-click magic link plus the PIN. Returns [ 'pin' => ..., 'sent' => bool ].
+	 * Shared by the public login flow and the admin "Send PIN" tool.
+	 */
+	private static function generate_and_email_pin( array $user ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'noodled_users';
+
 		$pin    = str_pad( wp_rand( 0, 999999 ), 6, '0', STR_PAD_LEFT );
 		$expiry = gmdate( 'Y-m-d H:i:s', time() + self::$token_ttl );
 
@@ -80,7 +97,7 @@ class Noodled_Auth {
 		$brand   = Noodled_Settings::get_brand_name();
 		$app_url = self::get_app_url();
 		$magic   = add_query_arg( [
-			'noodled_email' => $email,
+			'noodled_email' => $user['email'],
 			'noodled_login' => $pin,
 		], $app_url );
 		$subject = "Your {$brand} login link";
@@ -89,13 +106,30 @@ class Noodled_Auth {
 			. "Or enter this PIN manually at {$app_url}\nPIN: {$pin}\n\n"
 			. "This link expires in 15 minutes.\n\n— {$brand}";
 
-		$sent = wp_mail( $email, $subject, $body );
+		$sent = wp_mail( $user['email'], $subject, $body );
 
-		if ( ! $sent ) {
-			return [ 'error' => 'Failed to send email. Check your mail settings.' ];
-		}
+		return [ 'pin' => $pin, 'sent' => (bool) $sent ];
+	}
 
-		return [ 'success' => true, 'message' => 'Check your email for a login PIN.' ];
+	/**
+	 * Admin tool: issue a login PIN for a member, email it, and return the PIN so
+	 * the admin can relay it directly (e.g. over the phone).
+	 */
+	public static function admin_send_pin( int $id ): array {
+		global $wpdb;
+		$user = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}noodled_users WHERE id = %d", $id
+		), ARRAY_A );
+		if ( ! $user ) return [ 'error' => 'User not found' ];
+		if ( $user['role'] === 'pending' ) return [ 'error' => 'Approve this user before sending a PIN.' ];
+
+		$r = self::generate_and_email_pin( $user );
+		return [
+			'success' => true,
+			'pin'     => $r['pin'],
+			'emailed' => $r['sent'],
+			'email'   => $user['email'],
+		];
 	}
 
 	/**

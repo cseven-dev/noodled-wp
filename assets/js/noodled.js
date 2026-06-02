@@ -168,13 +168,16 @@ function renderNotebooks() {
   const el = document.getElementById('nbList');
   el.innerHTML = notebooks.map((nb, i) => {
     const name = nb.name;
+    // Display label may differ from the addressing name (e.g. a member's drop
+    // folder shows as "Shared with {Admin}" but is still addressed by name).
+    const label = nb.label || nb.name;
     const active = activeNotebook === name ? ' active' : '';
     const color = nbColors[i % nbColors.length];
     const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="Shared with you">&#128279;</span>' : '';
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="Read only">&#128274;</span>' : '';
     return `<div class="nb-item${active}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
-      <span class="nb-name">${esc(name)}${shared}${readOnly}</span>
+      <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
     </div>`;
   }).join('');

@@ -142,6 +142,12 @@ class Noodled_REST {
 		register_rest_route( $ns, '/admin/permissions', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'admin_set_permission' ], ] + $admin,
 		] );
+		register_rest_route( $ns, '/admin/users/(?P<id>\d+)/drop', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'admin_set_drop' ], ] + $admin,
+		] );
+		register_rest_route( $ns, '/admin/users/(?P<id>\d+)/pin', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'admin_send_pin' ], ] + $admin,
+		] );
 		register_rest_route( $ns, '/admin/landing', [
 			[ 'methods' => 'DELETE', 'callback' => function() { delete_option( 'noodled_landing_html' ); return new \WP_REST_Response( true ); }, ] + $admin,
 		] );
@@ -775,5 +781,21 @@ class Noodled_REST {
 
 		Noodled_Permissions::set( $user_id, $notebook_id, $can_read, $can_write );
 		return new \WP_REST_Response( [ 'success' => true ] );
+	}
+
+	/** Toggle a member's shared drop folder (shared read+write with the acting admin). */
+	public static function admin_set_drop( \WP_REST_Request $req ): \WP_REST_Response {
+		$member_id = (int) $req['id'];
+		$enabled   = (bool) $req->get_param( 'enabled' );
+		$result    = Noodled_Notebooks::set_drop_folder( $member_id, self::current_user_id(), $enabled );
+		$status    = isset( $result['error'] ) ? 400 : 200;
+		return new \WP_REST_Response( $result, $status );
+	}
+
+	/** Issue + email a login PIN to a member, returning the PIN for the admin to relay. */
+	public static function admin_send_pin( \WP_REST_Request $req ): \WP_REST_Response {
+		$result = Noodled_Auth::admin_send_pin( (int) $req['id'] );
+		$status = isset( $result['error'] ) ? 400 : 200;
+		return new \WP_REST_Response( $result, $status );
 	}
 }

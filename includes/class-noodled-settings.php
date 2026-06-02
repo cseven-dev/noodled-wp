@@ -145,27 +145,36 @@ class Noodled_Settings {
 		$users     = Noodled_Auth::get_all_users();
 		$notebooks = Noodled_Notebooks::get_all();
 		global $wpdb;
-		$note_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}noodled_notes WHERE deleted_at IS NULL" );
+		$p           = $wpdb->prefix;
+		$note_count  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}noodled_notes WHERE deleted_at IS NULL" );
+		$trash_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}noodled_notes WHERE deleted_at IS NOT NULL" );
+		$att_count   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}noodled_attachments" );
+		$att_bytes   = (int) $wpdb->get_var( "SELECT COALESCE(SUM(file_size),0) FROM {$p}noodled_attachments" );
+		$drop_count  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}noodled_notebooks WHERE drop_to > 0" );
+		$pending     = Noodled_Auth::get_pending_count();
+		$last_sync   = get_option( 'noodled_last_sync' );
+		$cards = [
+			[ 'v' => $note_count,                       'l' => 'Notes' ],
+			[ 'v' => count( $notebooks ),               'l' => 'Notebooks' ],
+			[ 'v' => count( $users ),                   'l' => 'Users' ],
+			[ 'v' => $pending,                          'l' => 'Pending',      'hot' => $pending > 0 ],
+			[ 'v' => $att_count,                        'l' => 'Attachments' ],
+			[ 'v' => size_format( $att_bytes ) ?: '0 B','l' => 'Storage' ],
+			[ 'v' => $trash_count,                      'l' => 'In Trash' ],
+			[ 'v' => $drop_count,                       'l' => 'Drop folders' ],
+			[ 'v' => $last_sync ? esc_html( $last_sync ) : 'Never', 'l' => 'Last sync', 'small' => true ],
+			[ 'v' => 'v' . NOODLED_VERSION,             'l' => 'Version' ],
+		];
 		?>
 		<div class="wrap">
 			<h1>Noodled</h1>
-			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:20px 0">
-				<div class="noodled-card">
-					<h3><?php echo $note_count; ?></h3>
-					<p>Notes</p>
+			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:20px 0">
+				<?php foreach ( $cards as $c ) : ?>
+				<div class="noodled-card<?php echo ! empty( $c['hot'] ) ? ' noodled-card--hot' : ''; ?>">
+					<h3<?php echo ! empty( $c['small'] ) ? ' style="font-size:15px"' : ''; ?>><?php echo $c['v']; ?></h3>
+					<p><?php echo esc_html( $c['l'] ); ?></p>
 				</div>
-				<div class="noodled-card">
-					<h3><?php echo count( $notebooks ); ?></h3>
-					<p>Notebooks</p>
-				</div>
-				<div class="noodled-card">
-					<h3><?php echo count( $users ); ?></h3>
-					<p>Users</p>
-				</div>
-				<div class="noodled-card">
-					<h3>v<?php echo NOODLED_VERSION; ?></h3>
-					<p>Version</p>
-				</div>
+				<?php endforeach; ?>
 			</div>
 
 			<h2>Quick Links</h2>
@@ -175,10 +184,15 @@ class Noodled_Settings {
 			<?php endif; ?>
 			</p>
 
+			<hr style="margin:28px 0">
+			<?php self::render_user_management(); ?>
+
 			<style>
 			.noodled-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;text-align:center}
-			.noodled-card h3{margin:0;font-size:28px;color:#0078d4}
+			.noodled-card h3{margin:0;font-size:28px;color:#0078d4;word-break:break-word}
 			.noodled-card p{margin:6px 0 0;color:#666;font-size:13px}
+			.noodled-card--hot{border-color:#d63638}
+			.noodled-card--hot h3{color:#d63638}
 			</style>
 		</div>
 		<?php
@@ -285,113 +299,162 @@ class Noodled_Settings {
 	   ──────────────────────────────────────────────────────────── */
 	public static function page_users() {
 		if ( ! current_user_can( 'manage_options' ) ) return;
-		$users     = Noodled_Auth::get_all_users();
-		$pending = array_values( array_filter( $users, function( $u ) { return $u['role'] === 'pending'; } ) );
-		$members = array_values( array_filter( $users, function( $u ) { return $u['role'] !== 'pending'; } ) );
 		?>
 		<div class="wrap">
 			<h1>Users</h1>
-
-			<?php if ( $pending ) : ?>
-			<h2>Pending requests <span class="awaiting-mod"><span class="pending-count"><?php echo count( $pending ); ?></span></span></h2>
-			<table class="widefat striped" style="max-width:700px;margin-bottom:24px">
-				<thead><tr><th>Email</th><th>Name</th><th>Requested</th><th></th></tr></thead>
-				<tbody>
-				<?php foreach ( $pending as $u ) : ?>
-					<tr>
-						<td><?php echo esc_html( $u['email'] ); ?></td>
-						<td><?php echo esc_html( $u['display_name'] ); ?></td>
-						<td><?php echo $u['created_at'] ? esc_html( $u['created_at'] ) : '&mdash;'; ?></td>
-						<td>
-							<button class="button button-primary button-small" onclick="noodledApprove(<?php echo (int) $u['id']; ?>)">Approve</button>
-							<button class="button button-small" onclick="noodledDeny(<?php echo (int) $u['id']; ?>)">Deny</button>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-				</tbody>
-			</table>
-			<?php endif; ?>
-
-			<h2>Members</h2>
-			<table class="widefat striped" style="max-width:700px;margin-bottom:16px">
-				<thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Last Login</th><th></th></tr></thead>
-				<tbody>
-				<?php foreach ( $members as $u ) : ?>
-					<tr>
-						<td><?php echo esc_html( $u['email'] ); ?></td>
-						<td><?php echo esc_html( $u['display_name'] ); ?></td>
-						<td><?php echo esc_html( $u['role'] ); ?></td>
-						<td><?php echo $u['last_login'] ? esc_html( $u['last_login'] ) : '<em>Never</em>'; ?></td>
-						<td><button class="button button-small" onclick="noodledDeleteUser(<?php echo (int) $u['id']; ?>)">Remove</button></td>
-					</tr>
-				<?php endforeach; ?>
-				</tbody>
-			</table>
-
-			<h3>Invite</h3>
-			<div style="display:flex;gap:8px;max-width:700px;margin-bottom:8px">
-				<input type="email" id="invite-email" placeholder="Email" class="regular-text" style="flex:1">
-				<input type="text" id="invite-name" placeholder="Name (optional)" class="regular-text" style="flex:1">
-				<select id="invite-role"><option value="member">Member</option><option value="admin">Admin</option></select>
-				<button type="button" class="button button-primary" onclick="noodledInvite()">Invite</button>
-			</div>
-			<span id="invite-status"></span>
-
-			<p class="description" style="max-width:700px;margin-top:24px">Notes are private per user. Members share their own notebooks and notes from inside the app — there is no admin-managed cross-user permission matrix, and admins cannot read members' private notes.</p>
-
-			<script>
-			const _nonce = '<?php echo wp_create_nonce( 'wp_rest' ); ?>';
-			const _api = '<?php echo esc_url( rest_url( 'noodled/v1' ) ); ?>';
-
-			async function noodledInvite() {
-				const email = document.getElementById('invite-email').value;
-				const name = document.getElementById('invite-name').value;
-				const role = document.getElementById('invite-role').value;
-				const status = document.getElementById('invite-status');
-				if (!email) { status.textContent = 'Email required'; return; }
-				const res = await fetch(_api + '/admin/users', {
-					method: 'POST',
-					headers: { 'X-WP-Nonce': _nonce, 'Content-Type': 'application/json' },
-					credentials: 'same-origin',
-					body: JSON.stringify({ email, name, role })
-				});
-				const data = await res.json();
-				status.textContent = data.error || 'Invited!';
-				if (!data.error) setTimeout(() => location.reload(), 500);
-			}
-
-			async function noodledDeleteUser(id) {
-				if (!confirm('Remove this user?')) return;
-				await fetch(_api + '/admin/users/' + id, {
-					method: 'DELETE',
-					headers: { 'X-WP-Nonce': _nonce },
-					credentials: 'same-origin'
-				});
-				location.reload();
-			}
-
-			async function noodledApprove(id) {
-				const res = await fetch(_api + '/admin/users/' + id + '/approve', {
-					method: 'POST',
-					headers: { 'X-WP-Nonce': _nonce },
-					credentials: 'same-origin'
-				});
-				const data = await res.json();
-				if (data.error) { alert(data.error); return; }
-				location.reload();
-			}
-
-			async function noodledDeny(id) {
-				if (!confirm('Deny and remove this request?')) return;
-				await fetch(_api + '/admin/users/' + id, {
-					method: 'DELETE',
-					headers: { 'X-WP-Nonce': _nonce },
-					credentials: 'same-origin'
-				});
-				location.reload();
-			}
-			</script>
+			<?php self::render_user_management(); ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Reusable user-management block (pending requests, members, invite). Rendered
+	 * on both the Users page and the Dashboard so members can be managed in one place.
+	 */
+	public static function render_user_management() {
+		$users   = Noodled_Auth::get_all_users();
+		$pending = array_values( array_filter( $users, function( $u ) { return $u['role'] === 'pending'; } ) );
+		$members = array_values( array_filter( $users, function( $u ) { return $u['role'] !== 'pending'; } ) );
+		?>
+		<?php if ( $pending ) : ?>
+		<h2>Pending requests <span class="awaiting-mod"><span class="pending-count"><?php echo count( $pending ); ?></span></span></h2>
+		<table class="widefat striped" style="max-width:860px;margin-bottom:24px">
+			<thead><tr><th>Email</th><th>Name</th><th>Requested</th><th></th></tr></thead>
+			<tbody>
+			<?php foreach ( $pending as $u ) : ?>
+				<tr>
+					<td><?php echo esc_html( $u['email'] ); ?></td>
+					<td><?php echo esc_html( $u['display_name'] ); ?></td>
+					<td><?php echo $u['created_at'] ? esc_html( $u['created_at'] ) : '&mdash;'; ?></td>
+					<td>
+						<button class="button button-primary button-small" onclick="noodledApprove(<?php echo (int) $u['id']; ?>)">Approve</button>
+						<button class="button button-small" onclick="noodledDeny(<?php echo (int) $u['id']; ?>)">Deny</button>
+					</td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+		<?php endif; ?>
+
+		<h2>Members</h2>
+		<table class="widefat striped" style="max-width:860px;margin-bottom:16px">
+			<thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Last Login</th><th title="When on, this member gets a folder whose contents are shared with you, shown under their name">Drop folder</th><th>Actions</th></tr></thead>
+			<tbody>
+			<?php foreach ( $members as $u ) :
+				$is_member = $u['role'] === 'member';
+				$has_drop  = $is_member && Noodled_Notebooks::member_drop_folder( (int) $u['id'] );
+			?>
+				<tr>
+					<td><?php echo esc_html( $u['email'] ); ?></td>
+					<td><?php echo esc_html( $u['display_name'] ); ?></td>
+					<td><?php echo esc_html( $u['role'] ); ?></td>
+					<td><?php echo $u['last_login'] ? esc_html( $u['last_login'] ) : '<em>Never</em>'; ?></td>
+					<td>
+						<?php if ( $is_member ) : ?>
+							<label><input type="checkbox" <?php checked( (bool) $has_drop ); ?> onchange="noodledToggleDrop(<?php echo (int) $u['id']; ?>, this.checked, this)"> Share</label>
+						<?php else : ?>
+							&mdash;
+						<?php endif; ?>
+					</td>
+					<td>
+						<button class="button button-small" onclick="noodledSendPin(<?php echo (int) $u['id']; ?>)">Send PIN</button>
+						<span class="noodled-pin" id="pin-<?php echo (int) $u['id']; ?>" style="margin:0 6px;font-size:12px"></span>
+						<button class="button button-small" onclick="noodledDeleteUser(<?php echo (int) $u['id']; ?>)">Remove</button>
+					</td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+
+		<h3>Invite</h3>
+		<div style="display:flex;gap:8px;max-width:860px;margin-bottom:8px">
+			<input type="email" id="invite-email" placeholder="Email" class="regular-text" style="flex:1">
+			<input type="text" id="invite-name" placeholder="Name (optional)" class="regular-text" style="flex:1">
+			<select id="invite-role"><option value="member">Member</option><option value="admin">Admin</option></select>
+			<button type="button" class="button button-primary" onclick="noodledInvite()">Invite</button>
+		</div>
+		<span id="invite-status"></span>
+
+		<p class="description" style="max-width:860px;margin-top:24px">Notes are private per user. Members share their own notebooks and notes from inside the app. <strong>Drop folder</strong> is the one exception: enabling it gives the member a folder whose contents are shared read/write with you, shown in your account under their name.</p>
+
+		<script>
+		const _nonce = '<?php echo wp_create_nonce( 'wp_rest' ); ?>';
+		const _api = '<?php echo esc_url( rest_url( 'noodled/v1' ) ); ?>';
+
+		async function noodledInvite() {
+			const email = document.getElementById('invite-email').value;
+			const name = document.getElementById('invite-name').value;
+			const role = document.getElementById('invite-role').value;
+			const status = document.getElementById('invite-status');
+			if (!email) { status.textContent = 'Email required'; return; }
+			const res = await fetch(_api + '/admin/users', {
+				method: 'POST',
+				headers: { 'X-WP-Nonce': _nonce, 'Content-Type': 'application/json' },
+				credentials: 'same-origin',
+				body: JSON.stringify({ email, name, role })
+			});
+			const data = await res.json();
+			status.textContent = data.error || 'Invited!';
+			if (!data.error) setTimeout(() => location.reload(), 500);
+		}
+
+		async function noodledDeleteUser(id) {
+			if (!confirm('Remove this user?')) return;
+			await fetch(_api + '/admin/users/' + id, {
+				method: 'DELETE',
+				headers: { 'X-WP-Nonce': _nonce },
+				credentials: 'same-origin'
+			});
+			location.reload();
+		}
+
+		async function noodledApprove(id) {
+			const res = await fetch(_api + '/admin/users/' + id + '/approve', {
+				method: 'POST',
+				headers: { 'X-WP-Nonce': _nonce },
+				credentials: 'same-origin'
+			});
+			const data = await res.json();
+			if (data.error) { alert(data.error); return; }
+			location.reload();
+		}
+
+		async function noodledDeny(id) {
+			if (!confirm('Deny and remove this request?')) return;
+			await fetch(_api + '/admin/users/' + id, {
+				method: 'DELETE',
+				headers: { 'X-WP-Nonce': _nonce },
+				credentials: 'same-origin'
+			});
+			location.reload();
+		}
+
+		async function noodledToggleDrop(id, enabled, el) {
+			el.disabled = true;
+			const res = await fetch(_api + '/admin/users/' + id + '/drop', {
+				method: 'POST',
+				headers: { 'X-WP-Nonce': _nonce, 'Content-Type': 'application/json' },
+				credentials: 'same-origin',
+				body: JSON.stringify({ enabled })
+			});
+			const data = await res.json();
+			el.disabled = false;
+			if (data.error) { alert(data.error); el.checked = !enabled; }
+		}
+
+		async function noodledSendPin(id) {
+			const out = document.getElementById('pin-' + id);
+			out.textContent = '…';
+			const res = await fetch(_api + '/admin/users/' + id + '/pin', {
+				method: 'POST',
+				headers: { 'X-WP-Nonce': _nonce },
+				credentials: 'same-origin'
+			});
+			const data = await res.json();
+			if (data.error) { out.textContent = data.error; return; }
+			out.innerHTML = 'PIN <strong>' + data.pin + '</strong>' + (data.emailed ? ' — emailed ✓' : ' — email failed');
+		}
+		</script>
 		<?php
 	}
 
