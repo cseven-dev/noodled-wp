@@ -3,7 +3,7 @@
  * Plugin Name: Noodled
  * Plugin URI:  https://github.com/cseven-dev/noodled-wp
  * Description: A full web version of the noodled note-taking app with family sharing, magic-link login, and GitHub sync.
- * Version:     1.1.58
+ * Version:     1.1.59
  * Author:      Simon
  * License:     GPL-2.0-or-later
  * Text Domain: noodled
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // "Cannot redeclare class" and a 500 on every page.
 if ( defined( 'NOODLED_VERSION' ) ) return;
 
-define( 'NOODLED_VERSION', '1.1.58' );
+define( 'NOODLED_VERSION', '1.1.59' );
 define( 'NOODLED_FILE', __FILE__ );
 define( 'NOODLED_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NOODLED_URL', plugin_dir_url( __FILE__ ) );
@@ -166,7 +166,11 @@ function noodled_activate() {
 		Noodled_App::register_rewrite();
 		flush_rewrite_rules();
 	} catch ( \Throwable $e ) {
-		wp_die( 'Noodled activation failed: ' . esc_html( $e->getMessage() ) . ' in ' . esc_html( $e->getFile() ) . ':' . $e->getLine() );
+		// Never silently wp_die() the activation screen (that produced a 500 with
+		// nothing in the log). Record the real cause and let activation complete —
+		// noodled_init retries install() on the next load with the same fail-safe,
+		// so a genuine problem is surfaced in php_errorlog instead of hidden.
+		noodled_fail_safe( $e, 'activate' );
 	}
 }
 
