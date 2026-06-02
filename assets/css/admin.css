@@ -1,0 +1,214 @@
+/* ============================================================
+   Noodled admin skin — full-bleed, landing-styled (Fraunces + Inter),
+   light "paper" + dark "app" variants. Scoped to the Noodled page only.
+   ============================================================ */
+
+/* ── Hide WP chrome on the Noodled page (full-bleed takeover) ── */
+body.toplevel_page_noodled #adminmenumain,
+body.toplevel_page_noodled #adminmenuback,
+body.toplevel_page_noodled #adminmenuwrap,
+body.toplevel_page_noodled #wpadminbar,
+body.toplevel_page_noodled #wpfooter { display: none !important; }
+html.wp-toolbar { padding-top: 0 !important; }
+body.toplevel_page_noodled #wpcontent { margin-left: 0 !important; padding-left: 0 !important; }
+body.toplevel_page_noodled #wpbody-content { padding-bottom: 0 !important; }
+body.toplevel_page_noodled #wpbody { float: none; }
+body.toplevel_page_noodled.wp-admin { background: var(--n-paper); }
+body.toplevel_page_noodled .update-nag,
+body.toplevel_page_noodled #wpbody-content > .notice,
+body.toplevel_page_noodled #wpbody-content > #message { display: none; }
+body.toplevel_page_noodled .wrap { margin: 0; max-width: none; padding: 0; }
+/* keep our own settings notices, styled to fit */
+.nood-admin .notice, .nood-admin #message, .nood-admin .updated, .nood-admin .error {
+  background: var(--n-card); border: 1px solid var(--n-line); border-left: 4px solid var(--n-blue);
+  border-radius: 12px; color: var(--n-ink); box-shadow: var(--n-shadow-sm); padding: 10px 14px; margin: 14px 0;
+}
+.nood-admin .notice-success, .nood-admin .updated { border-left-color: #2ea043; }
+.nood-admin .notice-error, .nood-admin .error { border-left-color: #d63638; }
+.nood-admin .notice p, .nood-admin .updated p, .nood-admin .error p { color: var(--n-ink); }
+
+/* ── Design tokens ── */
+.nood-admin {
+  --n-blue: #0078D4; --n-blue-hi: #2E97F0; --n-blue-deep: #0A559E; --n-blue-soft: #E3F1FC;
+  --n-paper: #FAF6F0; --n-paper-alt: #F3ECE1; --n-card: #FFFFFF; --n-line: #E6E1DA;
+  --n-ink: #1A1A1A; --n-soft: #3A3A3A; --n-faint: #6B6B6B;
+  --n-shadow: 0 14px 40px rgba(20,30,60,.10); --n-shadow-sm: 0 2px 8px rgba(20,12,0,.06);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
+  min-height: 100vh; background: var(--n-paper); color: var(--n-ink);
+  -webkit-font-smoothing: antialiased;
+}
+.nood-admin[data-nood-theme="dark"] {
+  --n-blue: #2E97F0; --n-blue-hi: #57ADF5; --n-blue-deep: #0A66B8; --n-blue-soft: rgba(46,151,240,.14);
+  --n-paper: #16181C; --n-paper-alt: #121419; --n-card: #1B1E24; --n-line: #2A2E36;
+  --n-ink: #E8EAED; --n-soft: #C2C7CF; --n-faint: #8B919C;
+  --n-shadow: 0 18px 50px rgba(0,0,0,.45); --n-shadow-sm: 0 2px 10px rgba(0,0,0,.3);
+}
+
+/* ambient blue glow behind everything */
+.nood-admin::before {
+  content: ''; position: fixed; top: -260px; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 620px; pointer-events: none; z-index: 0;
+  background: radial-gradient(closest-side, rgba(46,151,240,.16), transparent 72%);
+}
+
+/* ── Top bar ── */
+.nood-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: color-mix(in srgb, var(--n-paper) 86%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--n-line);
+}
+.nood-bar .nood-brand { display: flex; align-items: center; gap: 10px; }
+.nood-bar .nood-brand svg { width: 34px; height: 34px; display: block; }
+.nood-bar .nood-brand svg path { stroke: var(--n-blue); }
+.nood-bar .nood-brand b {
+  font-family: var(--font-display); font-weight: 900; letter-spacing: -.03em;
+  font-size: 23px; color: var(--n-ink);
+}
+.nood-bar .nood-brand span { font-size: 11px; color: var(--n-faint); font-weight: 500; }
+.nood-bar .nood-spacer { flex: 1; }
+.nood-bar a.nood-link, .nood-bar button.nood-toggle {
+  font: inherit; font-size: 13px; color: var(--n-faint); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px;
+  border: 1px solid transparent; background: transparent; cursor: pointer; transition: .15s;
+}
+.nood-bar a.nood-link:hover, .nood-bar button.nood-toggle:hover {
+  color: var(--n-ink); background: var(--n-card); border-color: var(--n-line);
+}
+
+/* ── Page canvas ── */
+.nood-wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: clamp(18px, 4vw, 34px) clamp(16px, 4vw, 40px) 64px; }
+.nood-admin h1, .nood-admin h2, .nood-admin h3 { font-family: var(--font-display); letter-spacing: -.02em; color: var(--n-ink); }
+.nood-title { font-size: clamp(26px, 4vw, 38px); font-weight: 900; margin: 6px 0 2px; }
+.nood-sub { color: var(--n-faint); font-size: 14px; margin: 0 0 22px; }
+
+/* ── Pill tabs ── */
+.nood-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 26px; }
+.nood-tabs a {
+  font-size: 14px; font-weight: 600; text-decoration: none; color: var(--n-soft);
+  padding: 9px 16px; border-radius: 999px; border: 1px solid var(--n-line);
+  background: var(--n-card); transition: .15s; display: inline-flex; align-items: center; gap: 7px;
+}
+.nood-tabs a:hover { transform: translateY(-1px); box-shadow: var(--n-shadow-sm); }
+.nood-tabs a.active {
+  color: #fff; background: linear-gradient(135deg, var(--n-blue-hi), var(--n-blue-deep));
+  border-color: transparent; box-shadow: 0 8px 22px rgba(46,151,240,.35);
+}
+.nood-tabs .pending-count { background: #d63638; }
+
+/* ── Stat cards ── */
+.nood-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 0 0 26px; }
+.noodled-card {
+  position: relative; overflow: hidden;
+  background: var(--n-card); border: 1px solid var(--n-line); border-radius: 16px;
+  padding: 20px 18px; text-align: left; box-shadow: var(--n-shadow-sm); transition: .2s;
+}
+.noodled-card::after {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--n-blue-hi), transparent);
+  opacity: .8;
+}
+.noodled-card:hover { transform: translateY(-3px); box-shadow: var(--n-shadow); border-color: color-mix(in srgb, var(--n-blue) 40%, var(--n-line)); }
+.noodled-card h3 {
+  font-family: var(--font-display); font-weight: 900; font-size: 30px; line-height: 1;
+  margin: 0; color: var(--n-blue); word-break: break-word;
+}
+.noodled-card p { margin: 8px 0 0; color: var(--n-faint); font-size: 12.5px; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; }
+.noodled-card--hot { border-color: #d63638; }
+.noodled-card--hot h3 { color: #d63638; }
+.noodled-card--hot::after { background: linear-gradient(90deg, #ff6b6d, transparent); }
+
+/* ── Activity chart ── */
+.nood-panel {
+  background: var(--n-card); border: 1px solid var(--n-line); border-radius: 18px;
+  padding: 22px 22px 18px; box-shadow: var(--n-shadow-sm); margin: 0 0 26px;
+}
+.nood-panel > h3 { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+.nood-panel .nood-panel-sub { color: var(--n-faint); font-size: 12px; margin: 0 0 18px; }
+.nood-chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+.nood-chart .bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; justify-content: flex-end; height: 100%; }
+.nood-chart .bar i {
+  display: block; width: 100%; max-width: 26px; border-radius: 6px 6px 3px 3px; min-height: 4px;
+  background: linear-gradient(180deg, var(--n-blue-hi), var(--n-blue-deep));
+  transition: filter .15s; transform-origin: bottom;
+  animation: noodGrow .6s var(--n-ease, cubic-bezier(.22,.61,.36,1)) both;
+}
+.nood-chart .bar:hover i { filter: brightness(1.18); }
+.nood-chart .bar b { font-size: 11px; color: var(--n-soft); font-variant-numeric: tabular-nums; }
+.nood-chart .bar span { font-size: 9px; color: var(--n-faint); }
+@keyframes noodGrow { from { transform: scaleY(0); opacity: .3; } to { transform: scaleY(1); opacity: 1; } }
+
+/* ── Quick links / buttons ── */
+.nood-admin .button, .nood-admin .button-primary, .nood-admin button.button {
+  font-family: var(--font-sans) !important; font-weight: 600 !important;
+  border-radius: 10px !important; border: 1px solid var(--n-line) !important;
+  background: var(--n-card) !important; color: var(--n-ink) !important;
+  padding: 7px 16px !important; height: auto !important; line-height: 1.6 !important;
+  box-shadow: none !important; transition: .15s !important; text-shadow: none !important;
+}
+.nood-admin .button:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--n-blue) 50%, var(--n-line)) !important; }
+.nood-admin .button-primary, .nood-admin .btn-accent {
+  background: linear-gradient(135deg, var(--n-blue-hi), var(--n-blue-deep)) !important;
+  border-color: transparent !important; color: #fff !important;
+  box-shadow: 0 8px 20px rgba(46,151,240,.32) !important;
+}
+.nood-admin .button-small, .nood-admin .button.button-small { padding: 4px 11px !important; font-size: 12px !important; }
+
+/* ── Forms (override WP form-table) ── */
+.nood-admin .form-table { background: var(--n-card); border: 1px solid var(--n-line); border-radius: 18px; box-shadow: var(--n-shadow-sm); padding: 8px 22px; margin-top: 8px; }
+.nood-admin .form-table th { color: var(--n-ink); font-weight: 700; font-size: 14px; padding: 18px 10px 18px 0; width: 200px; }
+.nood-admin .form-table td { padding: 14px 0; }
+.nood-admin .form-table tr { border-bottom: 1px solid var(--n-line); }
+.nood-admin .form-table tr:last-child { border-bottom: none; }
+.nood-admin input[type=text], .nood-admin input[type=email], .nood-admin input[type=password],
+.nood-admin input[type=url], .nood-admin input[type=number], .nood-admin select, .nood-admin textarea {
+  background: var(--n-paper-alt) !important; border: 1px solid var(--n-line) !important;
+  border-radius: 10px !important; color: var(--n-ink) !important; padding: 9px 13px !important;
+  font-family: var(--font-sans) !important; box-shadow: none !important; min-height: 0 !important;
+}
+.nood-admin input:focus, .nood-admin select:focus, .nood-admin textarea:focus {
+  border-color: var(--n-blue) !important; box-shadow: 0 0 0 3px var(--n-blue-soft) !important; outline: none !important;
+}
+.nood-admin .description, .nood-admin p.description { color: var(--n-faint); font-size: 12.5px; }
+.nood-admin .regular-text { max-width: 100%; }
+
+/* ── Tables → dark/paper rows ── */
+.nood-admin .widefat {
+  background: var(--n-card); border: 1px solid var(--n-line); border-radius: 16px;
+  overflow: hidden; box-shadow: var(--n-shadow-sm); border-collapse: separate; border-spacing: 0;
+}
+.nood-admin .widefat thead th { background: var(--n-paper-alt); color: var(--n-faint); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; border: none; }
+.nood-admin .widefat td, .nood-admin .widefat th { border-color: var(--n-line) !important; color: var(--n-ink); }
+.nood-admin .widefat tbody tr { background: transparent; }
+.nood-admin .widefat.striped tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--n-paper-alt) 50%, transparent); }
+.nood-admin .widefat tbody tr:hover { background: var(--n-blue-soft); }
+
+/* invite / user-management bits */
+.nood-admin h2, .nood-admin h3 { margin-top: 26px; }
+.nood-admin .noodled-import-card { background: var(--n-card) !important; border: 1px solid var(--n-line) !important; border-radius: 18px !important; box-shadow: var(--n-shadow-sm); }
+.nood-admin .noodled-import-card h2 { margin-top: 0; }
+.nood-admin .awaiting-mod { background: #d63638; }
+.nood-admin code { background: var(--n-paper-alt); color: var(--n-blue); border-radius: 6px; padding: 2px 7px; }
+.nood-admin .nav-tab-wrapper { display: none; } /* replaced by .nood-tabs */
+.nood-admin hr { border-color: var(--n-line); }
+
+/* ── Mobile ── */
+@media (max-width: 782px) {
+  body.toplevel_page_noodled #wpcontent { padding-top: 0 !important; }
+  .nood-wrap { padding: 16px 14px 56px; }
+  .nood-bar { padding: 12px 14px; }
+  .nood-bar .nood-brand span { display: none; }
+  .nood-tabs { gap: 6px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .nood-tabs a { white-space: nowrap; }
+  .nood-admin .form-table th { display: block; width: auto; padding: 14px 0 4px; }
+  .nood-admin .form-table td { display: block; padding: 0 0 14px; }
+  .nood-admin .widefat thead { display: none; }
+  .nood-admin .widefat td { display: block; border: none !important; padding: 2px 14px; }
+  .nood-admin .widefat tbody tr { display: block; border-bottom: 1px solid var(--n-line); padding: 10px 0; }
+  .nood-chart { height: 90px; gap: 3px; }
+  .nood-chart .bar span { display: none; }
+}

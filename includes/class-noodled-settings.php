@@ -11,6 +11,31 @@ class Noodled_Settings {
 		add_action( 'admin_init', [ __CLASS__, 'handle_landing_upload' ] );
 		add_action( 'admin_init', [ __CLASS__, 'handle_evernote_upload' ] );
 		add_action( 'admin_init', [ __CLASS__, 'maybe_redirect_to_setup' ] );
+		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin' ] );
+	}
+
+	/** Load the landing-styled admin skin + fonts, only on the Noodled page. */
+	public static function enqueue_admin( $hook ) {
+		if ( $hook !== 'toplevel_page_noodled' ) return;
+		wp_enqueue_style( 'noodled-admin-fonts', 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap', [], null );
+		wp_enqueue_style( 'noodled-admin', NOODLED_URL . 'assets/css/admin.css', [], NOODLED_VERSION );
+	}
+
+	/**
+	 * Backend theme — follows the app theme stored in the admin's noodled config,
+	 * and the ?nood_theme toggle writes back so the app and backend stay in sync.
+	 */
+	private static function admin_theme(): string {
+		global $wpdb;
+		$email = wp_get_current_user()->user_email;
+		$nid   = $email ? (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}noodled_users WHERE email = %s", $email ) ) : 0;
+		$cfg   = $nid ? get_option( 'noodled_config_' . $nid, [] ) : [];
+		$theme = ( $cfg['theme'] ?? '' ) ?: 'dark';
+		if ( isset( $_GET['nood_theme'] ) && in_array( $_GET['nood_theme'], [ 'dark', 'light' ], true ) ) {
+			$theme = $_GET['nood_theme'];
+			if ( $nid ) { $cfg['theme'] = $theme; update_option( 'noodled_config_' . $nid, $cfg ); }
+		}
+		return $theme;
 	}
 
 	/* ────────────────────────────────────────────────────────────
@@ -152,29 +177,40 @@ class Noodled_Settings {
 		if ( ! isset( $tabs[ $tab ] ) ) $tab = 'overview';
 		$pending = Noodled_Auth::get_pending_count();
 		$bubble  = $pending ? ' <span class="awaiting-mod"><span class="pending-count">' . (int) $pending . '</span></span>' : '';
+		$theme   = self::admin_theme();
+		$other   = $theme === 'dark' ? 'light' : 'dark';
+		$brand   = self::get_brand_name();
+		$noodle  = '<svg viewBox="0 0 30 30" fill="none"><path d="M5 19 C5 11, 12 8, 15 13 C17 16, 12 20, 11 16 C10 12, 17 9, 21 13 C24 16, 23 21, 26 19" stroke-width="3" stroke-linecap="round"/></svg>';
 		?>
-		<div class="wrap">
-			<h1 style="margin-bottom:8px">Noodled</h1>
-			<h2 class="nav-tab-wrapper">
-				<?php foreach ( $tabs as $k => $label ) :
-					$url = admin_url( 'admin.php?page=noodled&tab=' . $k );
-					?>
-					<a href="<?php echo esc_url( $url ); ?>" class="nav-tab<?php echo $tab === $k ? ' nav-tab-active' : ''; ?>"><?php echo esc_html( $label ) . ( $k === 'users' ? $bubble : '' ); ?></a>
-				<?php endforeach; ?>
-			</h2>
-			<div style="margin-top:20px">
-			<?php
-			switch ( $tab ) {
-				case 'users':    self::render_user_management(); break;
-				case 'branding': self::render_branding();        break;
-				case 'import':   self::render_import();           break;
-				case 'sync':     self::render_sync();             break;
-				case 'settings': self::render_settings();         break;
-				default:         self::render_overview();
-			}
-			?>
+		<div class="wrap"><div class="nood-admin" data-nood-theme="<?php echo esc_attr( $theme ); ?>">
+			<div class="nood-bar">
+				<div class="nood-brand"><?php echo $noodle; // phpcs:ignore ?>
+					<span style="display:flex;flex-direction:column;line-height:1.05"><b><?php echo esc_html( $brand ); ?></b><span>control room</span></span>
+				</div>
+				<div class="nood-spacer"></div>
+				<a class="nood-toggle" href="<?php echo esc_url( add_query_arg( [ 'tab' => $tab, 'nood_theme' => $other ] ) ); ?>"><?php echo $theme === 'dark' ? '&#9728;&#65038; Light' : '&#9789; Dark'; ?></a>
+				<a class="nood-link" href="<?php echo esc_url( admin_url() ); ?>">WP&nbsp;Admin &#8599;</a>
 			</div>
-		</div>
+			<div class="nood-wrap">
+				<div class="nood-tabs">
+					<?php foreach ( $tabs as $k => $label ) :
+						$url = admin_url( 'admin.php?page=noodled&tab=' . $k );
+						?>
+						<a href="<?php echo esc_url( $url ); ?>" class="<?php echo $tab === $k ? 'active' : ''; ?>"><?php echo esc_html( $label ) . ( $k === 'users' ? $bubble : '' ); ?></a>
+					<?php endforeach; ?>
+				</div>
+				<?php
+				switch ( $tab ) {
+					case 'users':    self::render_user_management(); break;
+					case 'branding': self::render_branding();        break;
+					case 'import':   self::render_import();           break;
+					case 'sync':     self::render_sync();             break;
+					case 'settings': self::render_settings();         break;
+					default:         self::render_overview();
+				}
+				?>
+			</div>
+		</div></div>
 		<?php
 	}
 
@@ -193,6 +229,19 @@ class Noodled_Settings {
 		$pending     = Noodled_Auth::get_pending_count();
 		$last_sync   = get_option( 'noodled_last_sync' );
 		$preview_url = add_query_arg( 'noodled_preview', 'landing', self::is_homepage_mode() ? home_url( '/' ) : $app_url );
+
+		// 14-day notes-created activity for the chart.
+		$rows = $wpdb->get_results(
+			"SELECT DATE(created_at) d, COUNT(*) c FROM {$p}noodled_notes
+			 WHERE deleted_at IS NULL AND created_at >= (UTC_TIMESTAMP() - INTERVAL 13 DAY)
+			 GROUP BY DATE(created_at)", OBJECT_K );
+		$days = [];
+		for ( $i = 13; $i >= 0; $i-- ) {
+			$date = gmdate( 'Y-m-d', time() - $i * DAY_IN_SECONDS );
+			$days[ $date ] = isset( $rows[ $date ] ) ? (int) $rows[ $date ]->c : 0;
+		}
+		$peak = max( 1, max( $days ) );
+
 		$cards = [
 			[ 'v' => $note_count,                       'l' => 'Notes' ],
 			[ 'v' => count( $notebooks ),               'l' => 'Notebooks' ],
@@ -206,16 +255,32 @@ class Noodled_Settings {
 			[ 'v' => 'v' . NOODLED_VERSION,             'l' => 'Version' ],
 		];
 		?>
-		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:4px 0 20px">
+		<div class="nood-cards">
 			<?php foreach ( $cards as $c ) : ?>
 			<div class="noodled-card<?php echo ! empty( $c['hot'] ) ? ' noodled-card--hot' : ''; ?>">
-				<h3<?php echo ! empty( $c['small'] ) ? ' style="font-size:15px"' : ''; ?>><?php echo $c['v']; ?></h3>
+				<h3<?php echo ! empty( $c['small'] ) ? ' style="font-size:17px"' : ''; ?>><?php echo $c['v']; ?></h3>
 				<p><?php echo esc_html( $c['l'] ); ?></p>
 			</div>
 			<?php endforeach; ?>
 		</div>
 
-		<h2>Quick Links</h2>
+		<div class="nood-panel">
+			<h3>Notes created</h3>
+			<div class="nood-panel-sub">Last 14 days</div>
+			<div class="nood-chart">
+				<?php foreach ( $days as $date => $count ) :
+					$h = $count ? max( 6, (int) round( $count / $peak * 80 ) ) : 3;
+					?>
+					<div class="bar" title="<?php echo esc_attr( $date . ' · ' . $count . ' notes' ); ?>">
+						<b><?php echo $count ?: ''; ?></b>
+						<i style="height:<?php echo (int) $h; ?>%"></i>
+						<span><?php echo esc_html( gmdate( 'j', strtotime( $date ) ) ); ?></span>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		</div>
+
+		<h2>Quick links</h2>
 		<p><a href="<?php echo esc_url( $app_url ); ?>" target="_blank" class="button button-primary">Open App</a>
 		<?php if ( self::is_homepage_mode() ) : ?>
 			<a href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" class="button">Open Homepage</a>
@@ -223,14 +288,6 @@ class Noodled_Settings {
 			<a href="<?php echo esc_url( $preview_url ); ?>" target="_blank" class="button">Preview Landing Page</a>
 		</p>
 		<p class="description">The landing page only shows to logged-out visitors, so use <strong>Preview Landing Page</strong> to see it while signed in.</p>
-
-		<style>
-		.noodled-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;text-align:center}
-		.noodled-card h3{margin:0;font-size:28px;color:#0078d4;word-break:break-word}
-		.noodled-card p{margin:6px 0 0;color:#666;font-size:13px}
-		.noodled-card--hot{border-color:#d63638}
-		.noodled-card--hot h3{color:#d63638}
-		</style>
 		<?php
 	}
 
