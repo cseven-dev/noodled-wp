@@ -922,6 +922,19 @@ body.reading-mode .rendered-content { cursor: default; }
 .noodled-lightbox .lb-prev { left: 16px; }
 .noodled-lightbox .lb-next { right: 16px; }
 
+/* ── Owner: manage people ── */
+.mu-head { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin: 16px 0 6px; }
+.mu-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.mu-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mu-info b { color: var(--text-bright); font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+.mu-info span { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.mu-pin { color: var(--green, #34d399); }
+.mu-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.mu-drop { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.mu-invite { display: flex; flex-direction: column; gap: 8px; }
+.mu-invite-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mu-status { font-size: 12px; color: var(--text-muted); }
+
 /* ── Save queue indicator ── */
 .save-queued { color: var(--yellow, #f59e0b) !important; }
 

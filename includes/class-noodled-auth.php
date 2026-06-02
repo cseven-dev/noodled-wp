@@ -272,6 +272,24 @@ class Noodled_Auth {
 		return self::get_current_user() !== null;
 	}
 
+	/**
+	 * Is the current request "the owner" — i.e. you? In wp-admin that's any WP
+	 * admin. In the app (PIN session) it's only the original admin account: the
+	 * one whose email matches the site admin email, or failing that the first
+	 * admin user created. Other admins or members can't manage users from the app.
+	 */
+	public static function is_owner(): bool {
+		if ( is_user_logged_in() && current_user_can( 'manage_options' ) ) return true;
+		$u = self::get_current_user();
+		if ( ! $u || ( $u['wp'] ?? false ) || ( $u['role'] ?? '' ) !== 'admin' ) return false;
+		if ( strcasecmp( (string) $u['email'], (string) get_option( 'admin_email' ) ) === 0 ) return true;
+		global $wpdb;
+		$first = (int) $wpdb->get_var(
+			"SELECT id FROM {$wpdb->prefix}noodled_users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+		);
+		return $first > 0 && (int) $u['id'] === $first;
+	}
+
 	public static function logout(): void {
 		$session = $_COOKIE[ self::$cookie_name ] ?? '';
 		if ( $session ) {

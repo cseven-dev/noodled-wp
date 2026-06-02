@@ -57,6 +57,12 @@ const api = {
   search(query)                          { return this._fetch('/search?q=' + encodeURIComponent(query)); },
   save_attachment(nb, noteId, name, b64) { return this._fetch('/attachments', { method: 'POST', body: JSON.stringify({ note_id: noteId, filename: name, data: b64 }) }); },
   import_evernote(formData)              { return fetch(this._base + '/import/evernote', { method: 'POST', headers: { 'X-WP-Nonce': this._nonce }, credentials: 'same-origin', body: formData }).then(r => r.json()); },
+  admin_users()                          { return this._fetch('/admin/users'); },
+  admin_invite(email, name, role, drop)  { return this._fetch('/admin/users', { method: 'POST', body: JSON.stringify({ email, name, role, drop }) }); },
+  admin_delete_user(id)                  { return this._fetch('/admin/users/' + id, { method: 'DELETE' }); },
+  admin_approve(id)                      { return this._fetch('/admin/users/' + id + '/approve', { method: 'POST' }); },
+  admin_send_pin(id)                     { return this._fetch('/admin/users/' + id + '/pin', { method: 'POST' }); },
+  admin_set_drop(id, enabled)            { return this._fetch('/admin/users/' + id + '/drop', { method: 'POST', body: JSON.stringify({ enabled }) }); },
   get_config()                           { return this._fetch('/config'); },
   set_config(key, value)                 { return this._fetch('/config', { method: 'PUT', body: JSON.stringify({ key, value }) }); },
   get_version()                          { return Promise.resolve(noodledConfig.version); },
@@ -1092,6 +1098,82 @@ async function handleEvernoteImport(input) {
     const n = res.imported || 0;
     showToast(`Imported ${n} note${n !== 1 ? 's' : ''}` + (res.skipped ? `, ${res.skipped} skipped` : ''));
   } catch (e) { showToast('Import failed'); }
+}
+
+// ── Owner: manage people (mobile-friendly user management, owner-only) ──
+function manageUsers() {
+  const menu = document.getElementById('appMenu'); if (menu) menu.classList.remove('show');
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal" style="max-width:540px">
+      <h3>People</h3>
+      <div id="muBody" style="max-height:62vh;overflow:auto;margin-top:8px">Loading…</div>
+      <div class="modal-buttons" style="margin-top:12px">
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+      </div>
+    </div></div>`;
+  renderManageUsers();
+}
+
+async function renderManageUsers() {
+  const body = document.getElementById('muBody');
+  if (!body) return;
+  let users;
+  try { users = await api.admin_users(); } catch (e) { body.textContent = 'Could not load people.'; return; }
+  if (users.error) { body.textContent = users.error; return; }
+  const pending = users.filter(u => u.role === 'pending');
+  const members = users.filter(u => u.role !== 'pending');
+  let h = '';
+  if (pending.length) {
+    h += '<div class="mu-head">Pending requests</div>';
+    pending.forEach(u => {
+      h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)}</span></div>
+        <div class="mu-actions"><button class="btn btn-sm btn-accent" onclick="muApprove(${u.id})">Approve</button><button class="btn btn-sm" onclick="muRemove(${u.id})">Deny</button></div></div>`;
+    });
+  }
+  h += '<div class="mu-head">Members</div>';
+  members.forEach(u => {
+    const drop = u.role === 'member'
+      ? `<label class="mu-drop"><input type="checkbox" ${u.drop ? 'checked' : ''} onchange="muDrop(${u.id}, this.checked)"> drop</label>` : '';
+    h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)} · ${esc(u.role)}</span><span class="mu-pin" id="mu-pin-${u.id}"></span></div>
+      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">PIN</button><button class="btn btn-sm" onclick="muRemove(${u.id})">&#10005;</button></div></div>`;
+  });
+  h += `<div class="mu-head">Invite someone</div>
+    <div class="mu-invite">
+      <input id="muEmail" type="email" inputmode="email" placeholder="email" class="login-input" style="margin:0">
+      <input id="muName" type="text" placeholder="name (optional)" class="login-input" style="margin:0">
+      <div class="mu-invite-row">
+        <label class="mu-drop"><input type="checkbox" id="muInviteDrop"> drop folder</label>
+        <button class="btn btn-sm btn-accent" onclick="muInvite()">Invite</button>
+        <span id="muInviteStatus" class="mu-status"></span>
+      </div>
+    </div>`;
+  body.innerHTML = h;
+}
+
+async function muApprove(id) { try { await api.admin_approve(id); } catch (e) { showToast('Failed'); } renderManageUsers(); }
+async function muRemove(id) { if (!confirm('Remove this person? Their notes stay but they lose access.')) return; try { await api.admin_delete_user(id); } catch (e) { showToast('Failed'); } renderManageUsers(); }
+async function muDrop(id, on) { try { const r = await api.admin_set_drop(id, on); if (r && r.error) showToast(r.error); } catch (e) { showToast('Failed'); } }
+async function muPin(id) {
+  const out = document.getElementById('mu-pin-' + id); if (out) out.textContent = '…';
+  try { const d = await api.admin_send_pin(id); if (out) out.innerHTML = d.error ? esc(d.error) : (' PIN <b>' + esc(d.pin) + '</b>' + (d.emailed ? ' ✓' : '')); }
+  catch (e) { if (out) out.textContent = 'failed'; }
+}
+async function muInvite() {
+  const email = document.getElementById('muEmail').value.trim();
+  const name = document.getElementById('muName').value.trim();
+  const drop = document.getElementById('muInviteDrop').checked;
+  const st = document.getElementById('muInviteStatus');
+  if (!email) { st.textContent = 'email?'; return; }
+  st.textContent = '…';
+  let d;
+  try { d = await api.admin_invite(email, name, 'member', drop); } catch (e) { st.textContent = 'failed'; return; }
+  if (d.error) { st.textContent = d.error; return; }
+  document.getElementById('muEmail').value = '';
+  document.getElementById('muName').value = '';
+  document.getElementById('muInviteDrop').checked = false;
+  st.textContent = 'invited ✓';
+  renderManageUsers();
 }
 
 // ── Checkbox toggle ──

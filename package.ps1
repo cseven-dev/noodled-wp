@@ -246,6 +246,29 @@ if ($Deploy) {
     }
 
     Write-Host "Uploaded $uploaded files" -ForegroundColor Green
+
+    # ── Flush OPcache so the new code runs immediately ──
+    # SiteGround caches compiled PHP and ignores file mtimes, so an FTP deploy
+    # otherwise keeps executing the old bytecode until PHP-FPM restarts. Drop a
+    # one-shot reset script in the web root, hit it, delete it.
+    $siteRoot = ($FtpPath -split '/public_html')[0]
+    $domain   = $siteRoot.Trim('/')
+    if ($domain) {
+        $resetFtp = "ftp://$FtpHost$siteRoot/public_html/_ocreset.php"
+        $php = '<?php if(function_exists("opcache_reset")){opcache_reset();} echo "ok";'
+        try {
+            $up = [System.Net.FtpWebRequest]::Create($resetFtp)
+            $up.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+            $up.Credentials = $cred; $up.UsePassive = $true; $up.UseBinary = $true
+            $b = [System.Text.Encoding]::ASCII.GetBytes($php)
+            $s = $up.GetRequestStream(); $s.Write($b, 0, $b.Length); $s.Close(); $up.GetResponse().Close()
+            Invoke-WebRequest "https://$domain/_ocreset.php?cb=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" -TimeoutSec 20 -UseBasicParsing | Out-Null
+            $del = [System.Net.FtpWebRequest]::Create($resetFtp)
+            $del.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile; $del.Credentials = $cred; $del.UsePassive = $true
+            $del.GetResponse().Close()
+            Write-Host "Flushed OPcache" -ForegroundColor Green
+        } catch { Write-Warning "OPcache flush skipped: $_" }
+    }
 }
 
 Write-Host ""

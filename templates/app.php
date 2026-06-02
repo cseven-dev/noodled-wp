@@ -59,6 +59,10 @@
   <div class="toolbar-menu-wrap">
     <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn">&#8942;</button>
     <div class="toolbar-dropdown" id="appMenu">
+      <?php if ( ! empty( $config['user']['owner'] ) ) : ?>
+      <div class="dropdown-item" onclick="manageUsers()">&#128101; Manage people</div>
+      <div class="dropdown-sep"></div>
+      <?php endif; ?>
       <div class="dropdown-item" onclick="showTemplates()">New from template</div>
       <div class="dropdown-item" onclick="openDailyJournal()">Daily journal</div>
       <div class="dropdown-sep"></div>

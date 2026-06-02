@@ -50,6 +50,7 @@ class Noodled_App {
 				'name'  => $current_user['name'],
 				'email' => $current_user['email'],
 				'admin' => $current_user['role'] === 'admin',
+				'owner' => Noodled_Auth::is_owner(),
 			],
 		];
 	}

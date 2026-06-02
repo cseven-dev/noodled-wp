@@ -140,9 +140,11 @@ class Noodled_REST {
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'share_notebook' ], ] + $auth,
 		] );
 
-		// Admin: user management
-		$admin = [ 'permission_callback' => function() { return current_user_can( 'manage_options' ); } ];
+		// Admin: user management. Owner-gated so it also works from the app (the
+		// original admin's PIN session), not just a WP-logged-in administrator.
+		$admin = [ 'permission_callback' => function() { return Noodled_Auth::is_owner(); } ];
 		register_rest_route( $ns, '/admin/users', [
+			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'admin_list_users' ], ] + $admin,
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'admin_invite_user' ], ] + $admin,
 		] );
 		register_rest_route( $ns, '/admin/users/(?P<id>\d+)', [
@@ -795,6 +797,16 @@ class Noodled_REST {
 	}
 
 	// ── Admin: User & Permission Management ──
+
+	/** List all users (for the in-app owner user manager), with drop-folder state. */
+	public static function admin_list_users(): \WP_REST_Response {
+		$users = Noodled_Auth::get_all_users();
+		foreach ( $users as &$u ) {
+			$u['id']   = (int) $u['id'];
+			$u['drop'] = $u['role'] === 'member' && (bool) Noodled_Notebooks::member_drop_folder( (int) $u['id'] );
+		}
+		return new \WP_REST_Response( $users );
+	}
 
 	public static function admin_invite_user( \WP_REST_Request $req ): \WP_REST_Response {
 		$email  = $req->get_param( 'email' );
