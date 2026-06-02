@@ -41,7 +41,7 @@ if (!(Test-Path "$pluginDir\dist")) { New-Item -ItemType Directory -Path "$plugi
 if (Test-Path $zipPath) { Remove-Item $zipPath }
 
 # Create zip excluding dev files
-$exclude = @("dist", ".git", ".env", "CLAUDE.md", "package.ps1", "*.zip")
+$exclude = @("dist", ".git", ".claude", ".env", "CLAUDE.md", "package.ps1", "*.zip")
 $tempDir = "$env:TEMP\noodled-pkg"
 if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
 New-Item -ItemType Directory -Path "$tempDir\$pluginName" | Out-Null
@@ -62,7 +62,21 @@ Get-ChildItem $pluginDir -Recurse | Where-Object {
     Copy-Item $_.FullName $dest
 }
 
-Compress-Archive -Path "$tempDir\$pluginName" -DestinationPath $zipPath -Force
+# Build the zip with forward-slash entry names. Compress-Archive / .NET on
+# Windows write backslash separators, which WordPress extracts on Linux as a
+# literal file "noodled\noodled.php" instead of a folder — causing the
+# "plugin file does not exist" install error.
+Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
+$base = (Resolve-Path $tempDir).Path.TrimEnd("\") + "\"
+$zip  = [System.IO.Compression.ZipFile]::Open($zipPath, "Create")
+try {
+    Get-ChildItem -Path "$tempDir\$pluginName" -Recurse -File | ForEach-Object {
+        $entry = $_.FullName.Substring($base.Length).Replace("\", "/")
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entry) | Out-Null
+    }
+} finally {
+    $zip.Dispose()
+}
 Remove-Item $tempDir -Recurse -Force
 
 $size = [math]::Round((Get-Item $zipPath).Length / 1KB, 1)
