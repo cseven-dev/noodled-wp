@@ -432,6 +432,15 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   width: min(420px, 92%);
   margin-left: auto;
 }
+/* stacked-deck look + each new note "lands" on the pile */
+.type-card::before, .type-card::after {
+  content: ""; position: absolute; inset: 0; border-radius: 18px; z-index: -1;
+  background: var(--white); border: 1px solid var(--rule); box-shadow: var(--shadow-md);
+}
+.type-card::before { transform: translate(9px, 11px) rotate(2deg); }
+.type-card::after  { transform: translate(18px, 22px) rotate(4deg); }
+.type-card.land { animation: tcLand .52s var(--ease); }
+@keyframes tcLand { from { transform: translateY(-16px) scale(.975); opacity: .55; } to { transform: translateY(0) scale(1); opacity: 1; } }
 .type-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .type-card__top .tdot { width: 11px; height: 11px; border-radius: 50%; }
 .type-card__title { margin-left: 8px; font-size: 13px; color: var(--slate); font-weight: 600; }
@@ -1346,17 +1355,17 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       { file: "skate / saturday-session.md", steps: [
           { type: `Today I\u2019m gonna land that kickflip\u2026`, speed: 36 },
           { erase: true },
-          { type: `Yeah. Right. \uD83D\uDE0C Filmed the kids\u2019 lines instead \u2014 way safer on the knees. <span class="tt">#skate</span>`, speed: 26 } ] },
+          { type: `Yeah. Right. \uD83D\uDE0C Film the homies instead with the drone, safer on the knees. <span class="tt">#skate</span>`, speed: 26 } ] },
       { file: "voice / from-plaud.md", attach: PLAUD("0:38"), steps: [
-          { type: `<h3>Voice memo \u2014 at the park</h3>\u201CNote to self: stretch <em>before</em> skating, not in the ER waiting room. Also we\u2019re out of grip tape.\u201D Transcribed one-handed between runs.` } ] },
+          { type: `<h3>Voice memo at the park</h3>\u201CNote to self: stretch <em>before</em> skating, not in the ER waiting room.\u201D Transcribed one-handed while bandaging an ankle.` } ] },
       { file: "home / parenting.md", steps: [
           { type: `<h3>11:47pm search history</h3>\u201Chow to discipline kids in 2026 without screens, sugar, raising your voice, bribery, or eye contact.\u201D <span class="tt">#kids</span>\n\n0 useful results. Closed 14 tabs. We move.` } ] },
       { file: "drones / repair-log.md", attach: PHOTO("cam2"), steps: [
-          { type: `<h3>Drone down. Again.</h3>A brand-new failure mode this time \u2014 genuinely impressed. Soldering the <span class="wlink">[[motor lead]]</span> back on for the third time. Before/after for the shame wall: <span class="tt">#drones</span>` } ] },
+          { type: `<h3>Drone down. Again.</h3>A brand-new failure mode this time. Genuinely impressed. Soldering the <span class="wlink">[[motor lead]]</span> back on for the third time. Before/after for the shame wall: <span class="tt">#drones</span>` } ] },
       { file: "dev / wtf.md", attach: FILE("build-error.log"), steps: [
           { type: `<h3>It\u2019s 2026, why</h3>Build died with <code>PC LOAD LETTER</code>.\n\n\u2026 what the actual f does that even mean. Attaching the log so future-me can also have no idea. <span class="tt">#programming</span>` } ] },
       { file: "home / dishwasher.md", attach: PHOTO("cam3"), steps: [
-          { type: `<h3>The dishwasher is dying</h3>Death rattle is back. Manual says check the <span class="wlink">[[drain pump]]</span>. Reality: hand-wash duty till further notice \u2014 no skipping the dishes in this house. \u270B <span class="tt">#fixit</span>` } ] },
+          { type: `<h3>The dishwasher is dying</h3>Death rattle is back. Manual says check the <span class="wlink">[[drain pump]]</span>. Reality: hand-wash duty till further notice. No skipping the dishes in this house. \u270B <span class="tt">#fixit</span>` } ] },
       { file: "home / dinner.md", steps: [
           { type: `<h3>The 5pm crisis</h3>Tonight\u2019s contenders: tacos (again), \u201CI don\u2019t care, you pick,\u201D or a noble surrender to takeout. Leaning takeout. Guilt: <span class="tt">#pending</span>` } ] },
       { file: "ideas / shower-thoughts.md", attach: PHOTO(""), steps: [
@@ -1364,7 +1373,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       { file: "home / fix-it.md", steps: [
           { type: `<h3>I\u2019ve got this</h3>Watched 3 YouTube videos. Now confident <em>and</em> wrong. Parts ordered. Told the family \u201CI\u2019ve got it.\u201D <span class="wlink">[[I do not got it]]</span> <span class="tt">#fixit</span>` } ] },
       { file: "dev / shipped-it.md", steps: [
-          { type: `<h3>Famous last words</h3>\u201CIt works on my machine.\u201D Shipped it. It did not, in fact, work on the machine. A memoir \u2014 in production. <span class="tt">#programming</span>` } ] },
+          { type: `<h3>Famous last words</h3>\u201CIt works on my machine.\u201D Shipped it. It did not, in fact, work on the machine. A memoir, in production. <span class="tt">#programming</span>` } ] },
     ];
 
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -1382,7 +1391,10 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       });
     }
 
+    function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
     async function runNote(n) {
+      const card = body.closest(".type-card");
+      if (card) { card.classList.remove("land"); void card.offsetWidth; card.classList.add("land"); }
       if (attachEl) attachEl.innerHTML = "";
       body.innerHTML = ""; setCounts("");
       if (fileEl) fileEl.textContent = n.file;
@@ -1394,7 +1406,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       await sleep(n.attach ? 4400 : 3700);
     }
 
-    async function cycle() { for (;;) { for (const n of NOTES) await runNote(n); } }
+    async function cycle() { for (;;) { for (const n of shuffle(NOTES)) await runNote(n); } }
     whenVisible(body.closest(".type-card") || body, () => setTimeout(cycle, 400), { ratio: 0.2 });
   }
 
@@ -1413,9 +1425,9 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       { title: "Brain dump \u2192 plan", steps: [
           { type: `ok dishwasher is dying again, there's a part, the youtube guy said pump or gasket, need it before it floods, and remember to tell everyone i've got it`, speed: 13 },
           { erase: true },
-          { type: `<h2>Dishwasher \u2014 fix plan</h2><div class="li"><span class="bx">\u25A2</span><span>Check the <span class="wl">[[drain pump]]</span> \u2014 the YouTube guy was right (annoyingly)</span></div><div class="li"><span class="bx">\u25A2</span><span>Order the gasket before it floods. Again.</span></div><div class="li done"><span class="bx">\u25A3</span><span>Tell the family "I've got this." Narrator: he did not.</span></div><p><span class="tg">#fixit</span> <span class="tg">#home</span></p>`, speed: 13 } ] },
+          { type: `<h2>Dishwasher fix plan</h2><div class="li"><span class="bx">\u25A2</span><span>Check the <span class="wl">[[drain pump]]</span>. The YouTube guy was right (annoyingly)</span></div><div class="li"><span class="bx">\u25A2</span><span>Order the gasket before it floods. Again.</span></div><div class="li done"><span class="bx">\u25A3</span><span>Tell the family "I've got this." Narrator: he did not.</span></div><p><span class="tg">#fixit</span> <span class="tg">#home</span></p>`, speed: 13 } ] },
       { title: "Drone repair log", steps: [
-          { type: `<h2>Drone repair log</h2><p>Third solder on the <span class="wl">[[motor lead]]</span>. A brand-new failure mode every single time \u2014 honestly, a real artist.</p><div class="li done"><span class="bx">\u25A3</span><span>Re-tin the pad</span></div><div class="li"><span class="bx">\u25A2</span><span>Maybe stop flying it into the fence</span></div><p><span class="tg">#drones</span></p>`, speed: 14 } ] },
+          { type: `<h2>Drone repair log</h2><p>Third solder on the <span class="wl">[[motor lead]]</span>. A brand-new failure mode every single time. Honestly, a real artist.</p><div class="li done"><span class="bx">\u25A3</span><span>Re-tin the pad</span></div><div class="li"><span class="bx">\u25A2</span><span>Maybe stop flying it into the fence</span></div><p><span class="tg">#drones</span></p>`, speed: 14 } ] },
       { title: "Shipped it", steps: [
           { type: `<h2>Famous last words</h2><p>"It works on my machine." Shipped it. <span class="wl">[[OPcache]]</span> had other plans.</p><div class="li"><span class="bx">\u25A2</span><span>Flush the cache <em>before</em> declaring victory</span></div><p><span class="tg">#programming</span> <span class="tg">#humility</span></p>`, speed: 14 } ] },
     ];
@@ -1445,7 +1457,8 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       }
       await sleep(5200);
     }
-    async function cycle() { for (;;) { for (const n of NOTES) await runNote(n); } }
+    function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    async function cycle() { for (;;) { for (const n of shuffle(NOTES)) await runNote(n); } }
     whenVisible(body.closest(".app") || body, () => setTimeout(cycle, 300), { ratio: 0.18 });
   }
 
