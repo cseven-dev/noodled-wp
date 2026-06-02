@@ -470,14 +470,27 @@ class Noodled_Auth {
 	}
 
 	public static function handle_verify( \WP_REST_Request $req ): \WP_REST_Response {
-		$token = $req->get_param( 'token' );
-		if ( ! $token ) return new \WP_REST_Response( [ 'error' => 'Token required' ], 400 );
+		$token = trim( (string) $req->get_param( 'token' ) );
+		if ( ! $token ) return new \WP_REST_Response( [ 'error' => 'PIN required' ], 400 );
+
+		// Token-only sign-in has no email to scope it, so it's brute-forceable —
+		// rate-limit by IP (the magic link and manual "Already have a PIN" both use this).
+		$rate_key = 'noodled_verify_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$attempts = (int) get_transient( $rate_key );
+		if ( $attempts >= 10 ) {
+			return new \WP_REST_Response( [ 'error' => 'Too many attempts. Try again in a few minutes.' ], 429 );
+		}
+		set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
 
 		$user = self::verify_token( $token );
 		if ( ! $user ) {
-			return new \WP_REST_Response( [ 'error' => 'Invalid or expired link' ], 401 );
+			return new \WP_REST_Response( [ 'error' => 'Invalid or expired PIN' ], 401 );
+		}
+		if ( ( $user['role'] ?? '' ) === 'pending' ) {
+			return new \WP_REST_Response( [ 'error' => 'Your account is still awaiting approval.' ], 403 );
 		}
 
+		delete_transient( $rate_key );
 		return new \WP_REST_Response( [ 'success' => true, 'name' => $user['display_name'] ] );
 	}
 
