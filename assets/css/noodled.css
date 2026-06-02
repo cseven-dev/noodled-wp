@@ -908,7 +908,10 @@ body.reading-mode .rendered-content { cursor: default; }
 }
 .gal-item:hover .gal-del { opacity: 1; transform: scale(1); }
 .gal-del:hover { background: #d63638; }
-@media (hover: none) { .gal-del { opacity: 1; transform: scale(1); } } /* always visible on touch */
+/* On touch: always visible AND a comfortable tap target (min ~36px). */
+@media (hover: none) {
+  .gal-del { opacity: 1; transform: scale(1); width: 36px; height: 36px; top: -10px; right: -10px; font-size: 15px; }
+}
 
 /* ── Image lightbox ── */
 .noodled-lightbox {

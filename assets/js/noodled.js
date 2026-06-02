@@ -451,6 +451,7 @@ function renderNoteList() {
 }
 
 async function selectNote(noteId) {
+  if (typeof dictating !== 'undefined' && dictating) stopDictation();
   // Show immediate loading feedback
   const item = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
   if (item) item.classList.add('loading');
@@ -637,6 +638,7 @@ function renderContent() {
       ${showRawMarkdown
         ? `<textarea id="noteBodyRaw" class="raw-markdown" oninput="schedSave(); updateWordCount()">${escAttr(n.body || '')}</textarea>`
         : `<div class="rendered-content" id="noteBody" contenteditable="true"
+               role="textbox" aria-multiline="true" aria-label="Note body"
                oninput="schedSave(); updateWordCount()" onkeydown="handleContentKey(event)"
                >${renderMarkdown(n.body)}</div>`
       }
@@ -674,30 +676,6 @@ function setupLinkClicks() {
       }
     }
   });
-}
-
-function viewAttachment(url, name) {
-  // Full-screen overlay with floating back button
-  let overlay = document.getElementById('attachOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'attachOverlay';
-    overlay.className = 'attach-overlay';
-    document.body.appendChild(overlay);
-  }
-  overlay.innerHTML = `
-    <div class="attach-toolbar">
-      <button class="btn btn-sm" onclick="closeAttachment()">&#8592; Back</button>
-      <button class="btn btn-sm" onclick="window.open('${url}','_blank','noopener')">New tab</button>
-    </div>
-    <iframe src="${url}" style="width:100%;height:100%;border:none"></iframe>
-  `;
-  overlay.classList.add('show');
-}
-
-function closeAttachment() {
-  const overlay = document.getElementById('attachOverlay');
-  if (overlay) { overlay.classList.remove('show'); overlay.innerHTML = ''; }
 }
 
 function updateWordCount() {
@@ -846,10 +824,22 @@ function insertHeading() {
   saveAndRerender();
 }
 
+// save_note returns a note row WITHOUT its attachments array. Carry the existing
+// one forward so the gallery doesn't vanish after an autosave / rerender.
+function adoptSaved(result) {
+  if (result && !result.error) {
+    if (result.attachments === undefined && activeNote && activeNote.attachments !== undefined) {
+      result.attachments = activeNote.attachments;
+    }
+    activeNote = result;
+  }
+  return result;
+}
+
 async function saveAndRerender() {
   const title = document.getElementById('titleInput')?.value || activeNote.title;
   const result = await api.save_note(activeNote.notebook, activeNote.id, title, activeNote.body);
-  if (!result.error) { activeNote = result; await loadNotes(); }
+  if (!result.error) { adoptSaved(result); await loadNotes(); }
   renderContent();
   setTimeout(() => {
     const el = document.getElementById('noteBody');
@@ -880,6 +870,7 @@ function toggleEditorMenu() {
 
 async function deleteCurrentNote() {
   if (!activeNote) return;
+  if (typeof dictating !== 'undefined' && dictating) stopDictation();
   if (!confirm(`Delete "${activeNote.title}"?`)) return;
   await api.delete_note(activeNote.notebook, activeNote.id);
   activeNote = null;
@@ -931,7 +922,7 @@ async function doSave() {
   activeNote.body = body;
   const result = await queuedSave(activeNote.notebook, activeNote.id, title, body);
   if (!result.error) {
-    activeNote = result;
+    adoptSaved(result);
     // Update local note in array instead of full reload
     const idx = notes.findIndex(n => n.id === result.id);
     if (idx >= 0) {
@@ -1025,6 +1016,7 @@ async function attachFile(file) {
       // Attachments stay out of the text — they render in the gallery below.
       (activeNote.attachments = activeNote.attachments || []).push(result);
       renderAttachmentGallery();
+      syncAttBadge();
       showToast(`Attached: ${result.filename}`);
     } else if (result && result.error) {
       showToast(result.error);
@@ -1083,7 +1075,21 @@ async function deleteAttachment(id) {
   catch (e) { showToast('Delete failed'); return; }
   if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(a => a.id !== id);
   renderAttachmentGallery();
+  syncAttBadge();
   showToast('Deleted');
+}
+
+// Keep the note-list paperclip count in sync after an attach/delete on the open
+// note (the server att_count only refreshes on a full reload otherwise).
+function syncAttBadge() {
+  if (!activeNote) return;
+  const c = (activeNote.attachments || []).length;
+  for (const arr of [typeof notes !== 'undefined' ? notes : null, typeof filteredNotes !== 'undefined' ? filteredNotes : null]) {
+    if (!arr) continue;
+    const it = arr.find(n => n.id === activeNote.id);
+    if (it) it.att = c;
+  }
+  renderNoteList();
 }
 
 // ── Evernote import (per-user, from the app) ──
@@ -1272,15 +1278,24 @@ function renderMarkdown(text) {
 
   function closeList() { if (inList) { out.push(listType === 'check' ? '</ul>' : `</${listType}>`); inList = false; listType = ''; } }
   function escLine(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  // Markdown URLs land in href/src attributes — block script-bearing schemes and
+  // escape the quote char so a crafted URL can't break out of the attribute.
+  // (s is already escLine'd, so &/</> are escaped; we only neutralise " here.)
+  function safeUrl(u) {
+    const t = u.trim().replace(/&amp;/g, '&'); // undo escLine for the scheme test
+    if (/^(javascript|vbscript|file|data):/i.test(t) && !/^data:image\//i.test(t)) return '#';
+    return u.trim().replace(/"/g, '&quot;');
+  }
+  function attrText(s) { return s.replace(/"/g, '&quot;'); }
   function inlineFormat(s) {
     return s
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => `<img src="${safeUrl(url)}" alt="${attrText(alt)}">`)
       .replace(/\[\[([^\]]+)\]\]/g, (match, title) => {
         const target = notes.find(n => n.title.toLowerCase() === title.toLowerCase().trim());
         if (target) return `<a href="#" class="wikilink" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
         return `<a href="#" class="wikilink broken" onclick="event.preventDefault()">${esc(title)}</a>`;
       })
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener">${txt}</a>`)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
@@ -2105,7 +2120,9 @@ function insertDictation(text) {
     return;
   }
 
-  // Fallback: append to the note body directly.
+  // Fallback: append to the note body directly. Guard against a late async
+  // recognition result arriving after the note was closed/deleted.
+  if (!activeNote) return;
   activeNote.body = (activeNote.body || '') + chunk;
   if (typeof saveAndRerender === 'function') saveAndRerender();
 }
@@ -2451,7 +2468,7 @@ function renderAttachmentGallery() {
     }
     // Intuitive delete: × on each item (always shown on touch, on hover on desktop).
     const del = document.createElement('button');
-    del.className = 'gal-del'; del.type = 'button'; del.title = 'Delete'; del.innerHTML = '&#10005;';
+    del.className = 'gal-del'; del.type = 'button'; del.title = 'Delete'; del.setAttribute('aria-label', 'Delete attachment'); del.innerHTML = '&#10005;';
     del.onclick = (e) => { e.stopPropagation(); deleteAttachment(a.id); };
     item.appendChild(del);
     gallery.appendChild(item);
@@ -2681,6 +2698,7 @@ function closeSidebar() {
 }
 
 function closeNote() {
+  if (typeof dictating !== 'undefined' && dictating) stopDictation();
   document.querySelector('.col-content')?.classList.remove('open');
   activeNote = null;
   renderNoteList();

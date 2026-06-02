@@ -135,6 +135,7 @@ class Noodled_Settings {
 	public static function handle_landing_upload() {
 		if ( empty( $_FILES['landing_html'] ) || $_FILES['landing_html']['error'] !== UPLOAD_ERR_OK ) return;
 		if ( ! current_user_can( 'manage_options' ) ) return;
+		if ( empty( $_POST['noodled_landing_nonce'] ) || ! wp_verify_nonce( $_POST['noodled_landing_nonce'], 'noodled_landing_upload' ) ) return;
 		$html = file_get_contents( $_FILES['landing_html']['tmp_name'] );
 		if ( $html ) {
 			update_option( 'noodled_landing_html', $html, false );
@@ -370,6 +371,7 @@ class Noodled_Settings {
 								<p style="margin-bottom:8px">Upload an HTML file to show as a landing page for visitors.</p>
 							<?php endif; ?>
 							<input type="file" name="landing_html" accept=".html,.htm">
+							<?php wp_nonce_field( 'noodled_landing_upload', 'noodled_landing_nonce' ); ?>
 							<p class="description">A login modal is automatically injected.</p>
 						</td>
 					</tr>
@@ -414,7 +416,7 @@ class Noodled_Settings {
 			<tbody>
 			<?php foreach ( $members as $u ) :
 				$is_member = $u['role'] === 'member';
-				$has_drop  = $is_member && Noodled_Notebooks::member_drop_folder( (int) $u['id'] );
+				$has_drop  = $is_member && Noodled_Notebooks::drop_folder_active( (int) $u['id'] );
 			?>
 				<tr>
 					<td><?php echo esc_html( $u['email'] ); ?></td>

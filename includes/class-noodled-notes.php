@@ -173,8 +173,8 @@ class Noodled_Notes {
 
 	public static function permanent_delete( int $id ): bool {
 		global $wpdb;
+		Noodled_Attachments::delete_for_note( $id );
 		$wpdb->delete( self::table(), [ 'id' => $id ] );
-		// TODO: delete attachments
 		return true;
 	}
 
@@ -182,7 +182,13 @@ class Noodled_Notes {
 		global $wpdb;
 		// Empty scope deletes NOTHING (never wipe all users' trash).
 		$ids = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
-		$wpdb->query( "DELETE FROM " . self::table() . " WHERE deleted_at IS NOT NULL AND (notebook_id IN ($ids) OR deleted_from IN ($ids))" );
+		$where = "deleted_at IS NOT NULL AND (notebook_id IN ($ids) OR deleted_from IN ($ids))";
+		// Clean up each note's attachment files + rows before dropping the notes.
+		$note_ids = $wpdb->get_col( "SELECT id FROM " . self::table() . " WHERE $where" );
+		foreach ( $note_ids as $nid ) {
+			Noodled_Attachments::delete_for_note( (int) $nid );
+		}
+		$wpdb->query( "DELETE FROM " . self::table() . " WHERE $where" );
 		return true;
 	}
 

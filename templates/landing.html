@@ -106,7 +106,22 @@
     var cta = document.querySelector('.nav-cta');
     if (cta && cta.parentNode) cta.parentNode.insertBefore(b, cta.nextSibling);
     else document.body.appendChild(b);
+    // Close the mobile nav after tapping a section link.
+    document.querySelectorAll('.nav-links a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        var nav = document.querySelector('.nav');
+        if (nav) nav.classList.remove('nav-open');
+        var burger = document.querySelector('.nav-burger');
+        if (burger) burger.setAttribute('aria-expanded', 'false');
+      });
+    });
   });
+  window.noodToggleNav = function (btn) {
+    var nav = document.querySelector('.nav');
+    if (!nav) return;
+    var open = nav.classList.toggle('nav-open');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
 })();
 </script>
 <style>
@@ -174,6 +189,8 @@ html.dark .nav { background: rgba(18,20,24,.82); }
 html.dark .nav.is-stuck { box-shadow: 0 6px 24px rgba(0,0,0,.45); }
 html.dark .card:hover { border-color: #2A4A66; }
 @media (max-width: 700px) { html.dark .nav { background: rgba(18,20,24,.97); } }
+/* Hand-drawn / icon SVGs hardcode the light-mode accent; track the dark token. */
+html.dark [stroke="#0078D4"], html.dark [stroke="#2E97F0"] { stroke: var(--n-blue); }
 
 /* ── Theme toggle button (injected) ── */
 .theme-toggle {
@@ -202,6 +219,14 @@ html.dark .card:hover { border-color: #2A4A66; }
 html.dark [data-tip]::after { background: #20242C; color: var(--ink); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 html.dark [data-tip]::before { border-top-color: #20242C; }
 @media (max-width: 700px) { [data-tip]::after, [data-tip]::before { display: none; } }
+/* The theme toggle sits at the far-right edge — right-anchor its tip so the
+   bubble can't be clipped by `overflow-x: clip`. */
+.theme-toggle[data-tip]::after { left: auto; right: 0; transform: translateX(0) translateY(5px); }
+.theme-toggle[data-tip]:hover::after, .theme-toggle[data-tip]:focus-visible::after { transform: translateX(0) translateY(0); }
+.theme-toggle[data-tip]::before { left: auto; right: 14px; transform: translateX(0); }
+
+/* Keyboard focus indicators on landing interactive elements. */
+.theme-toggle:focus-visible, .btn:focus-visible, .nav-links a:focus-visible { outline: 2px solid var(--n-blue); outline-offset: 2px; }
 
 /* ── Mobile overflow guards ── */
 @media (max-width: 880px) { .float-card { display: none !important; } }
@@ -320,6 +345,13 @@ a { color: inherit; }
 .nav-links a:hover { color: var(--n-blue); }
 .nav-links a:hover::after { right: 0; }
 .nav-cta { margin-left: auto; }
+.nav-burger {
+  display: none; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin-left: 6px; font-size: 20px; line-height: 1;
+  background: var(--white); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 50%; cursor: pointer;
+}
+.nav-burger:focus-visible { outline: 2px solid var(--n-blue); outline-offset: 2px; }
 
 /* ============================================================
    BUTTONS
@@ -494,8 +526,8 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 
 @keyframes wiggle {
-  0%,100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-6px) rotate(2deg); }
+  0%,100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
+  50% { transform: translateY(-6px) rotate(calc(var(--rot, 0deg) + 2deg)); }
 }
 .wiggle { animation: wiggle 6s ease-in-out infinite; }
 .wiggle.slow { animation-duration: 8.5s; }
@@ -747,7 +779,17 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
   .card--wide { grid-column: span 2; }
 }
 @media (max-width: 860px) {
-  .nav-links { display: none; }
+  .nav-burger { display: inline-flex; }
+  /* Collapse the section links behind the burger instead of hiding them. */
+  .nav-links {
+    position: absolute; top: 100%; right: 12px; left: 12px;
+    flex-direction: column; gap: 4px; padding: 10px;
+    background: var(--white); border: 1px solid var(--rule); border-radius: 14px;
+    box-shadow: var(--shadow-md); display: none;
+  }
+  .nav.nav-open .nav-links { display: flex; }
+  .nav-links a { padding: 10px 12px; border-radius: 9px; }
+  .nav-links a:hover { background: var(--paper-alt); }
   .hero__grid { grid-template-columns: 1fr; }
   .hero__stage { min-height: 340px; margin-top: 8px; }
   .tangle__grid, .honest__grid { grid-template-columns: 1fr; }
@@ -796,6 +838,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
     <a href="#honest">The honest bit</a>
   </nav>
   <a class="btn nav-cta" href="#get" data-tip="Request access — we'll email you a login PIN">Get Noodled</a>
+  <button class="nav-burger" type="button" aria-label="Menu" aria-expanded="false" onclick="noodToggleNav(this)">☰</button>
 </header>
 
 <main id="top">
@@ -1135,7 +1178,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       <h2 class="reveal d1">Go on.<br /><span class="accent">Use your noodle.</span></h2>
       <p class="reveal d2">Drop it on your WordPress in a few minutes, log in with a PIN, and start untangling. It's free to run.</p>
       <div class="finalcta__cta reveal d2">
-        <a class="btn btn--lg" href="#" id="dl-btn">Download the plugin</a>
+        <a class="btn btn--lg" href="https://c7.ca/noodled/noodled.zip" id="dl-btn">Download the plugin</a>
         <a class="btn btn--ghost" href="#live" data-tip="Back to the live editor demo">See it move again</a>
       </div>
       <p class="tiny reveal d3" id="dl-note">WordPress 5.9+ &middot; PHP 8+ &middot; MySQL &middot; made in Toronto by <a href="https://c7.ca" style="color:var(--n-blue); text-decoration:none; font-weight:600;">c-Seven</a></p>
@@ -1451,6 +1494,9 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
     async function runNote(n) {
       body.innerHTML = ""; setCounts("");
       if (titleEl) titleEl.textContent = n.title;
+      // Keep the highlighted note-list row in step with the note being typed.
+      const actRow = document.querySelector(".note-row.act .nr-t");
+      if (actRow) actRow.textContent = n.title;
       for (const s of n.steps) {
         if (s.erase) { await sleep(600); await eraseAll(11); await sleep(220); }
         else { await typeHTML(body, s.type, { speed: s.speed || 14, caretClass: "ed-caret", onUpdate: setCounts }); }
@@ -1567,6 +1613,9 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       btn.setAttribute('download', '');
       btn.textContent = 'Download v' + version;
     }
+
+    // Keep the demo chrome's version label in step with the real release.
+    document.querySelectorAll('.tb-v').forEach(el => { el.textContent = 'v' + version; });
 
     const note = document.getElementById('dl-note');
     if (note) {

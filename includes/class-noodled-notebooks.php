@@ -70,13 +70,29 @@ class Noodled_Notebooks {
 	   DROP FOLDERS (admin-enabled shared inbox per member)
 	   ──────────────────────────────────────────────────────────── */
 
-	/** The member's drop folder row, or null if they don't have one. */
+	/**
+	 * The member's drop folder row, or null. `drop_to` is a PERSISTENT designation
+	 * (it survives a disable), so this finds the folder whether sharing is currently
+	 * on or off — which is what lets re-enable reuse it instead of spawning a duplicate.
+	 */
 	public static function member_drop_folder( int $member_id ): ?array {
 		global $wpdb;
 		return $wpdb->get_row( $wpdb->prepare(
 			"SELECT * FROM " . self::table() . " WHERE owner_id = %d AND drop_to > 0 LIMIT 1",
 			$member_id
 		), ARRAY_A );
+	}
+
+	/** Whether the member's drop folder is currently SHARED (admin has access). */
+	public static function drop_folder_active( int $member_id ): bool {
+		global $wpdb;
+		$row = self::member_drop_folder( $member_id );
+		if ( ! $row ) return false;
+		$pt = self::perms_table();
+		return (bool) $wpdb->get_var( $wpdb->prepare(
+			"SELECT 1 FROM {$pt} WHERE user_id = %d AND notebook_id = %d AND can_read = 1 LIMIT 1",
+			(int) $row['drop_to'], (int) $row['id']
+		) );
 	}
 
 	/** A notebook name unique across all owners (suffixes " (2)", " (3)"…). */
@@ -121,19 +137,24 @@ class Noodled_Notebooks {
 
 		if ( ! $on ) {
 			if ( $existing ) {
+				// Turn sharing OFF by revoking the admin's access only. We KEEP the
+				// folder and its drop_to marker so a later re-enable reuses the exact
+				// same notebook — never orphaning the member's notes or spawning a
+				// duplicate "Name (2)" folder (the previous name-based lookup could).
 				$wpdb->delete( self::perms_table(), [
 					'user_id'     => (int) $existing['drop_to'],
 					'notebook_id' => (int) $existing['id'],
 				] );
-				$wpdb->update( self::table(), [ 'drop_to' => 0 ], [ 'id' => (int) $existing['id'] ] );
 			}
 			return [ 'success' => true, 'enabled' => false ];
 		}
 
-		// Enabling — reuse the member's active drop folder if one is already on.
+		// Enabling — reuse the member's existing drop folder (active OR dormant).
 		if ( $existing ) {
 			$nb_id = (int) $existing['id'];
-			$wpdb->update( self::table(), [ 'drop_to' => $admin_id ], [ 'id' => $nb_id ] );
+			if ( (int) $existing['drop_to'] !== $admin_id ) {
+				$wpdb->update( self::table(), [ 'drop_to' => $admin_id ], [ 'id' => $nb_id ] );
+			}
 			Noodled_Permissions::set( $admin_id, $nb_id, true, true );
 			return [ 'success' => true, 'enabled' => true, 'name' => $existing['name'] ];
 		}
@@ -144,17 +165,6 @@ class Noodled_Notebooks {
 		if ( ! $member ) return [ 'error' => 'Member not found' ];
 
 		$base = $member['display_name'] ?: explode( '@', $member['email'] )[0];
-
-		// Reuse a previously-created (now dormant) drop folder so re-toggling
-		// doesn't orphan the member's earlier notes or spawn a duplicate.
-		$dormant = self::get_by_name( $base, $member_id );
-		if ( $dormant ) {
-			$nb_id = (int) $dormant['id'];
-			$wpdb->update( self::table(), [ 'drop_to' => $admin_id ], [ 'id' => $nb_id ] );
-			Noodled_Permissions::set( $admin_id, $nb_id, true, true );
-			return [ 'success' => true, 'enabled' => true, 'name' => $dormant['name'] ];
-		}
-
 		$name = self::unique_notebook_name( $base );
 
 		$wpdb->insert( self::table(), [

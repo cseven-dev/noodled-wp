@@ -22,17 +22,37 @@ class Noodled_Attachments {
 		return $upload['baseurl'] . '/noodled';
 	}
 
-	private static $blocked_extensions = [ 'php', 'phtml', 'php3', 'php4', 'php5', 'phps', 'phar', 'cgi', 'pl', 'py', 'sh', 'bash', 'exe', 'bat', 'cmd', 'com', 'jsp', 'asp', 'aspx' ];
+	// Allowlist — anything not here is rejected (safer than a blocklist that can
+	// miss executable-capable extensions like .pht, .phtml variants, or .htaccess).
+	private static $allowed_extensions = [
+		// images
+		'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'avif', 'svg', 'tif', 'tiff', 'ico',
+		// documents
+		'pdf', 'txt', 'md', 'markdown', 'rtf', 'csv', 'tsv', 'log', 'json', 'xml',
+		'doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'odp',
+		'pages', 'numbers', 'key', 'epub',
+		// web (served sandboxed via the proxy)
+		'html', 'htm',
+		// archives
+		'zip',
+		// audio / video
+		'mp3', 'm4a', 'wav', 'ogg', 'oga', 'aac', 'flac', 'mp4', 'm4v', 'mov', 'webm', 'mkv',
+	];
+	private static $image_extensions = [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'avif', 'tif', 'tiff', 'ico' ];
 	private static $max_upload_bytes = 10485760; // 10 MB
 
 	public static function save( int $note_id, string $filename, string $data_b64 ): array {
 		global $wpdb;
 
 		$filename = sanitize_file_name( $filename );
+		// Never allow dot-files / server-config names (e.g. .htaccess). sanitize_file_name
+		// keeps a leading dot, so strip it before validating.
+		$filename = ltrim( $filename, '.' );
+		if ( $filename === '' ) return [ 'error' => 'Invalid filename' ];
 
-		// Block dangerous file types
+		// Allowlist the extension — reject scripts, configs and anything unknown.
 		$ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
-		if ( in_array( $ext, self::$blocked_extensions, true ) ) {
+		if ( $ext === '' || ! in_array( $ext, self::$allowed_extensions, true ) ) {
 			return [ 'error' => 'File type not allowed: .' . $ext ];
 		}
 
@@ -40,6 +60,28 @@ class Noodled_Attachments {
 		if ( strlen( $data_b64 ) > self::$max_upload_bytes * 1.34 ) {
 			return [ 'error' => 'File too large (max 10 MB)' ];
 		}
+
+		$data = base64_decode( $data_b64 );
+		if ( $data === false ) return [ 'error' => 'Invalid base64 data' ];
+		if ( strlen( $data ) > self::$max_upload_bytes ) return [ 'error' => 'File too large (max 10 MB)' ];
+
+		// Content must match the claimed type for images — blocks a script disguised
+		// as a .png that an Apache handler override could otherwise execute.
+		$is_image = in_array( $ext, self::$image_extensions, true );
+		if ( $is_image ) {
+			$info = @getimagesizefromstring( $data );
+			if ( $info === false ) return [ 'error' => 'That file is not a valid image.' ];
+		}
+
+		// Determine a TRUSTWORTHY mime from the bytes (not the attacker-chosen name).
+		$mime = '';
+		if ( $is_image && ! empty( $info['mime'] ) ) {
+			$mime = $info['mime'];
+		} elseif ( function_exists( 'finfo_open' ) ) {
+			$fi = finfo_open( FILEINFO_MIME_TYPE );
+			if ( $fi ) { $mime = (string) finfo_buffer( $fi, $data ); finfo_close( $fi ); }
+		}
+		if ( ! $mime ) $mime = wp_check_filetype( $filename )['type'] ?: 'application/octet-stream';
 
 		$dir = self::upload_dir() . '/' . $note_id;
 		wp_mkdir_p( $dir );
@@ -54,13 +96,10 @@ class Noodled_Attachments {
 		$subdir  = $dir . '/' . $token;
 		wp_mkdir_p( $subdir );
 		$filepath = $subdir . '/' . $filename;
-		$data = base64_decode( $data_b64 );
-		if ( $data === false ) return [ 'error' => 'Invalid base64 data' ];
 
 		file_put_contents( $filepath, $data );
 
 		$relative = $note_id . '/' . $token . '/' . $filename;
-		$mime = wp_check_filetype( $filename )['type'] ?: '';
 		$exif = self::extract_exif( $filepath, $mime );
 
 		$wpdb->insert( self::table(), [
@@ -179,6 +218,25 @@ class Noodled_Attachments {
 		}
 
 		return true;
+	}
+
+	/** Delete every attachment (files + rows) belonging to a note. Used on hard-delete. */
+	public static function delete_for_note( int $note_id ): void {
+		global $wpdb;
+		$ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT id FROM " . self::table() . " WHERE note_id = %d", $note_id
+		) );
+		foreach ( $ids as $id ) {
+			self::delete( (int) $id );
+		}
+		// Best-effort removal of the now-empty per-note folder.
+		$dir = self::upload_dir() . '/' . $note_id;
+		if ( is_dir( $dir ) ) {
+			foreach ( glob( $dir . '/*' ) ?: [] as $sub ) {
+				if ( is_dir( $sub ) && ! ( glob( $sub . '/*' ) ?: [] ) ) @rmdir( $sub );
+			}
+			if ( ! ( glob( $dir . '/*' ) ?: [] ) ) @rmdir( $dir );
+		}
 	}
 
 	public static function get_for_note( int $note_id ): array {

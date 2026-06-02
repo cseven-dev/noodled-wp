@@ -38,8 +38,8 @@
 
 <!-- Top toolbar — clean and minimal -->
 <div class="toolbar">
-  <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu">&#9776;</button>
-  <button class="btn-icon mobile-back" onclick="closeNote()" title="Back">&#8592;</button>
+  <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu" aria-label="Open menu">&#9776;</button>
+  <button class="btn-icon mobile-back" onclick="closeNote()" title="Back" aria-label="Back to notes">&#8592;</button>
   <span class="logo" onclick="closeNote()" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
   <span class="logo-version">v<?php echo NOODLED_VERSION; ?></span>
   <button class="btn btn-sm hide-mobile" id="newNoteBtn" onclick="createNote()" title="New note">+ New Note</button>
@@ -57,7 +57,7 @@
   <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="Import Plaud recordings">Plaud</button>
   <?php endif; ?>
   <div class="toolbar-menu-wrap">
-    <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn">&#8942;</button>
+    <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn" aria-label="More actions">&#8942;</button>
     <div class="toolbar-dropdown" id="appMenu">
       <?php if ( ! empty( $config['user']['owner'] ) ) : ?>
       <div class="dropdown-item" onclick="manageUsers()">&#128101; Manage people</div>
@@ -80,7 +80,7 @@
       <div class="dropdown-item" onclick="doLogout()">Logout</div>
     </div>
   </div>
-  <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">&#9680;</button>
+  <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn" aria-label="Toggle theme">&#9680;</button>
 </div>
 
 <!-- Main 3-column layout -->
@@ -108,13 +108,13 @@
   <!-- Col 2: Note list -->
   <div class="col-notes">
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Search notes..." oninput="onSearch()">
+      <input type="text" id="searchInput" placeholder="Search notes..." aria-label="Search notes" oninput="onSearch()">
       <button class="sort-btn" id="sortBtn" onclick="cycleSort()" title="Change sort order">Modified</button>
     </div>
     <div class="pull-indicator" id="pullIndicator">&#8595; Pull to refresh</div>
     <div class="note-list" id="noteList"></div>
     <div class="note-count" id="noteCount">
-      <button class="btn-icon" onclick="toggleBulkMode()" title="Select multiple" style="font-size:11px;float:right">&#9745;</button>
+      <button class="btn-icon" onclick="toggleBulkMode()" title="Select multiple" aria-label="Select multiple notes" style="font-size:11px;float:right">&#9745;</button>
     </div>
     <div class="bulk-bar" id="bulkBar">
       <span><span id="bulkCount">0</span> selected</span>
@@ -144,7 +144,7 @@
     <span class="bottom-nav-icon">&#128269;</span>
     <span class="bottom-nav-label">Search</span>
   </button>
-  <button class="bottom-nav-item bottom-nav-primary" onclick="createNote()">
+  <button class="bottom-nav-item bottom-nav-primary" onclick="createNote()" aria-label="New note">
     <span class="bottom-nav-icon">&#43;</span>
   </button>
   <button class="bottom-nav-item" onclick="syncPull()">
@@ -162,7 +162,7 @@
 
 <!-- Quick capture -->
 <div class="quick-capture" id="quickCapture">
-  <input type="text" id="qcInput" placeholder="Quick thought..." onkeydown="if(event.key==='Enter'){submitQuickCapture();} if(event.key==='Escape'){toggleQuickCapture();}">
+  <input type="text" id="qcInput" placeholder="Quick thought..." aria-label="Quick capture" onkeydown="if(event.key==='Enter'){submitQuickCapture();} if(event.key==='Escape'){toggleQuickCapture();}">
   <button class="btn btn-sm" onclick="submitQuickCapture()">Save</button>
   <button class="btn btn-sm" onclick="toggleQuickCapture()">&#10005;</button>
 </div>

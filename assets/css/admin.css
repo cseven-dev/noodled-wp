@@ -94,6 +94,7 @@ body.toplevel_page_noodled .wrap { margin: 0; max-width: none; padding: 0; }
   background: var(--n-card); transition: .15s; display: inline-flex; align-items: center; gap: 7px;
 }
 .nood-tabs a:hover { transform: translateY(-1px); box-shadow: var(--n-shadow-sm); }
+.nood-tabs a:focus-visible { outline: 2px solid var(--n-blue); outline-offset: 2px; }
 .nood-tabs a.active {
   color: #fff; background: linear-gradient(135deg, var(--n-blue-hi), var(--n-blue-deep));
   border-color: transparent; box-shadow: 0 8px 22px rgba(46,151,240,.35);
@@ -192,7 +193,7 @@ body.toplevel_page_noodled .wrap { margin: 0; max-width: none; padding: 0; }
 .nood-admin .noodled-import-card { background: var(--n-card) !important; border: 1px solid var(--n-line) !important; border-radius: 18px !important; box-shadow: var(--n-shadow-sm); }
 .nood-admin .noodled-import-card h2 { margin-top: 0; }
 .nood-admin .awaiting-mod { background: #d63638; }
-.nood-admin code { background: var(--n-paper-alt); color: var(--n-blue); border-radius: 6px; padding: 2px 7px; }
+.nood-admin code { background: var(--n-paper-alt); color: var(--n-blue); border-radius: 6px; padding: 2px 7px; overflow-wrap: anywhere; word-break: break-word; }
 .nood-admin .nav-tab-wrapper { display: none; } /* replaced by .nood-tabs */
 .nood-admin hr { border-color: var(--n-line); }
 

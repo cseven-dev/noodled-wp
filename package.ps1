@@ -100,7 +100,12 @@ Write-Host "Production: $productionDir\noodled.zip" -ForegroundColor Green
 # ── Update metadata.json version ──
 $metaFile = "$pluginDir\metadata.json"
 if (Test-Path $metaFile) {
-    (Get-Content $metaFile -Raw) -replace '"version":\s*"[^"]*"', "`"version`": `"$version`"" | Set-Content $metaFile
+    $metaRaw = Get-Content $metaFile -Raw
+    $metaRaw = $metaRaw -replace '"version":\s*"[^"]*"', "`"version`": `"$version`""
+    # Keep the changelog's leading heading in step with the version so the WP
+    # "what's new" modal never shows a stale version number.
+    $metaRaw = $metaRaw -replace '<h4>[^<]*</h4>', "<h4>$version</h4>"
+    $metaRaw | Set-Content $metaFile
     Write-Host "Updated metadata.json to v$version" -ForegroundColor Green
 }
 

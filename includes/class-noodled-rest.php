@@ -465,13 +465,23 @@ class Noodled_REST {
 
 		while ( ob_get_level() ) { ob_end_clean(); }
 		$mime = $att['mime_type'] ?: 'application/octet-stream';
+		// Any type that can run script when rendered inline gets sandboxed.
+		$risky  = ( stripos( $mime, 'html' ) !== false || stripos( $mime, 'svg' ) !== false
+			|| stripos( $mime, 'xml' ) !== false || stripos( $mime, 'text/' ) === 0 );
+		// Only render genuinely safe types inline; everything else downloads.
+		$inline = $risky
+			|| strpos( $mime, 'image/' ) === 0
+			|| strpos( $mime, 'audio/' ) === 0
+			|| strpos( $mime, 'video/' ) === 0
+			|| $mime === 'application/pdf';
+		$fname  = str_replace( [ '"', "\r", "\n" ], '', $att['filename'] );
 		nocache_headers();
 		header( 'Content-Type: ' . $mime );
 		header( 'Content-Length: ' . filesize( $path ) );
-		header( 'Content-Disposition: inline; filename="' . str_replace( '"', '', $att['filename'] ) . '"' );
+		header( 'Content-Disposition: ' . ( $inline ? 'inline' : 'attachment' ) . '; filename="' . $fname . '"' );
 		header( 'X-Content-Type-Options: nosniff' );
-		// Neutralise stored HTML/SVG so an uploaded file can't run scripts in our origin.
-		if ( stripos( $mime, 'html' ) !== false || stripos( $mime, 'svg' ) !== false ) {
+		// Neutralise stored HTML/SVG/XML/text so an uploaded file can't run scripts in our origin.
+		if ( $risky ) {
 			header( "Content-Security-Policy: sandbox allow-popups allow-top-navigation-by-user-activation; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src data:;" );
 		}
 		readfile( $path );
@@ -803,7 +813,7 @@ class Noodled_REST {
 		$users = Noodled_Auth::get_all_users();
 		foreach ( $users as &$u ) {
 			$u['id']   = (int) $u['id'];
-			$u['drop'] = $u['role'] === 'member' && (bool) Noodled_Notebooks::member_drop_folder( (int) $u['id'] );
+			$u['drop'] = $u['role'] === 'member' && Noodled_Notebooks::drop_folder_active( (int) $u['id'] );
 		}
 		return new \WP_REST_Response( $users );
 	}
