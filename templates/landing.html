@@ -442,6 +442,7 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   border: 1px solid var(--rule);
   padding: 16px 18px;
   width: 250px;
+  opacity: .9;
   transform: rotate(var(--rot, 0deg));
 }
 .float-card h4 { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin: 0 0 8px; letter-spacing: 0; }
@@ -465,14 +466,15 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   margin-left: auto;
 }
 /* fanned-deck look + each new note "lands" on the pile. The backings pivot from
-   the bottom-left so they splay out to the side like a hand of cards. */
+   the top edge so they splay DOWNWARD behind the card — clear of the floating
+   cards beside it, so nothing covers their text. */
 .type-card::before, .type-card::after {
   content: ""; position: absolute; inset: 0; border-radius: 18px; z-index: -1;
   background: var(--white); border: 1px solid var(--rule); box-shadow: var(--shadow-md);
-  transform-origin: bottom left;
+  transform-origin: top center;
 }
-.type-card::before { transform: rotate(4deg) translate(10px, 4px); }
-.type-card::after  { transform: rotate(8deg) translate(20px, 8px); }
+.type-card::before { transform: translate(5px, 12px) rotate(2.5deg); }
+.type-card::after  { transform: translate(10px, 24px) rotate(5deg); }
 .type-card.land { animation: tcLand .52s var(--ease); }
 @keyframes tcLand { from { transform: translateY(-16px) scale(.975); opacity: .55; } to { transform: translateY(0) scale(1); opacity: 1; } }
 .type-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
@@ -869,13 +871,13 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       </div>
 
       <div class="hero__stage reveal d2">
-        <div class="float-card wiggle" style="--rot:-5deg; top: 0; left: -6%; width: 210px;">
+        <div class="float-card wiggle" style="--rot:-5deg; top: -9%; left: -12%; width: 196px;">
           <h4>Half-thoughts</h4>
           <div class="bar"></div>
           <div class="bar s"></div>
           <span class="chip"># later</span>
         </div>
-        <div class="float-card wiggle slow" style="--rot:6deg; bottom: 4%; right: -4%; width: 200px;">
+        <div class="float-card wiggle slow" style="--rot:6deg; bottom: -6%; right: -9%; width: 190px;">
           <h4>Voice memo &rarr; text</h4>
           <p>Plaud dropped a transcript in while you slept.</p>
         </div>
