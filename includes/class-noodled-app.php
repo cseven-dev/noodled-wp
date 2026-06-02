@@ -78,8 +78,10 @@ class Noodled_App {
 				wp_unslash( $_GET['noodled_email'] ),
 				wp_unslash( $_GET['noodled_login'] )
 			);
+			// On failure bounce back with the email so the login box can pre-fill it
+			// (the user shouldn't have to retype it to get a fresh PIN).
 			$target = isset( $result['error'] )
-				? add_query_arg( 'login', 'expired', self::get_app_url() )
+				? add_query_arg( [ 'login' => 'expired', 'e' => sanitize_email( wp_unslash( $_GET['noodled_email'] ) ) ], self::get_app_url() )
 				: self::get_app_url();
 			wp_safe_redirect( $target );
 			exit;
@@ -141,8 +143,10 @@ class Noodled_App {
 .n-login-msg{margin-top:12px;font-size:13px;text-align:center;min-height:20px}
 .n-login-msg.error{color:#f87171}
 .n-login-msg.success{color:#34d399}
-.n-login-link{color:#5a5a68;font-size:12px;text-decoration:none;display:block;text-align:center;margin-top:10px}
-.n-login-link:hover{color:#b0b0b8}
+.n-login-link{color:#9a9aa8;font-size:13.5px;text-decoration:none;display:block;text-align:center;margin-top:12px}
+.n-login-link:hover{color:#e8e8ef}
+.n-login-link.lg{font-size:15px;font-weight:600;color:{$accent};margin-top:18px}
+.n-login-link.lg:hover{filter:brightness(1.15)}
 .n-pin-input{text-align:center;font-size:24px;letter-spacing:8px}
 </style>
 
@@ -153,7 +157,7 @@ class Noodled_App {
       <div class="sub">We'll send a PIN to your email</div>
       <input class="n-login-input" type="email" id="nEmail" placeholder="you@example.com">
       <button class="n-login-btn" id="nEmailBtn" onclick="nSendPin()">Continue</button>
-      <a href="#" class="n-login-link" onclick="event.preventDefault();nGotPin()">Got a PIN for your noodle?</a>
+      <a href="#" class="n-login-link lg" onclick="event.preventDefault();nGotPin()">Already have a PIN? Sign in &rarr;</a>
     </div>
     <div id="nStepPin" style="display:none">
       <h3>Enter your PIN</h3>
@@ -170,12 +174,14 @@ class Noodled_App {
 <script>
 let _nEmail='';
 function nShowStep(id){['nStepEmail','nStepPin'].forEach(s=>{const e=document.getElementById(s);if(e)e.style.display=s===id?'block':'none'});document.getElementById('nLoginMsg').textContent='';document.getElementById('nLoginMsg').className='n-login-msg'}
-function nGotPin(){const e=document.getElementById('nEmail').value;const pe=document.getElementById('nPinEmail');if(pe&&e)pe.value=e;nShowStep('nStepPin');(e?document.getElementById('nPin'):pe).focus();}
-async function nSendPin(){const email=document.getElementById('nEmail').value;if(!email)return;_nEmail=email;const btn=document.getElementById('nEmailBtn');btn.disabled=true;btn.textContent='Sending...';const msg=document.getElementById('nLoginMsg');msg.textContent='';try{const r=await fetch('{$login_api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error'}else{const pe=document.getElementById('nPinEmail');if(pe)pe.value=email;nShowStep('nStepPin');document.getElementById('nPin').focus()}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error'}btn.disabled=false;btn.textContent='Continue'}
+function nGotPin(){const e=document.getElementById('nEmail').value.trim();if(e)_nEmail=e;nGotoPin();}
+// Go to the PIN step. If we already know the email, hide that field — just ask for the PIN.
+function nGotoPin(){const pe=document.getElementById('nPinEmail');const e=(_nEmail||(pe?pe.value:'')).trim();if(pe){if(e){pe.value=e;pe.style.display='none';}else{pe.style.display='';}}nShowStep('nStepPin');const f=document.getElementById(e?'nPin':'nPinEmail');if(f)f.focus();}
+async function nSendPin(){const email=document.getElementById('nEmail').value;if(!email)return;_nEmail=email;const btn=document.getElementById('nEmailBtn');btn.disabled=true;btn.textContent='Sending...';const msg=document.getElementById('nLoginMsg');msg.textContent='';try{const r=await fetch('{$login_api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error'}else{nGotoPin()}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error'}btn.disabled=false;btn.textContent='Continue'}
 async function nVerifyPin(){const pin=document.getElementById('nPin').value;const email=(document.getElementById('nPinEmail').value||_nEmail).trim();const msg=document.getElementById('nLoginMsg');if(!email){msg.textContent='Enter your email.';msg.className='n-login-msg error';document.getElementById('nPinEmail').focus();return;}if(!pin)return;const btn=document.getElementById('nPinBtn');btn.disabled=true;btn.textContent='Verifying...';try{const r=await fetch('{$pin_api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,pin})});const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error';btn.disabled=false;btn.textContent='Sign in'}else{msg.innerHTML='&#10003; Welcome!';msg.className='n-login-msg success';setTimeout(()=>window.location.href='{$app_url}'+('{$app_url}'.includes('?')?'&':'?')+'_='+Date.now(),500)}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error';btn.disabled=false;btn.textContent='Sign in'}}
 document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.getElementById('nStepPin');if(pin&&pin.style.display!=='none')nVerifyPin();else if(document.getElementById('nStepEmail').style.display!=='none')nSendPin()}});
-// Expired one-click link → open login modal with a message
-(function(){if(new URLSearchParams(location.search).get('login')==='expired'){const o=document.getElementById('nLoginOverlay');if(o)o.classList.add('show');const m=document.getElementById('nLoginMsg');if(m){m.textContent='That sign-in link expired. Enter your email to get a new one.';m.className='n-login-msg error';}}})();
+// Expired one-click link → open login modal, pre-fill the email so they don't retype it.
+(function(){const q=new URLSearchParams(location.search);if(q.get('login')==='expired'){const o=document.getElementById('nLoginOverlay');if(o)o.classList.add('show');const em=q.get('e');if(em){_nEmail=em;const ne=document.getElementById('nEmail');if(ne)ne.value=em;const pe=document.getElementById('nPinEmail');if(pe)pe.value=em;}const m=document.getElementById('nLoginMsg');if(m){m.textContent='That sign-in link expired — tap Continue to get a fresh PIN.';m.className='n-login-msg error';}}})();
 // Inject login button into page nav (ghost style, left of Get Noodled)
 (function(){
   const cta=document.querySelector('.nav-cta');
