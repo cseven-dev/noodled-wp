@@ -23,11 +23,11 @@ Noodled turns any WordPress site into a private note-taking app at `/noodled/`. 
 
 ### Editor Tools
 - **Formatting** — bullet lists, checklists (with toggle), headings (cycle H1/H2/H3/P)
-- **File upload** — attach any file type, inserts markdown link into note body
+- **Photo upload** — "+ Photos" grabs many images at once and creates an auto-titled `Image Upload {date/time}` note; photos render in a gallery below the text and open in a **lightbox** (arrow keys / Esc), captioned with stored **EXIF** (date taken, camera, exposure, ISO, and a 📍 map link if geotagged)
+- **Attachment gallery** — images and file-type icon tiles (🌐 HTML, 📕 PDF, 📄 docs, 📎 other) render in a bar below the note rather than lumped into the text; HTML/files open in the **same window** (swipe back to return)
+- **File upload & drag-and-drop** — attach any file type from the toolbar or by dropping onto the editor
 - **Image paste** — Ctrl+V screenshots from clipboard, auto-uploads as attachment
-- **Voice memo** — record audio from browser microphone, saves as `.webm` attachment
-- **HTML attachment viewer** — uploaded HTML files (e.g., Claude artifacts) open in a full-screen overlay with Back button, instead of navigating away
-- **Drag & drop** — drop files onto the editor to attach
+- **Dictation** — tap 🎤 and speak; your words are transcribed straight into the note at the cursor (Web Speech API)
 - **Source mode** — toggle between rendered view and raw markdown editing
 - **Find & replace** — Ctrl+H, highlights matches in the rendered content
 - **Table of contents** — jump-to-heading navigation for long notes
@@ -45,15 +45,34 @@ Noodled turns any WordPress site into a private note-taking app at `/noodled/`. 
 - **GitHub bidirectional sync** — push notes to a GitHub repo, pull changes from desktop app
 - **Webhook support** — GitHub push webhooks trigger automatic imports
 - **Auto-sync** — silently pulls from GitHub every 5 minutes
+- **Evernote import (per user)** — each member imports their own `.enex` export from inside the app (⋮ menu → Import from Evernote); admins can also bulk-import from the Dashboard
 - **Plaud sync** — imports voice recordings from [Plaud](https://plaud.ai) as transcribed notes (reads token from `.env` file)
 - **Conflict resolution** — last-write-wins by modified timestamp
 - **Frontmatter compatibility** — reads/writes the same YAML frontmatter format as the desktop app
 
 ### Authentication
-- **PIN login** — enter email, receive a 6-digit PIN via email, type it to log in (no passwords, no magic link URLs to fumble with on mobile)
+- **PIN login** — enter email, receive a 6-digit PIN via email, type it to log in (no passwords)
+- **One-click magic link** — the login email's button signs you in directly (the PIN is embedded in the link)
+- **PIN-only entry** — "Already have a PIN?" asks for just the 6-digit code (no email), so phone OTP autofill lands in the right field; the endpoint is IP rate-limited
+- **Branded emails** — login PINs and share notifications are HTML emails styled to match your brand (name, tagline, accent color, CTA button)
 - **1-year sessions** — cookie lasts 365 days so you rarely need to re-authenticate
 - **WP admin auto-auth** — WordPress administrators are automatically authenticated
-- **Family sharing** — invite members via email, per-notebook read/write permissions
+
+### Admin & Family Sharing
+- **Tabbed Dashboard** — Overview, Users, Branding, Import, Sync, and Settings are tabs on a single Noodled admin page
+- **At-a-glance stats** — notes, notebooks, users, pending requests, attachments, storage used, trash, drop folders, last sync, version
+- **User management** — invite, approve, remove members and assign roles, all from the dashboard
+- **Send PIN** — issue a member a login PIN from the backend; it's emailed *and* shown to you so you can relay it directly
+- **Drop folders** — tick a member (or enable at invite time) and they get one folder whose contents are shared read/write with you, appearing in your account **under their name**; the member sees it as "{Your name}'s noodle"
+- **Per-notebook & per-note sharing** — members share their own notebooks and notes (read or read/write); notes are private by default with no admin god-view
+- **Landing page preview** — preview the public landing page from the dashboard even while signed in
+- **Branding** — custom app name, tagline, accent color, and an uploadable landing page
+
+### Privacy & Security
+- **Private attachments** — files are served only through an access-checked proxy (`/noodled/v1/file/{id}`) that returns a file solely to a logged-in user who can read its note (otherwise 403). The uploads directory denies all direct web access and files are stored under random, unguessable subfolders — nothing is reachable at a public URL.
+- **Sandboxed HTML/SVG** — uploaded HTML/SVG is served with a CSP sandbox so a malicious file can't run scripts in your site's origin
+- **Fail-safe loading** — if the plugin ever throws on load or init, it logs the cause and stays out of the way instead of white-screening the whole site (including wp-admin)
+- **Everything private by default** — notes, notebooks, and attachments are private to their owner unless explicitly shared
 
 ### Mobile Experience
 - **Bottom tab bar** — Notes, Search, +New, Sync, Menu (replaces desktop toolbar)
@@ -94,18 +113,19 @@ Noodled turns any WordPress site into a private note-taking app at `/noodled/`. 
 noodled-wp/
   noodled.php                          # Main plugin file, constants, hooks
   includes/
-    class-noodled-db.php               # 5 tables via dbDelta (notebooks, notes, users, permissions, attachments)
-    class-noodled-app.php              # Serves full-screen app at /noodled/, handles auth routing
-    class-noodled-rest.php             # 25+ REST API endpoints under noodled/v1
+    class-noodled-db.php               # 6 tables via dbDelta: notebooks (drop_to), notes, users, permissions, note_permissions, attachments (exif)
+    class-noodled-app.php              # Serves full-screen app at /noodled/, auth routing, login modal, landing preview
+    class-noodled-rest.php             # 30+ REST API endpoints under noodled/v1, incl. private file proxy
     class-noodled-notes.php            # Note CRUD (DB operations)
-    class-noodled-notebooks.php        # Notebook CRUD
-    class-noodled-attachments.php      # File uploads to wp-content/uploads/noodled/
+    class-noodled-notebooks.php        # Notebook CRUD + drop folders ("{Name}'s noodle" labelling)
+    class-noodled-attachments.php      # Private uploads + EXIF extraction; served only via the proxy
     class-noodled-github.php           # GitHub API client (read + write)
     class-noodled-sync.php             # Bidirectional sync, webhook handler, full import
     class-noodled-frontmatter.php      # Markdown frontmatter serialize/parse
-    class-noodled-auth.php             # PIN login, session management
-    class-noodled-permissions.php      # Per-notebook read/write access control
-    class-noodled-settings.php         # Admin settings page (GitHub config, user management)
+    class-noodled-evernote.php         # .enex import (per-user and admin)
+    class-noodled-auth.php             # PIN login, magic link, branded emails, session management
+    class-noodled-permissions.php      # Per-notebook & per-note read/write access control
+    class-noodled-settings.php         # Tabbed admin dashboard (stats, users, branding, import, sync, settings)
     class-noodled-plaud.php            # Plaud API client for voice recording import
   assets/
     js/noodled.js                      # Complete frontend (~2300 lines)
@@ -137,12 +157,14 @@ Desktop app (Python/pywebview)
 - **Trash** — GET/DELETE `/trash`, GET `/trash/count`, POST `/trash/{id}/restore`, DELETE `/trash/{id}`
 - **Search** — GET `/search?q=`
 - **Attachments** — POST `/attachments`, DELETE `/attachments/{id}`
+- **File proxy** — GET `/file/{id}` (access-checked private file streaming; returns 403 unless the session can read the note)
+- **Import** — POST `/import/evernote` (per-user `.enex` upload)
 - **Sync** — GET `/sync/status`, POST `/sync/push`, `/sync/pull`, `/sync/import`
 - **Plaud** — GET `/plaud/status`, POST `/plaud/sync`
-- **Auth** — POST `/auth/login`, `/auth/pin`, `/auth/logout`, GET `/auth/verify`, `/auth/me`
-- **Sharing** — POST `/share`, GET `/shared/{token}`
+- **Auth** — POST `/auth/login`, `/auth/pin`, `/auth/logout`, GET `/auth/verify` (PIN-only, rate-limited), `/auth/me`
+- **Sharing** — POST `/share`, `/notebooks/{id}/shares`, `/notes/{id}/shares`, GET `/shared/{token}`
 - **Config** — GET/PUT `/config`
-- **Admin** — POST `/admin/users`, DELETE `/admin/users/{id}`, POST `/admin/permissions`
+- **Admin** — POST `/admin/users`, DELETE `/admin/users/{id}`, POST `/admin/users/{id}/approve`, `/admin/users/{id}/drop` (drop folder), `/admin/users/{id}/pin` (send PIN), `/admin/permissions`
 
 ### Keyboard Shortcuts
 | Shortcut | Action |
