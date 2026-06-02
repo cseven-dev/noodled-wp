@@ -58,6 +58,7 @@ class Noodled_Attachments {
 
 		$relative = $note_id . '/' . $filename;
 		$mime = wp_check_filetype( $filename )['type'] ?: '';
+		$exif = self::extract_exif( $filepath, $mime );
 
 		$wpdb->insert( self::table(), [
 			'note_id'    => $note_id,
@@ -65,6 +66,7 @@ class Noodled_Attachments {
 			'file_path'  => $relative,
 			'mime_type'  => $mime,
 			'file_size'  => strlen( $data ),
+			'exif'       => $exif,
 			'created_at' => current_time( 'mysql', true ),
 		] );
 
@@ -72,7 +74,63 @@ class Noodled_Attachments {
 			'id'       => (int) $wpdb->insert_id,
 			'filename' => $filename,
 			'url'      => self::upload_url() . '/' . $relative,
+			'mime'     => $mime,
+			'exif'     => $exif ? json_decode( $exif, true ) : null,
 		];
+	}
+
+	/** Pull a clean, JSON-safe subset of EXIF from an image, stored for later use. */
+	private static function extract_exif( string $filepath, string $mime ): ?string {
+		if ( ! function_exists( 'exif_read_data' ) ) return null;
+		if ( stripos( $mime, 'jpeg' ) === false && stripos( $mime, 'tiff' ) === false ) return null;
+		$raw = @exif_read_data( $filepath, null, true );
+		if ( ! $raw ) return null;
+
+		$ifd0 = $raw['IFD0'] ?? [];
+		$exif = $raw['EXIF'] ?? [];
+		$gps  = $raw['GPS'] ?? [];
+		$map = [
+			'Make'             => $ifd0['Make'] ?? null,
+			'Model'            => $ifd0['Model'] ?? null,
+			'Orientation'      => $ifd0['Orientation'] ?? null,
+			'Software'         => $ifd0['Software'] ?? null,
+			'DateTimeOriginal' => $exif['DateTimeOriginal'] ?? ( $ifd0['DateTime'] ?? null ),
+			'ExposureTime'     => $exif['ExposureTime'] ?? null,
+			'FNumber'          => $exif['FNumber'] ?? null,
+			'ISO'              => $exif['ISOSpeedRatings'] ?? null,
+			'FocalLength'      => $exif['FocalLength'] ?? null,
+			'PixelWidth'       => $exif['ExifImageWidth'] ?? null,
+			'PixelHeight'      => $exif['ExifImageLength'] ?? null,
+		];
+		$pick = [];
+		foreach ( $map as $k => $v ) {
+			if ( $v === null || $v === '' ) continue;
+			$pick[ $k ] = is_string( $v ) ? trim( $v ) : $v;
+		}
+		if ( isset( $gps['GPSLatitude'], $gps['GPSLongitude'] ) ) {
+			$lat = self::gps_decimal( $gps['GPSLatitude'], $gps['GPSLatitudeRef'] ?? 'N' );
+			$lng = self::gps_decimal( $gps['GPSLongitude'], $gps['GPSLongitudeRef'] ?? 'E' );
+			if ( $lat !== null && $lng !== null ) { $pick['GPSLatitude'] = $lat; $pick['GPSLongitude'] = $lng; }
+		}
+		return $pick ? wp_json_encode( $pick ) : null;
+	}
+
+	private static function gps_decimal( $coord, string $ref ): ?float {
+		if ( ! is_array( $coord ) || count( $coord ) < 3 ) return null;
+		$d = self::frac( $coord[0] ); $m = self::frac( $coord[1] ); $s = self::frac( $coord[2] );
+		if ( $d === null ) return null;
+		$dec = $d + ( $m ?? 0 ) / 60 + ( $s ?? 0 ) / 3600;
+		if ( in_array( strtoupper( $ref ), [ 'S', 'W' ], true ) ) $dec = -$dec;
+		return round( $dec, 6 );
+	}
+
+	private static function frac( $v ): ?float {
+		if ( is_numeric( $v ) ) return (float) $v;
+		if ( is_string( $v ) && strpos( $v, '/' ) !== false ) {
+			[ $n, $d ] = explode( '/', $v, 2 );
+			return (float) $d ? (float) $n / (float) $d : 0.0;
+		}
+		return null;
 	}
 
 	public static function delete( int $id ): bool {
@@ -107,6 +165,7 @@ class Noodled_Attachments {
 				'url'      => $base_url . '/' . $r['file_path'],
 				'mime'     => $r['mime_type'],
 				'size'     => (int) $r['file_size'],
+				'exif'     => ! empty( $r['exif'] ) ? json_decode( $r['exif'], true ) : null,
 			];
 		}, $rows ?: [] );
 	}

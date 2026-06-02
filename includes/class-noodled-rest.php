@@ -86,6 +86,11 @@ class Noodled_REST {
 			[ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'delete_attachment' ], ] + $auth,
 		] );
 
+		// Per-user Evernote import (each user imports their own .enex from the app)
+		register_rest_route( $ns, '/import/evernote', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'import_evernote' ], ] + $auth,
+		] );
+
 		// Config
 		register_rest_route( $ns, '/config', [
 			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'get_config' ], ] + $auth,
@@ -418,7 +423,21 @@ class Noodled_REST {
 	public static function get_note( \WP_REST_Request $req ): \WP_REST_Response {
 		$note = self::verify_note_access( (int) $req['id'] );
 		if ( ! $note ) return new \WP_REST_Response( [ 'error' => 'Note not found' ], 404 );
+		$note['attachments'] = Noodled_Attachments::get_for_note( (int) $req['id'] );
 		return new \WP_REST_Response( $note );
+	}
+
+	/** Per-user Evernote .enex import from the app. */
+	public static function import_evernote( \WP_REST_Request $req ): \WP_REST_Response {
+		$files = $req->get_file_params();
+		$f = $files['file'] ?? null;
+		if ( ! $f || empty( $f['tmp_name'] ) || ( $f['error'] ?? 1 ) !== UPLOAD_ERR_OK ) {
+			return new \WP_REST_Response( [ 'error' => 'No file uploaded' ], 400 );
+		}
+		if ( strtolower( pathinfo( $f['name'] ?? '', PATHINFO_EXTENSION ) ) !== 'enex' ) {
+			return new \WP_REST_Response( [ 'error' => 'Please choose an Evernote .enex export file.' ], 400 );
+		}
+		return new \WP_REST_Response( Noodled_Evernote::import( $f['tmp_name'], self::current_user_id() ) );
 	}
 
 	public static function create_note( \WP_REST_Request $req ): \WP_REST_Response {
@@ -742,10 +761,15 @@ class Noodled_REST {
 	// ── Admin: User & Permission Management ──
 
 	public static function admin_invite_user( \WP_REST_Request $req ): \WP_REST_Response {
-		$email = $req->get_param( 'email' );
-		$name  = $req->get_param( 'name' ) ?: '';
-		$role  = $req->get_param( 'role' ) ?: 'member';
-		return new \WP_REST_Response( Noodled_Auth::invite_user( $email, $name, $role ) );
+		$email  = $req->get_param( 'email' );
+		$name   = $req->get_param( 'name' ) ?: '';
+		$role   = $req->get_param( 'role' ) ?: 'member';
+		$result = Noodled_Auth::invite_user( $email, $name, $role );
+		// Optionally drop them straight into a shared drop folder at invite time.
+		if ( ! isset( $result['error'] ) && $req->get_param( 'drop' ) && ! empty( $result['id'] ) ) {
+			Noodled_Notebooks::set_drop_folder( (int) $result['id'], self::current_user_id(), true );
+		}
+		return new \WP_REST_Response( $result );
 	}
 
 	public static function admin_delete_user( \WP_REST_Request $req ): \WP_REST_Response {

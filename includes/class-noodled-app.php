@@ -89,6 +89,15 @@ class Noodled_App {
 
 		$current_user = Noodled_Auth::get_current_user();
 
+		// Admin landing preview: view the public landing page even while logged in
+		// (you can't otherwise see it once authenticated).
+		if ( isset( $_GET['noodled_preview'] ) && $_GET['noodled_preview'] === 'landing'
+			&& $current_user && ( $current_user['role'] ?? '' ) === 'admin' ) {
+			$landing_file = NOODLED_PATH . 'templates/landing.html';
+			$landing = file_exists( $landing_file ) ? file_get_contents( $landing_file ) : Noodled_Settings::get_landing_html();
+			if ( $landing ) { self::serve_landing( $landing ); exit; }
+		}
+
 		if ( ! $current_user ) {
 			// Check file-based landing page first, then DB upload
 			$landing_file = NOODLED_PATH . 'templates/landing.html';

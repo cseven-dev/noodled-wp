@@ -43,6 +43,9 @@
   <span class="logo" onclick="closeNote()" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
   <span class="logo-version">v<?php echo NOODLED_VERSION; ?></span>
   <button class="btn btn-sm hide-mobile" id="newNoteBtn" onclick="createNote()" title="New note">+ New Note</button>
+  <button class="btn btn-sm hide-mobile" id="photoNoteBtn" onclick="uploadPhotos()" title="Upload photos into a new note">+ Photos</button>
+  <input type="file" id="photoUploadInput" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this)">
+  <input type="file" id="enexImportInput" accept=".enex" style="display:none" onchange="handleEvernoteImport(this)">
   <span class="spacer"></span>
   <div class="focus-timer" id="focusTimer">
     <span id="focusTime">25:00</span>
@@ -64,6 +67,7 @@
       <div class="dropdown-item" onclick="showLinkGraph()">Note links</div>
       <div class="dropdown-item" onclick="showStats()">Statistics</div>
       <div class="dropdown-item" onclick="toggleQuickCapture()">Quick capture</div>
+      <div class="dropdown-item" onclick="importEvernote()">Import from Evernote</div>
       <div class="dropdown-sep"></div>
       <div class="dropdown-item" onclick="showShortcutsHelp()">Keyboard shortcuts</div>
       <div class="dropdown-item" onclick="toggleTheme()">Toggle theme</div>

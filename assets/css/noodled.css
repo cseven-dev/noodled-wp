@@ -868,16 +868,47 @@ body.reading-mode .rendered-content { cursor: default; }
   border-top: 1px solid var(--border);
 }
 .gallery-thumb {
-  width: 64px; height: 64px; border-radius: 6px; object-fit: cover;
-  border: 1px solid var(--border); cursor: pointer; transition: transform 0.15s;
+  width: 96px; height: 96px; border-radius: 8px; object-fit: cover;
+  border: 1px solid var(--border); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; background: var(--bg-input);
 }
-.gallery-thumb:hover { transform: scale(1.1); }
+.gallery-thumb:hover { transform: scale(1.05); box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
 .gallery-file {
   display: flex; align-items: center; gap: 4px; padding: 4px 10px;
   background: var(--bg-input); border-radius: 6px; font-size: 11px;
   color: var(--text); cursor: pointer; border: 1px solid var(--border);
 }
 .gallery-file:hover { border-color: var(--accent); }
+
+/* ── Image lightbox ── */
+.noodled-lightbox {
+  position: fixed; inset: 0; z-index: 11000; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.86); backdrop-filter: blur(3px);
+}
+.noodled-lightbox .lb-stage {
+  max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.noodled-lightbox #lbImg {
+  max-width: 92vw; max-height: 82vh; object-fit: contain;
+  border-radius: 8px; box-shadow: 0 10px 50px rgba(0,0,0,0.6);
+}
+.noodled-lightbox .lb-caption {
+  color: #e8e8ef; font-size: 13px; text-align: center; line-height: 1.5; max-width: 80vw;
+}
+.noodled-lightbox .lb-caption .lb-exif { color: #9a9aa8; font-size: 12px; }
+.noodled-lightbox .lb-caption a { color: var(--accent); }
+.noodled-lightbox .lb-close,
+.noodled-lightbox .lb-nav {
+  position: absolute; background: rgba(255,255,255,0.1); color: #fff; border: none;
+  cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.noodled-lightbox .lb-close:hover,
+.noodled-lightbox .lb-nav:hover { background: rgba(255,255,255,0.22); }
+.noodled-lightbox .lb-close { top: 18px; right: 20px; width: 40px; height: 40px; font-size: 18px; }
+.noodled-lightbox .lb-nav { top: 50%; transform: translateY(-50%); width: 48px; height: 48px; font-size: 28px; }
+.noodled-lightbox .lb-prev { left: 16px; }
+.noodled-lightbox .lb-next { right: 16px; }
 
 /* ── Save queue indicator ── */
 .save-queued { color: var(--yellow, #f59e0b) !important; }

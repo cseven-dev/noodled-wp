@@ -30,16 +30,23 @@ class Noodled_Settings {
 			30
 		);
 
-		add_submenu_page( 'noodled', 'Dashboard', 'Dashboard', 'manage_options', 'noodled', [ __CLASS__, 'page_dashboard' ] );
-		add_submenu_page( 'noodled', 'Settings', 'Settings', 'manage_options', 'noodled-settings', [ __CLASS__, 'page_settings' ] );
-		add_submenu_page( 'noodled', 'Branding', 'Branding', 'manage_options', 'noodled-branding', [ __CLASS__, 'page_branding' ] );
-		add_submenu_page( 'noodled', 'Users' . $bubble, 'Users' . $bubble, 'manage_options', 'noodled-users', [ __CLASS__, 'page_users' ] );
-		add_submenu_page( 'noodled', 'Import', 'Import', 'manage_options', 'noodled-import', [ __CLASS__, 'page_import' ] );
-		add_submenu_page( 'noodled', 'Sync', 'Sync', 'manage_options', 'noodled-sync', [ __CLASS__, 'page_sync' ] );
-
+		// Everything (Overview, Users, Branding, Import, Sync, Settings) is a tab on
+		// the single Dashboard page now — no separate submenu items.
 		if ( ! self::is_setup_complete() ) {
 			add_submenu_page( null, 'Setup', 'Setup', 'manage_options', 'noodled-setup', [ __CLASS__, 'render_setup' ] );
 		}
+	}
+
+	/** Tab definitions for the Dashboard. */
+	private static function tabs(): array {
+		return [
+			'overview' => 'Overview',
+			'users'    => 'Users',
+			'branding' => 'Branding',
+			'import'   => 'Import',
+			'sync'     => 'Sync',
+			'settings' => 'Settings',
+		];
 	}
 
 	/* ────────────────────────────────────────────────────────────
@@ -140,7 +147,39 @@ class Noodled_Settings {
 	   ──────────────────────────────────────────────────────────── */
 	public static function page_dashboard() {
 		if ( ! current_user_can( 'manage_options' ) ) return;
-		$opts      = get_option( self::$option_key, [] );
+		$tabs    = self::tabs();
+		$tab     = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'overview';
+		if ( ! isset( $tabs[ $tab ] ) ) $tab = 'overview';
+		$pending = Noodled_Auth::get_pending_count();
+		$bubble  = $pending ? ' <span class="awaiting-mod"><span class="pending-count">' . (int) $pending . '</span></span>' : '';
+		?>
+		<div class="wrap">
+			<h1 style="margin-bottom:8px">Noodled</h1>
+			<h2 class="nav-tab-wrapper">
+				<?php foreach ( $tabs as $k => $label ) :
+					$url = admin_url( 'admin.php?page=noodled&tab=' . $k );
+					?>
+					<a href="<?php echo esc_url( $url ); ?>" class="nav-tab<?php echo $tab === $k ? ' nav-tab-active' : ''; ?>"><?php echo esc_html( $label ) . ( $k === 'users' ? $bubble : '' ); ?></a>
+				<?php endforeach; ?>
+			</h2>
+			<div style="margin-top:20px">
+			<?php
+			switch ( $tab ) {
+				case 'users':    self::render_user_management(); break;
+				case 'branding': self::render_branding();        break;
+				case 'import':   self::render_import();           break;
+				case 'sync':     self::render_sync();             break;
+				case 'settings': self::render_settings();         break;
+				default:         self::render_overview();
+			}
+			?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/** Overview tab: stat cards, quick links, landing preview. */
+	private static function render_overview() {
 		$app_url   = home_url( '/' . self::get_app_path() . '/' );
 		$users     = Noodled_Auth::get_all_users();
 		$notebooks = Noodled_Notebooks::get_all();
@@ -153,6 +192,7 @@ class Noodled_Settings {
 		$drop_count  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}noodled_notebooks WHERE drop_to > 0" );
 		$pending     = Noodled_Auth::get_pending_count();
 		$last_sync   = get_option( 'noodled_last_sync' );
+		$preview_url = add_query_arg( 'noodled_preview', 'landing', self::is_homepage_mode() ? home_url( '/' ) : $app_url );
 		$cards = [
 			[ 'v' => $note_count,                       'l' => 'Notes' ],
 			[ 'v' => count( $notebooks ),               'l' => 'Notebooks' ],
@@ -166,47 +206,40 @@ class Noodled_Settings {
 			[ 'v' => 'v' . NOODLED_VERSION,             'l' => 'Version' ],
 		];
 		?>
-		<div class="wrap">
-			<h1>Noodled</h1>
-			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:20px 0">
-				<?php foreach ( $cards as $c ) : ?>
-				<div class="noodled-card<?php echo ! empty( $c['hot'] ) ? ' noodled-card--hot' : ''; ?>">
-					<h3<?php echo ! empty( $c['small'] ) ? ' style="font-size:15px"' : ''; ?>><?php echo $c['v']; ?></h3>
-					<p><?php echo esc_html( $c['l'] ); ?></p>
-				</div>
-				<?php endforeach; ?>
+		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:4px 0 20px">
+			<?php foreach ( $cards as $c ) : ?>
+			<div class="noodled-card<?php echo ! empty( $c['hot'] ) ? ' noodled-card--hot' : ''; ?>">
+				<h3<?php echo ! empty( $c['small'] ) ? ' style="font-size:15px"' : ''; ?>><?php echo $c['v']; ?></h3>
+				<p><?php echo esc_html( $c['l'] ); ?></p>
 			</div>
-
-			<h2>Quick Links</h2>
-			<p><a href="<?php echo esc_url( $app_url ); ?>" target="_blank" class="button button-primary">Open App</a>
-			<?php if ( self::is_homepage_mode() ) : ?>
-				<a href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" class="button">Open Homepage</a>
-			<?php endif; ?>
-			</p>
-
-			<hr style="margin:28px 0">
-			<?php self::render_user_management(); ?>
-
-			<style>
-			.noodled-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;text-align:center}
-			.noodled-card h3{margin:0;font-size:28px;color:#0078d4;word-break:break-word}
-			.noodled-card p{margin:6px 0 0;color:#666;font-size:13px}
-			.noodled-card--hot{border-color:#d63638}
-			.noodled-card--hot h3{color:#d63638}
-			</style>
+			<?php endforeach; ?>
 		</div>
+
+		<h2>Quick Links</h2>
+		<p><a href="<?php echo esc_url( $app_url ); ?>" target="_blank" class="button button-primary">Open App</a>
+		<?php if ( self::is_homepage_mode() ) : ?>
+			<a href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" class="button">Open Homepage</a>
+		<?php endif; ?>
+			<a href="<?php echo esc_url( $preview_url ); ?>" target="_blank" class="button">Preview Landing Page</a>
+		</p>
+		<p class="description">The landing page only shows to logged-out visitors, so use <strong>Preview Landing Page</strong> to see it while signed in.</p>
+
+		<style>
+		.noodled-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;text-align:center}
+		.noodled-card h3{margin:0;font-size:28px;color:#0078d4;word-break:break-word}
+		.noodled-card p{margin:6px 0 0;color:#666;font-size:13px}
+		.noodled-card--hot{border-color:#d63638}
+		.noodled-card--hot h3{color:#d63638}
+		</style>
 		<?php
 	}
 
 	/* ────────────────────────────────────────────────────────────
 	   PAGE: SETTINGS
 	   ──────────────────────────────────────────────────────────── */
-	public static function page_settings() {
-		if ( ! current_user_can( 'manage_options' ) ) return;
+	private static function render_settings() {
 		$opts = get_option( self::$option_key, [] );
 		?>
-		<div class="wrap">
-			<h1>Settings</h1>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'noodled_general' ); ?>
 				<input type="hidden" name="<?php echo self::$option_key; ?>[_tab]" value="general">
@@ -241,21 +274,17 @@ class Noodled_Settings {
 				<p class="description" style="max-width:700px">Each new member gets their own private <strong>My Notes</strong> notebook. Notes are private by default; users share their own notebooks/notes from inside the app. Admins do not have a god-view of members' notes.</p>
 				<?php submit_button(); ?>
 			</form>
-		</div>
 		<?php
 	}
 
 	/* ────────────────────────────────────────────────────────────
-	   PAGE: BRANDING
+	   TAB: BRANDING
 	   ──────────────────────────────────────────────────────────── */
-	public static function page_branding() {
-		if ( ! current_user_can( 'manage_options' ) ) return;
+	private static function render_branding() {
 		$opts = get_option( self::$option_key, [] );
 		$has_landing = ! empty( get_option( 'noodled_landing_html' ) );
 		settings_errors( 'noodled_branding' );
 		?>
-		<div class="wrap">
-			<h1>Branding</h1>
 			<form method="post" action="options.php" enctype="multipart/form-data">
 				<?php settings_fields( 'noodled_branding' ); ?>
 				<table class="form-table">
@@ -290,26 +319,12 @@ class Noodled_Settings {
 				</table>
 				<?php submit_button(); ?>
 			</form>
-		</div>
-		<?php
-	}
-
-	/* ────────────────────────────────────────────────────────────
-	   PAGE: USERS
-	   ──────────────────────────────────────────────────────────── */
-	public static function page_users() {
-		if ( ! current_user_can( 'manage_options' ) ) return;
-		?>
-		<div class="wrap">
-			<h1>Users</h1>
-			<?php self::render_user_management(); ?>
-		</div>
 		<?php
 	}
 
 	/**
-	 * Reusable user-management block (pending requests, members, invite). Rendered
-	 * on both the Users page and the Dashboard so members can be managed in one place.
+	 * Reusable user-management block (pending requests, members, invite).
+	 * Rendered as the Users tab on the Dashboard.
 	 */
 	public static function render_user_management() {
 		$users   = Noodled_Auth::get_all_users();
@@ -367,10 +382,11 @@ class Noodled_Settings {
 		</table>
 
 		<h3>Invite</h3>
-		<div style="display:flex;gap:8px;max-width:860px;margin-bottom:8px">
-			<input type="email" id="invite-email" placeholder="Email" class="regular-text" style="flex:1">
-			<input type="text" id="invite-name" placeholder="Name (optional)" class="regular-text" style="flex:1">
+		<div style="display:flex;gap:8px;align-items:center;max-width:860px;margin-bottom:8px;flex-wrap:wrap">
+			<input type="email" id="invite-email" placeholder="Email" class="regular-text" style="flex:1;min-width:160px">
+			<input type="text" id="invite-name" placeholder="Name (optional)" class="regular-text" style="flex:1;min-width:140px">
 			<select id="invite-role"><option value="member">Member</option><option value="admin">Admin</option></select>
+			<label style="white-space:nowrap"><input type="checkbox" id="invite-drop"> Drop folder</label>
 			<button type="button" class="button button-primary" onclick="noodledInvite()">Invite</button>
 		</div>
 		<span id="invite-status"></span>
@@ -385,13 +401,14 @@ class Noodled_Settings {
 			const email = document.getElementById('invite-email').value;
 			const name = document.getElementById('invite-name').value;
 			const role = document.getElementById('invite-role').value;
+			const drop = document.getElementById('invite-drop').checked;
 			const status = document.getElementById('invite-status');
 			if (!email) { status.textContent = 'Email required'; return; }
 			const res = await fetch(_api + '/admin/users', {
 				method: 'POST',
 				headers: { 'X-WP-Nonce': _nonce, 'Content-Type': 'application/json' },
 				credentials: 'same-origin',
-				body: JSON.stringify({ email, name, role })
+				body: JSON.stringify({ email, name, role, drop })
 			});
 			const data = await res.json();
 			status.textContent = data.error || 'Invited!';
@@ -461,16 +478,12 @@ class Noodled_Settings {
 	/* ────────────────────────────────────────────────────────────
 	   PAGE: IMPORT
 	   ──────────────────────────────────────────────────────────── */
-	public static function page_import() {
-		if ( ! current_user_can( 'manage_options' ) ) return;
+	private static function render_import() {
 		settings_errors( 'noodled_import' );
 		?>
-		<div class="wrap">
-			<h1>Import</h1>
-
 			<div class="noodled-import-card">
-				<h2>From Evernote</h2>
-				<p>Export your notes from Evernote desktop as an <code>.enex</code> file, then upload it here.</p>
+				<h2>From Evernote (admin)</h2>
+				<p>Export your notes from Evernote desktop as an <code>.enex</code> file, then upload it here. Members can also import their own from inside the app (toolbar &rarr; Import).</p>
 				<form method="post" enctype="multipart/form-data">
 					<?php wp_nonce_field( 'noodled_evernote_import' ); ?>
 					<input type="file" name="enex_file" accept=".enex" style="margin-right:8px">
@@ -516,21 +529,16 @@ class Noodled_Settings {
 			.noodled-import-card h2{margin:0 0 8px;font-size:16px}
 			.noodled-import-card p{color:#555;font-size:13px;margin:0 0 12px}
 			</style>
-		</div>
 		<?php
 	}
 
 	/* ────────────────────────────────────────────────────────────
-	   PAGE: SYNC
+	   TAB: SYNC
 	   ──────────────────────────────────────────────────────────── */
-	public static function page_sync() {
-		if ( ! current_user_can( 'manage_options' ) ) return;
+	private static function render_sync() {
 		$opts = get_option( self::$option_key, [] );
 		$webhook_url = rest_url( 'noodled/v1/webhook/github' );
 		?>
-		<div class="wrap">
-			<h1>Sync</h1>
-
 			<h2>GitHub</h2>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'noodled_sync' ); ?>
@@ -552,7 +560,6 @@ class Noodled_Settings {
 			<h2 style="margin-top:30px">Plaud</h2>
 			<p style="color:green">&#10003; Plaud token detected from <code>.env</code> file. Voice recordings will sync via the app toolbar.</p>
 			<?php endif; ?>
-		</div>
 		<?php
 	}
 

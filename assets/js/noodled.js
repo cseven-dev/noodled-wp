@@ -56,6 +56,7 @@ const api = {
   trash_count()                          { return this._fetch('/trash/count'); },
   search(query)                          { return this._fetch('/search?q=' + encodeURIComponent(query)); },
   save_attachment(nb, noteId, name, b64) { return this._fetch('/attachments', { method: 'POST', body: JSON.stringify({ note_id: noteId, filename: name, data: b64 }) }); },
+  import_evernote(formData)              { return fetch(this._base + '/import/evernote', { method: 'POST', headers: { 'X-WP-Nonce': this._nonce }, credentials: 'same-origin', body: formData }).then(r => r.json()); },
   get_config()                           { return this._fetch('/config'); },
   set_config(key, value)                 { return this._fetch('/config', { method: 'PUT', body: JSON.stringify({ key, value }) }); },
   get_version()                          { return Promise.resolve(noodledConfig.version); },
@@ -997,24 +998,29 @@ function htmlToMarkdown(el) {
 }
 
 // ── File attachments ──
+function fileToB64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function attachFile(file) {
   if (!activeNote) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const b64 = reader.result.split(',')[1];
+  try {
+    const b64 = await fileToB64(file);
     const result = await api.save_attachment(activeNote.notebook, activeNote.id, file.name, b64);
-    if (result.filename) {
-      const isImage = /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(file.name);
-      const url = result.url || result.filename;
-      let ref;
-      if (isImage) ref = `\n![${result.filename}](${url})\n`;
-      else ref = `\n[${result.filename}](${url})\n`;
-      activeNote.body = (activeNote.body || '') + ref;
-      await saveAndRerender();
+    if (result && result.filename) {
+      // Attachments stay out of the text — they render in the gallery below.
+      (activeNote.attachments = activeNote.attachments || []).push(result);
+      renderAttachmentGallery();
       showToast(`Attached: ${result.filename}`);
+    } else if (result && result.error) {
+      showToast(result.error);
     }
-  };
-  reader.readAsDataURL(file);
+  } catch (e) { showToast('Upload failed'); }
 }
 
 async function handleDrop(e) {
@@ -1030,6 +1036,61 @@ function uploadFile() {
 async function handleFileUpload(input) {
   if (!activeNote || !input.files.length) return;
   for (const file of input.files) await attachFile(file);
+}
+
+// ── Photo upload: creates a new "Image Upload …" note, images shown in the gallery ──
+function uploadPhotos() {
+  const input = document.getElementById('photoUploadInput');
+  if (input) { input.value = ''; input.click(); }
+}
+
+async function handlePhotoUpload(input) {
+  const files = Array.from(input.files || []).filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(f.name));
+  if (!files.length) return;
+  await doSave();
+  const nb = activeNotebook || 'General';
+  const title = 'Image Upload ' + new Date().toLocaleString();
+  showToast(`Uploading ${files.length} photo${files.length !== 1 ? 's' : ''}…`);
+  const note = await api.create_note(nb, title, '');
+  if (!note || note.error) { showToast('Could not create note'); return; }
+  let ok = 0;
+  for (const f of files) {
+    try {
+      const b64 = await fileToB64(f);
+      const r = await api.save_attachment(note.notebook, note.id, f.name, b64);
+      if (r && r.filename) ok++;
+    } catch (e) {}
+  }
+  activeNote = await api.get_note(null, note.id);
+  await loadNotebooks();
+  await loadNotes();
+  renderNoteList();
+  renderContent();
+  document.querySelector('.col-content')?.classList.add('open');
+  closeSidebar();
+  showToast(`${ok} photo${ok !== 1 ? 's' : ''} added`);
+}
+
+// ── Evernote import (per-user, from the app) ──
+function importEvernote() {
+  const input = document.getElementById('enexImportInput');
+  if (input) { input.value = ''; input.click(); }
+}
+
+async function handleEvernoteImport(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  showToast('Importing from Evernote…');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await api.import_evernote(fd);
+    if (res && res.error) { showToast('Import failed: ' + res.error); return; }
+    await loadNotebooks();
+    await loadNotes();
+    const n = res.imported || 0;
+    showToast(`Imported ${n} note${n !== 1 ? 's' : ''}` + (res.skipped ? `, ${res.skipped} skipped` : ''));
+  } catch (e) { showToast('Import failed'); }
 }
 
 // ── Checkbox toggle ──
@@ -2256,44 +2317,105 @@ function getNotebookCover(nbName) {
   return (config.nb_covers || {})[nbName] || '';
 }
 
-// ── Attachment gallery ──
+// ── Attachment gallery + lightbox ──
+function isImageAttachment(a) {
+  return /^image\//.test(a.mime || '') || /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(a.filename || a.name || '');
+}
+
 function renderAttachmentGallery() {
+  document.querySelectorAll('.attachment-gallery').forEach(g => g.remove());
   if (!activeNote) return;
-  const body = activeNote.body || '';
-  const attachments = [];
-  // Find all markdown links/images that look like attachments
-  const imgRe = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  const linkRe = /\[([^\]]+)\]\(([^)]+noodled[^)]*)\)/g;
-  let m;
-  while ((m = imgRe.exec(body)) !== null) attachments.push({ name: m[1] || m[2].split('/').pop(), url: m[2], isImage: true });
-  while ((m = linkRe.exec(body)) !== null) {
-    if (!attachments.find(a => a.url === m[2])) attachments.push({ name: m[1], url: m[2], isImage: false });
-  }
-  if (!attachments.length) return;
+  const atts = activeNote.attachments || [];
+  if (!atts.length) return;
   const footer = document.getElementById('editorFooter');
   if (!footer) return;
+  const images = atts.filter(isImageAttachment);
   const gallery = document.createElement('div');
   gallery.className = 'attachment-gallery';
-  attachments.forEach(a => {
-    if (a.isImage) {
+  atts.forEach(a => {
+    const name = a.filename || a.name;
+    if (isImageAttachment(a)) {
       const img = document.createElement('img');
       img.className = 'gallery-thumb';
-      img.src = a.url;
-      img.alt = a.name;
-      img.onclick = () => window.open(a.url, '_blank');
+      img.src = a.url; img.alt = name; img.loading = 'lazy';
+      img.onclick = () => openLightbox(images, images.indexOf(a));
       gallery.appendChild(img);
     } else {
       const div = document.createElement('div');
       div.className = 'gallery-file';
-      div.textContent = a.name;
-      div.onclick = () => {
-        if (/\.html?$/i.test(a.url)) viewAttachment(a.url, a.name);
-        else window.open(a.url, '_blank');
-      };
+      div.textContent = name;
+      div.onclick = () => { if (/\.html?$/i.test(a.url)) viewAttachment(a.url, name); else window.open(a.url, '_blank'); };
       gallery.appendChild(div);
     }
   });
   footer.after(gallery);
+}
+
+// Lightbox for image attachments, captioned with stored EXIF.
+let _lbImages = [], _lbIndex = 0;
+function openLightbox(images, index) {
+  if (!images || !images.length) return;
+  _lbImages = images; _lbIndex = Math.max(0, index || 0);
+  let lb = document.getElementById('noodledLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'noodledLightbox';
+    lb.className = 'noodled-lightbox';
+    lb.innerHTML = `
+      <button class="lb-close" onclick="closeLightbox()" aria-label="Close">&#10005;</button>
+      <button class="lb-nav lb-prev" onclick="lightboxStep(-1)" aria-label="Previous">&#8249;</button>
+      <div class="lb-stage"><img id="lbImg" alt=""><div class="lb-caption" id="lbCaption"></div></div>
+      <button class="lb-nav lb-next" onclick="lightboxStep(1)" aria-label="Next">&#8250;</button>`;
+    lb.onclick = (e) => { if (e.target === lb) closeLightbox(); };
+    document.body.appendChild(lb);
+    document.addEventListener('keydown', lightboxKey);
+  }
+  lb.style.display = 'flex';
+  renderLightbox();
+}
+function renderLightbox() {
+  const a = _lbImages[_lbIndex];
+  if (!a) return;
+  document.getElementById('lbImg').src = a.url;
+  document.getElementById('lbCaption').innerHTML = lightboxCaption(a);
+  const nav = _lbImages.length > 1;
+  document.querySelectorAll('#noodledLightbox .lb-nav').forEach(b => b.style.display = nav ? '' : 'none');
+}
+function lightboxCaption(a) {
+  const parts = ['<strong>' + esc(a.filename || a.name || '') + '</strong>'];
+  const e = a.exif;
+  if (e) {
+    const bits = [];
+    if (e.DateTimeOriginal) bits.push(esc(String(e.DateTimeOriginal)));
+    if (e.Make || e.Model) bits.push(esc([e.Make, e.Model].filter(Boolean).join(' ')));
+    if (e.FNumber) bits.push('f/' + esc(String(evalFrac(e.FNumber))));
+    if (e.ExposureTime) bits.push(esc(String(e.ExposureTime)) + 's');
+    if (e.ISO) bits.push('ISO ' + esc(String(e.ISO)));
+    if (e.FocalLength) bits.push(esc(String(evalFrac(e.FocalLength))) + 'mm');
+    if (e.GPSLatitude && e.GPSLongitude) bits.push('<a href="https://maps.google.com/?q=' + e.GPSLatitude + ',' + e.GPSLongitude + '" target="_blank" rel="noopener">📍 map</a>');
+    if (bits.length) parts.push('<span class="lb-exif">' + bits.join(' &middot; ') + '</span>');
+  }
+  return parts.join('<br>');
+}
+function evalFrac(v) {
+  if (typeof v === 'string' && v.includes('/')) { const p = v.split('/'); return p[1] ? +(parseFloat(p[0]) / parseFloat(p[1])).toFixed(1) : v; }
+  return v;
+}
+function lightboxStep(d) {
+  if (!_lbImages.length) return;
+  _lbIndex = (_lbIndex + d + _lbImages.length) % _lbImages.length;
+  renderLightbox();
+}
+function closeLightbox() {
+  const lb = document.getElementById('noodledLightbox');
+  if (lb) lb.style.display = 'none';
+}
+function lightboxKey(e) {
+  const lb = document.getElementById('noodledLightbox');
+  if (!lb || lb.style.display === 'none') return;
+  if (e.key === 'Escape') closeLightbox();
+  else if (e.key === 'ArrowLeft') lightboxStep(-1);
+  else if (e.key === 'ArrowRight') lightboxStep(1);
 }
 
 // ── Remember last note on load ──

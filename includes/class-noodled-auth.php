@@ -54,6 +54,53 @@ class Noodled_Auth {
 		] );
 	}
 
+	// ── Branded email ──
+
+	/** A styled paragraph for branded HTML emails. */
+	private static function email_p( string $html ): string {
+		return '<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3a3a40">' . $html . '</p>';
+	}
+
+	/**
+	 * Send an HTML email wrapped in noodled branding (brand name, tagline, accent
+	 * colour, CTA button) so it matches the marketing look. $cta = [ 'label', 'url' ]
+	 * is optional. $body_html is trusted HTML built by the caller.
+	 */
+	private static function send_branded( string $to, string $subject, string $heading, string $body_html, ?array $cta = null ): bool {
+		$brand   = Noodled_Settings::get_brand_name();
+		$tagline = Noodled_Settings::get_brand_tagline();
+		$accent  = Noodled_Settings::get_accent_color();
+		$app     = self::get_app_url();
+
+		$cta_html = '';
+		if ( $cta && ! empty( $cta['url'] ) ) {
+			$cta_html = '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px"><tr>'
+				. '<td style="border-radius:10px;background:' . esc_attr( $accent ) . '">'
+				. '<a href="' . esc_url( $cta['url'] ) . '" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none">' . esc_html( $cta['label'] ) . '</a>'
+				. '</td></tr></table>';
+		}
+
+		$html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>'
+			. '<body style="margin:0;padding:0;background:#faf6f0;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif">'
+			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6f0;padding:32px 12px"><tr><td align="center">'
+			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #ecebe6;border-radius:16px;overflow:hidden">'
+			. '<tr><td style="padding:26px 32px 0">'
+			. '<div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:' . esc_attr( $accent ) . '">' . esc_html( $brand ) . '</div>'
+			. '<div style="font-size:12px;color:#9a978f;margin-top:3px">' . esc_html( $tagline ) . '</div>'
+			. '</td></tr>'
+			. '<tr><td style="padding:20px 32px 28px">'
+			. ( $heading ? '<h1 style="margin:0 0 14px;font-size:19px;font-weight:700;color:#1a1a1f">' . esc_html( $heading ) . '</h1>' : '' )
+			. $body_html
+			. $cta_html
+			. '</td></tr>'
+			. '<tr><td style="padding:16px 32px;background:#faf6f0;border-top:1px solid #ecebe6">'
+			. '<div style="font-size:12px;color:#9a978f">Sent by ' . esc_html( $brand ) . ' &middot; <a href="' . esc_url( $app ) . '" style="color:' . esc_attr( $accent ) . ';text-decoration:none">Open ' . esc_html( $brand ) . '</a></div>'
+			. '</td></tr>'
+			. '</table></td></tr></table></body></html>';
+
+		return (bool) wp_mail( $to, $subject, $html, [ 'Content-Type: text/html; charset=UTF-8' ] );
+	}
+
 	// ── Magic Link ──
 
 	public static function send_magic_link( string $email ): array {
@@ -95,18 +142,28 @@ class Noodled_Auth {
 		], [ 'id' => $user['id'] ] );
 
 		$brand   = Noodled_Settings::get_brand_name();
+		$accent  = Noodled_Settings::get_accent_color();
 		$app_url = self::get_app_url();
 		$magic   = add_query_arg( [
 			'noodled_email' => $user['email'],
 			'noodled_login' => $pin,
 		], $app_url );
-		$subject = "Your {$brand} login link";
-		$body    = "Hi {$user['display_name']},\n\n"
-			. "Click here to sign in to {$brand} — no PIN to type:\n{$magic}\n\n"
-			. "Or enter this PIN manually at {$app_url}\nPIN: {$pin}\n\n"
-			. "This link expires in 15 minutes.\n\n— {$brand}";
 
-		$sent = wp_mail( $user['email'], $subject, $body );
+		$pin_box = '<div style="text-align:center;margin:4px 0 16px">'
+			. '<div style="display:inline-block;padding:14px 24px;background:#faf6f0;border:1px dashed ' . esc_attr( $accent )
+			. ';border-radius:12px;font-size:30px;font-weight:700;letter-spacing:8px;color:#1a1a1f;font-family:\'Courier New\',monospace">'
+			. esc_html( $pin ) . '</div></div>';
+		$body = self::email_p( 'Tap the button to sign in instantly, or enter this PIN on the login screen:' )
+			. $pin_box
+			. self::email_p( '<span style="color:#9a978f;font-size:13px">This PIN expires in 15 minutes. If you didn\'t request it, you can ignore this email.</span>' );
+
+		$sent = self::send_branded(
+			$user['email'],
+			"Your {$brand} login PIN",
+			'Hi ' . $user['display_name'] . ',',
+			$body,
+			[ 'label' => "Sign in to {$brand}", 'url' => $magic ]
+		);
 
 		return [ 'pin' => $pin, 'sent' => (bool) $sent ];
 	}
@@ -286,19 +343,18 @@ class Noodled_Auth {
 
 		$brand   = Noodled_Settings::get_brand_name();
 		$app     = self::get_app_url();
-		$by      = $sharer ? " by {$sharer}" : '';
+		$by      = $sharer ? ' by <strong>' . esc_html( $sharer ) . '</strong>' : '';
 		$subject = "A {$kind} was shared with you on {$brand}";
-		$body    = "Hi {$u['display_name']},\n\n"
-			. "The {$kind} \"{$title}\"{$by} is now shared with you on {$brand}.\n\n"
-			. "Open {$brand}: {$app}\n\n— {$brand}";
-		wp_mail( $u['email'], $subject, $body );
+		$body    = self::email_p( 'The ' . esc_html( $kind ) . ' <strong>' . esc_html( $title ) . '</strong>' . $by . ' is now shared with you.' )
+			. self::email_p( "Open {$brand} to take a look." );
+		self::send_branded( $u['email'], $subject, 'Hi ' . $u['display_name'] . ',', $body, [ 'label' => "Open {$brand}", 'url' => $app ] );
 	}
 
 	/** Email the site admin that someone has requested access. */
 	public static function notify_admin_of_request( string $name, string $email ): void {
 		$brand     = Noodled_Settings::get_brand_name();
 		$to        = Noodled_Settings::get_notify_email();
-		$users_url = admin_url( 'admin.php?page=noodled-users' );
+		$users_url = admin_url( 'admin.php?page=noodled&tab=users' );
 		$subject   = "[{$brand}] New noodle request from {$name}";
 		$body      = "{$name} ({$email}) has requested a noodle.\n\nApprove or deny here:\n{$users_url}";
 		wp_mail( $to, $subject, $body );
@@ -321,15 +377,20 @@ class Noodled_Auth {
 
 		$brand = Noodled_Settings::get_brand_name();
 		$body  = "# Welcome to {$brand}! \u{1F35C}\n\n"
-			. "This is **your** private notebook — only you can see it unless you choose to share.\n\n"
-			. "## A few things to try\n\n"
-			. "- Create notebooks (folders) in the left sidebar\n"
-			. "- Link notes together with `[[Note Title]]` wiki-links\n"
-			. "- Tag a thought with `#ideas` to find it later\n"
-			. "- Right-click a note or notebook to **Share** it with another user\n\n"
-			. "## Privacy\n\n"
-			. "Your notes are private to your account. Sharing is always opt-in, per notebook or per note, read-only or read/write.\n\n"
-			. "Happy noodling.\n";
+			. "This is **your** private notebook — only you can see what's here unless you choose to share it. Here's the quick tour.\n\n"
+			. "## What you can do\n\n"
+			. "- **Write notes** in plain language — they save automatically as you type.\n"
+			. "- **Organize with notebooks** — make folders for projects, topics, anyone you like, from the left sidebar.\n"
+			. "- **Format with Markdown** — type `# ` for a heading, `- ` for a bullet, `- [ ] ` for a checkbox, `**bold**`, and they render live.\n"
+			. "- **Search everything** instantly from the search box at the top.\n"
+			. "- **Dictate** a note with the \u{1F3A4} button, attach files with the \u{1F4CE} button.\n"
+			. "- **Share** a note or notebook with another person, read-only or read/write.\n\n"
+			. "## Two quick tips\n\n"
+			. "1. **Link your notes together** — type `[[` and the title of another note to connect them, like a personal wiki.\n"
+			. "2. **Tag a thought** with `#idea` or `#todo` anywhere in a note, then search the tag later to pull them all up.\n\n"
+			. "## Your privacy\n\n"
+			. "Everything you write is private to your account. Sharing is always opt-in — nothing leaves your noodle unless you decide it should.\n\n"
+			. "Happy noodling \u{2014} delete this note whenever you're ready.\n";
 
 		// Noodled_Notes::create() ensures the 'My Notes' notebook exists owned by
 		// this user, then creates the welcome note inside it.

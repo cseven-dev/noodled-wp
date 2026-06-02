@@ -49,10 +49,10 @@ class Noodled_Notebooks {
 
 		return array_map( function ( $r ) use ( $user_id ) {
 			$is_drop = (int) $r['drop_to'] > 0;
-			// A member's own drop folder is shown to them as "Shared with {Admin}".
+			// A member's own drop folder is shown to them as "{Admin}'s noodle".
 			// Everyone else (the admin receiving it) sees the real name = the member's name.
 			$label = ( $is_drop && (int) $r['owner_id'] === $user_id )
-				? 'Shared with ' . ( $r['drop_admin'] ?: 'admin' )
+				? self::drop_label( $r['drop_admin'] )
 				: $r['name'];
 			return [
 				'id'     => (int) $r['id'],
@@ -89,6 +89,23 @@ class Noodled_Notebooks {
 			$i++;
 		}
 		return $name;
+	}
+
+	/** Friendly possessive label for a drop folder, e.g. "Simon's noodle". */
+	private static function drop_label( ?string $admin_name ): string {
+		$first = self::first_name( $admin_name );
+		return $first ? $first . "'s noodle" : 'Shared noodle';
+	}
+
+	/** Clean first name from a display name or email ("simon@c7.ca" → "Simon"). */
+	private static function first_name( ?string $name ): string {
+		$name = trim( (string) $name );
+		if ( $name === '' ) return '';
+		if ( strpos( $name, '@' ) !== false ) $name = substr( $name, 0, strpos( $name, '@' ) );
+		$name  = preg_replace( '/[._-]+/', ' ', $name );
+		$first = trim( explode( ' ', trim( $name ) )[0] );
+		if ( $first === '' ) return '';
+		return function_exists( 'mb_convert_case' ) ? mb_convert_case( $first, MB_CASE_TITLE, 'UTF-8' ) : ucfirst( $first );
 	}
 
 	/**
@@ -151,14 +168,16 @@ class Noodled_Notebooks {
 
 		Noodled_Permissions::set( $admin_id, $nb_id, true, true );
 
-		// Seed a one-line welcome note so the folder is visible immediately.
+		// Seed a short note so the folder is visible immediately and self-explains.
 		$admin_name = (string) $wpdb->get_var( $wpdb->prepare(
 			"SELECT display_name FROM {$wpdb->prefix}noodled_users WHERE id = %d", $admin_id
 		) );
+		$first = self::first_name( $admin_name );
 		Noodled_Notes::create(
 			$name,
-			'Shared folder',
-			"Anything you put in this folder is shared with {$admin_name}.\n",
+			'About this folder',
+			"\u{1F4E5} Anything you add to **this folder** is automatically shared with " . ( $first ?: 'the admin' ) . ".\n\n"
+			. "Drop notes here that you'd like " . ( $first ?: 'them' ) . " to see. Your other notebooks stay private.\n",
 			$member_id
 		);
 
