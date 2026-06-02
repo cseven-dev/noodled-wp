@@ -465,7 +465,7 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   width: min(420px, 92%);
   margin-left: auto;
   /* Lean the whole card (text included) so the note matches its own card. */
-  transform: rotate(-7.5deg);
+  transform: rotate(-12.5deg);
 }
 /* fanned-deck look + each new note "lands" on the pile. The backings pivot from
    the top edge so they splay DOWNWARD behind the card — clear of the floating
@@ -479,7 +479,7 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
 .type-card::after  { transform: translate(8px, 26px) rotate(-4deg); }
 .type-card.land { animation: tcLand .52s var(--ease); }
 /* keep the card's -4deg lean through the land animation (no flicker to flat). */
-@keyframes tcLand { from { transform: translateY(-16px) scale(.975) rotate(-7.5deg); opacity: .55; } to { transform: translateY(0) scale(1) rotate(-7.5deg); opacity: 1; } }
+@keyframes tcLand { from { transform: translateY(-16px) scale(.975) rotate(-12.5deg); opacity: .55; } to { transform: translateY(0) scale(1) rotate(-12.5deg); opacity: 1; } }
 .type-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .type-card__top .tdot { width: 11px; height: 11px; border-radius: 50%; }
 .type-card__title { margin-left: 8px; font-size: 13px; color: var(--slate); font-weight: 600; }
