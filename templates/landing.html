@@ -99,10 +99,13 @@
   document.addEventListener('DOMContentLoaded', function () {
     var b = document.createElement('button');
     b.id = 'noodThemeBtn'; b.className = 'theme-toggle'; b.type = 'button';
-    b.setAttribute('aria-label', 'Toggle dark mode'); b.title = 'Toggle dark mode';
+    b.setAttribute('aria-label', 'Toggle dark mode');
+    b.setAttribute('data-tip', 'Switch light / dark');
     b.onclick = window.noodToggleTheme;
     b.textContent = cur() === 'dark' ? '☀︎' : '☾';
-    document.body.appendChild(b);
+    var cta = document.querySelector('.nav-cta');
+    if (cta && cta.parentNode) cta.parentNode.insertBefore(b, cta.nextSibling);
+    else document.body.appendChild(b);
   });
 })();
 </script>
@@ -174,16 +177,37 @@ html.dark .card:hover { border-color: #2A4A66; }
 
 /* ── Theme toggle button (injected) ── */
 .theme-toggle {
-  position: fixed; right: 18px; bottom: 18px; z-index: 9998;
-  width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--rule);
-  background: var(--white); color: var(--ink); cursor: pointer; font-size: 20px; line-height: 1;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: var(--shadow-md); transition: transform .15s ease, background .25s, color .25s, border-color .25s;
+  margin-left: 10px; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--white); color: var(--ink); cursor: pointer;
+  font-size: 17px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-sm); transition: transform .15s ease, background .25s, color .25s, border-color .25s;
 }
-.theme-toggle:hover { transform: translateY(-2px) scale(1.06); }
+.theme-toggle:hover { transform: translateY(-1px) scale(1.06); border-color: var(--n-blue); }
+
+/* ── Tooltips (nice, on any [data-tip] element) ── */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 11px); left: 50%;
+  transform: translateX(-50%) translateY(5px); width: max-content; max-width: 230px; text-align: center;
+  background: var(--ink); color: var(--paper); font-family: var(--font-sans); font-size: 12.5px; font-weight: 500;
+  line-height: 1.35; padding: 8px 12px; border-radius: 10px; box-shadow: var(--shadow-md);
+  opacity: 0; pointer-events: none; transition: opacity .16s var(--ease), transform .16s var(--ease); z-index: 9999;
+}
+[data-tip]::before {
+  content: ''; position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--ink); opacity: 0; transition: opacity .16s; z-index: 9999;
+}
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+[data-tip]:hover::before, [data-tip]:focus-visible::before { opacity: 1; }
+html.dark [data-tip]::after { background: #20242C; color: var(--ink); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+html.dark [data-tip]::before { border-top-color: #20242C; }
+@media (max-width: 700px) { [data-tip]::after, [data-tip]::before { display: none; } }
+
+/* ── Mobile overflow guards ── */
+@media (max-width: 880px) { .float-card { display: none !important; } }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
 body {
   margin: 0;
   background: var(--paper);
@@ -757,12 +781,12 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
     noodled
   </a>
   <nav class="nav-links">
-    <a href="#live">See it move</a>
+    <a href="#live" data-tip="See the editor type in real time">See it move</a>
     <a href="#features">What it does</a>
     <a href="#connect">Links &amp; voice</a>
     <a href="#honest">The honest bit</a>
   </nav>
-  <a class="btn nav-cta" href="#get">Get Noodled</a>
+  <a class="btn nav-cta" href="#get" data-tip="Request access — we'll email you a login PIN">Get Noodled</a>
 </header>
 
 <main id="top">
@@ -782,8 +806,8 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
           markdown. Yours forever.
         </p>
         <div class="hero__cta reveal d2">
-          <a class="btn btn--lg" href="#get">Start noodling — free</a>
-          <a class="btn btn--ghost btn--lg" href="#live">Watch it work</a>
+          <a class="btn btn--lg" href="#get" data-tip="Get on the list — it's free">Start noodling — free</a>
+          <a class="btn btn--ghost btn--lg" href="#live" data-tip="Jump to the live editor demo">Watch it work</a>
         </div>
         <div class="hero__note reveal d3">
           <span class="dot"></span> Runs on your own WordPress. No accounts to beg for.
@@ -884,7 +908,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
               <span class="tool">Source</span><span class="tool">TOC</span><span class="tool">Find</span>
               <span class="tool">Read</span><span class="tool">Zen</span><span class="tool">&#x23F1; Goal</span><span class="tool">&#x1F399; Mic</span>
             </div>
-            <h1 class="ed-title">Establishing a local test bed</h1>
+            <h1 class="ed-title" id="edTitle">Establishing a local test bed</h1>
             <div class="ed-meta">2026-05-30 22:23 &middot; General &middot; auto-saved</div>
             <div class="ed-body" id="edType"></div>
             <div class="ed-foot">
@@ -1103,7 +1127,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
       <p class="reveal d2">Drop it on your WordPress in a few minutes, log in with a PIN, and start untangling. It's free to run.</p>
       <div class="finalcta__cta reveal d2">
         <a class="btn btn--lg" href="#" id="dl-btn">Download the plugin</a>
-        <a class="btn btn--ghost btn--lg" href="#live">See it move again</a>
+        <a class="btn btn--ghost" href="#live" data-tip="Back to the live editor demo">See it move again</a>
       </div>
       <p class="tiny reveal d3" id="dl-note">WordPress 5.9+ &middot; PHP 8+ &middot; MySQL &middot; made in Toronto by <a href="https://c7.ca" style="color:var(--n-blue); text-decoration:none; font-weight:600;">c-Seven</a></p>
     </div>
@@ -1379,27 +1403,50 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
      ============================================================ */
   function runAppDemo() {
     const body = document.getElementById("edType");
+    const titleEl = document.getElementById("edTitle");
     const wc = document.getElementById("edWords");
     const cc = document.getElementById("edChars");
     const rt = document.getElementById("edRead");
     if (!body) return;
-    const content =
-      `<h2>Core synopsis</h2>` +
-      `<p>Spin up a local WordPress test bed with <span class="wl">Flywheel</span> so we can install Launchpad <em>and</em> every plugin, then run real-world checks instead of demo theatre.</p>` +
-      `<h2>Decision frame</h2>` +
-      `<div class="li"><span class="bx">\u25A2</span><span>Define the test surface \u2014 core, plugins, theme interactions</span></div>` +
-      `<div class="li done"><span class="bx">\u25A3</span><span>Confirm PHP modules + <code>wp-cli</code> are available</span></div>` +
-      `<div class="li"><span class="bx">\u25A2</span><span>Seed failure cases: broken updates, migration rollbacks</span></div>` +
-      `<p>Linked from <span class="wl">[[QA playbook]]</span> \u00B7 <span class="tg">#testing</span> <span class="tg">#flywheel</span></p>`;
-    const update = (buf) => {
+
+    const NOTES = [
+      { title: "Brain dump \u2192 plan", steps: [
+          { type: `ok dishwasher is dying again, there's a part, the youtube guy said pump or gasket, need it before it floods, and remember to tell everyone i've got it`, speed: 13 },
+          { erase: true },
+          { type: `<h2>Dishwasher \u2014 fix plan</h2><div class="li"><span class="bx">\u25A2</span><span>Check the <span class="wl">[[drain pump]]</span> \u2014 the YouTube guy was right (annoyingly)</span></div><div class="li"><span class="bx">\u25A2</span><span>Order the gasket before it floods. Again.</span></div><div class="li done"><span class="bx">\u25A3</span><span>Tell the family "I've got this." Narrator: he did not.</span></div><p><span class="tg">#fixit</span> <span class="tg">#home</span></p>`, speed: 13 } ] },
+      { title: "Drone repair log", steps: [
+          { type: `<h2>Drone repair log</h2><p>Third solder on the <span class="wl">[[motor lead]]</span>. A brand-new failure mode every single time \u2014 honestly, a real artist.</p><div class="li done"><span class="bx">\u25A3</span><span>Re-tin the pad</span></div><div class="li"><span class="bx">\u25A2</span><span>Maybe stop flying it into the fence</span></div><p><span class="tg">#drones</span></p>`, speed: 14 } ] },
+      { title: "Shipped it", steps: [
+          { type: `<h2>Famous last words</h2><p>"It works on my machine." Shipped it. <span class="wl">[[OPcache]]</span> had other plans.</p><div class="li"><span class="bx">\u25A2</span><span>Flush the cache <em>before</em> declaring victory</span></div><p><span class="tg">#programming</span> <span class="tg">#humility</span></p>`, speed: 14 } ] },
+    ];
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const setCounts = (buf) => {
       const { w, c } = countWords(buf);
-      if (wc) wc.textContent = w;
-      if (cc) cc.textContent = c;
+      if (wc) wc.textContent = w; if (cc) cc.textContent = c;
       if (rt) rt.textContent = Math.max(1, Math.round(w / 200));
     };
-    const go = () =>
-      typeHTML(body, content, { speed: 15, caretClass: "ed-caret", onUpdate: update }).then(() => setTimeout(go, 6500));
-    whenVisible(body.closest(".app") || body, () => setTimeout(go, 300), { ratio: 0.18 });
+    function eraseAll(speed) {
+      return new Promise(resolve => {
+        (function step() {
+          const txt = body.textContent || "";
+          if (!txt.length) { body.innerHTML = ""; setCounts(""); return resolve(); }
+          body.textContent = txt.slice(0, -1); setCounts(body.textContent);
+          setTimeout(step, speed);
+        })();
+      });
+    }
+    async function runNote(n) {
+      body.innerHTML = ""; setCounts("");
+      if (titleEl) titleEl.textContent = n.title;
+      for (const s of n.steps) {
+        if (s.erase) { await sleep(600); await eraseAll(11); await sleep(220); }
+        else { await typeHTML(body, s.type, { speed: s.speed || 14, caretClass: "ed-caret", onUpdate: setCounts }); }
+      }
+      await sleep(5200);
+    }
+    async function cycle() { for (;;) { for (const n of NOTES) await runNote(n); } }
+    whenVisible(body.closest(".app") || body, () => setTimeout(cycle, 300), { ratio: 0.18 });
   }
 
   /* ============================================================
