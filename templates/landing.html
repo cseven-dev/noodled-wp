@@ -78,6 +78,34 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+/* Light/dark theme toggle. Sets the class immediately (no flash), respects the
+   visitor's OS preference, and remembers their choice. Button injected on load. */
+(function () {
+  var KEY = 'noodled-landing-theme', root = document.documentElement;
+  function cur() { return root.classList.contains('dark') ? 'dark' : 'light'; }
+  function apply(t) {
+    root.classList.toggle('dark', t === 'dark');
+    var b = document.getElementById('noodThemeBtn');
+    if (b) b.textContent = t === 'dark' ? '☀︎' : '☾';
+  }
+  var saved = null; try { saved = localStorage.getItem(KEY); } catch (e) {}
+  apply(saved || ((window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'));
+  window.noodToggleTheme = function () {
+    var n = cur() === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(KEY, n); } catch (e) {}
+    apply(n);
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    var b = document.createElement('button');
+    b.id = 'noodThemeBtn'; b.className = 'theme-toggle'; b.type = 'button';
+    b.setAttribute('aria-label', 'Toggle dark mode'); b.title = 'Toggle dark mode';
+    b.onclick = window.noodToggleTheme;
+    b.textContent = cur() === 'dark' ? '☀︎' : '☾';
+    document.body.appendChild(b);
+  });
+})();
+</script>
 <style>
 /* ============================================================
    Noodled — marketing landing
@@ -120,6 +148,39 @@
   --shadow-lg: 0 26px 70px rgba(15,30,70,.18);
   --ease: cubic-bezier(.22,.61,.36,1);
 }
+
+/* ── Dark theme (toggle) — flip the tokens; the live-demo section is already dark ── */
+html.dark {
+  --ink:        #E8EAED;
+  --ink-soft:   #C2C7CF;
+  --slate:      #9CA3AF;
+  --rule:       #2A2E36;
+  --paper:      #14161A;
+  --paper-alt:  #1B1E24;
+  --white:      #1B1E24;
+  --n-blue:       #2E97F0;
+  --n-blue-hover: #57ADF5;
+  --n-blue-soft:  rgba(46,151,240,.16);
+  --n-blue-wash:  #121A26;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 10px 34px rgba(0,0,0,.5);
+  --shadow-lg: 0 26px 70px rgba(0,0,0,.6);
+}
+html.dark body { background: var(--paper); color: var(--ink); }
+html.dark .nav { background: rgba(18,20,24,.82); }
+html.dark .nav.is-stuck { box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+html.dark .card:hover { border-color: #2A4A66; }
+@media (max-width: 700px) { html.dark .nav { background: rgba(18,20,24,.97); } }
+
+/* ── Theme toggle button (injected) ── */
+.theme-toggle {
+  position: fixed; right: 18px; bottom: 18px; z-index: 9998;
+  width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--rule);
+  background: var(--white); color: var(--ink); cursor: pointer; font-size: 20px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-md); transition: transform .15s ease, background .25s, color .25s, border-color .25s;
+}
+.theme-toggle:hover { transform: translateY(-2px) scale(1.06); }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
