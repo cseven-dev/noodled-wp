@@ -3,7 +3,7 @@
  * Plugin Name: Noodled
  * Plugin URI:  https://github.com/cseven-dev/noodled-wp
  * Description: A full web version of the noodled note-taking app with family sharing, magic-link login, and GitHub sync.
- * Version:     1.1.54
+ * Version:     1.1.56
  * Author:      Simon
  * License:     GPL-2.0-or-later
  * Text Domain: noodled
@@ -19,64 +19,102 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // "Cannot redeclare class" and a 500 on every page.
 if ( defined( 'NOODLED_VERSION' ) ) return;
 
-define( 'NOODLED_VERSION', '1.1.54' );
+define( 'NOODLED_VERSION', '1.1.56' );
 define( 'NOODLED_FILE', __FILE__ );
 define( 'NOODLED_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NOODLED_URL', plugin_dir_url( __FILE__ ) );
 define( 'NOODLED_BASENAME', plugin_basename( __FILE__ ) );
 
-/* ───── Plugin Update Checker ───── */
-require_once NOODLED_PATH . 'plugin-update-checker/plugin-update-checker.php';
-
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
-PucFactory::buildUpdateChecker(
-    'https://c7.ca/noodled/metadata.json',
-    __FILE__,
-    'noodled'
-);
+/* ───── Fail-safe ─────
+   If anything throws while loading or initialising, log it and stay out of the
+   way instead of white-screening every page (including wp-admin). A plugin
+   should never be able to lock you out of your own site. */
+function noodled_fail_safe( \Throwable $e, string $phase ) {
+	error_log( '[Noodled] Fatal during ' . $phase . ': ' . $e->getMessage()
+		. ' in ' . $e->getFile() . ':' . $e->getLine() );
+	error_log( '[Noodled] Trace: ' . $e->getTraceAsString() );
 
-/* ───── Includes ───── */
-require_once NOODLED_PATH . 'includes/class-noodled-db.php';
-require_once NOODLED_PATH . 'includes/class-noodled-settings.php';
-require_once NOODLED_PATH . 'includes/class-noodled-app.php';
-require_once NOODLED_PATH . 'includes/class-noodled-notebooks.php';
-require_once NOODLED_PATH . 'includes/class-noodled-notes.php';
-require_once NOODLED_PATH . 'includes/class-noodled-attachments.php';
-require_once NOODLED_PATH . 'includes/class-noodled-frontmatter.php';
-require_once NOODLED_PATH . 'includes/class-noodled-github.php';
-require_once NOODLED_PATH . 'includes/class-noodled-sync.php';
-require_once NOODLED_PATH . 'includes/class-noodled-auth.php';
-require_once NOODLED_PATH . 'includes/class-noodled-permissions.php';
-require_once NOODLED_PATH . 'includes/class-noodled-plaud.php';
-require_once NOODLED_PATH . 'includes/class-noodled-evernote.php';
-require_once NOODLED_PATH . 'includes/class-noodled-rest.php';
+	if ( function_exists( 'update_option' ) ) {
+		update_option( 'noodled_last_fatal', [
+			'phase' => $phase,
+			'msg'   => $e->getMessage(),
+			'file'  => $e->getFile(),
+			'line'  => $e->getLine(),
+			'time'  => gmdate( 'c' ),
+		], false );
+	}
+
+	if ( function_exists( 'add_action' ) ) {
+		add_action( 'admin_notices', function () use ( $e, $phase ) {
+			if ( ! current_user_can( 'manage_options' ) ) return;
+			echo '<div class="notice notice-error"><p><strong>Noodled hit an error during '
+				. esc_html( $phase ) . ' and disabled itself to keep your site online:</strong><br>'
+				. esc_html( $e->getMessage() ) . '<br><code>'
+				. esc_html( $e->getFile() ) . ':' . (int) $e->getLine() . '</code></p></div>';
+		} );
+	}
+}
+
+try {
+	/* ───── Plugin Update Checker ───── */
+	require_once NOODLED_PATH . 'plugin-update-checker/plugin-update-checker.php';
+	PucFactory::buildUpdateChecker(
+		'https://c7.ca/noodled/metadata.json',
+		__FILE__,
+		'noodled'
+	);
+
+	/* ───── Includes ───── */
+	require_once NOODLED_PATH . 'includes/class-noodled-db.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-settings.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-app.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-notebooks.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-notes.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-attachments.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-frontmatter.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-github.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-sync.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-auth.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-permissions.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-plaud.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-evernote.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-rest.php';
+} catch ( \Throwable $e ) {
+	noodled_fail_safe( $e, 'load' );
+	return; // stop here — don't register hooks against half-loaded classes
+}
 
 /* ───── Init ───── */
 function noodled_init() {
-	// Auto-install tables if missing
-	if ( get_option( 'noodled_db_version' ) !== NOODLED_VERSION ) {
-		Noodled_DB::install();
-	}
+	try {
+		// Auto-install tables if missing
+		if ( get_option( 'noodled_db_version' ) !== NOODLED_VERSION ) {
+			Noodled_DB::install();
+		}
 
-	// One-time migration to the per-user-private model.
-	if ( ! get_option( 'noodled_privacy_migrated' ) ) {
-		noodled_migrate_privacy();
-		update_option( 'noodled_privacy_migrated', 1 );
-	}
+		// One-time migration to the per-user-private model.
+		if ( ! get_option( 'noodled_privacy_migrated' ) ) {
+			noodled_migrate_privacy();
+			update_option( 'noodled_privacy_migrated', 1 );
+		}
 
-	// Revoke stale grants to admin-owned notebooks (the old shared
-	// "default notebook" auto-grant leaked admins' notes to every member).
-	if ( ! get_option( 'noodled_admin_grants_revoked' ) ) {
-		noodled_revoke_admin_grants();
-		update_option( 'noodled_admin_grants_revoked', 1 );
-	}
+		// Revoke stale grants to admin-owned notebooks (the old shared
+		// "default notebook" auto-grant leaked admins' notes to every member).
+		if ( ! get_option( 'noodled_admin_grants_revoked' ) ) {
+			noodled_revoke_admin_grants();
+			update_option( 'noodled_admin_grants_revoked', 1 );
+		}
 
-	Noodled_Settings::init();
-	Noodled_App::init();
-	Noodled_REST::init();
-	Noodled_Sync::init();
-	Noodled_Auth::init();
+		Noodled_Settings::init();
+		Noodled_App::init();
+		Noodled_REST::init();
+		Noodled_Sync::init();
+		Noodled_Auth::init();
+	} catch ( \Throwable $e ) {
+		noodled_fail_safe( $e, 'init' );
+	}
 }
 add_action( 'plugins_loaded', 'noodled_init' );
 
