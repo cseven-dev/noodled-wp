@@ -460,17 +460,19 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   border-radius: 18px;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--rule);
-  padding: 22px 24px 20px;
+  padding: 30px 32px 28px;
   width: min(420px, 92%);
   margin-left: auto;
 }
-/* stacked-deck look + each new note "lands" on the pile */
+/* fanned-deck look + each new note "lands" on the pile. The backings pivot from
+   the bottom-left so they splay out to the side like a hand of cards. */
 .type-card::before, .type-card::after {
   content: ""; position: absolute; inset: 0; border-radius: 18px; z-index: -1;
   background: var(--white); border: 1px solid var(--rule); box-shadow: var(--shadow-md);
+  transform-origin: bottom left;
 }
-.type-card::before { transform: translate(7px, 9px); }
-.type-card::after  { transform: translate(14px, 18px); }
+.type-card::before { transform: rotate(4deg) translate(10px, 4px); }
+.type-card::after  { transform: rotate(8deg) translate(20px, 8px); }
 .type-card.land { animation: tcLand .52s var(--ease); }
 @keyframes tcLand { from { transform: translateY(-16px) scale(.975); opacity: .55; } to { transform: translateY(0) scale(1); opacity: 1; } }
 .type-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
