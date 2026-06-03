@@ -877,9 +877,42 @@ body.reading-mode .rendered-content { cursor: default; }
 /* Map embed (location notes) */
 .map-embed { display: flex; flex-direction: column; gap: 6px; margin: 0.5em 0; }
 .map-embed .map-open { font-size: 12px; color: var(--accent); align-self: flex-start; }
+
+/* ── Dictation "Listening" bar ── */
+.dictation-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  padding-left: max(18px, env(safe-area-inset-left, 18px));
+  padding-right: max(18px, env(safe-area-inset-right, 18px));
+  background: var(--bg-toolbar); border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 24px rgba(0,0,0,0.35);
+  transform: translateY(120%); transition: transform 0.25s ease;
+}
+.dictation-bar.show { transform: none; }
+.dict-dot {
+  width: 14px; height: 14px; border-radius: 50%; background: #e5484d; flex-shrink: 0;
+  animation: dictPulse 1.2s ease-in-out infinite;
+}
+@keyframes dictPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.65); } }
+.dict-status { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dict-label { font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.dict-interim { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dict-stop {
+  flex-shrink: 0; background: #e5484d; color: #fff; border: none;
+  border-radius: 24px; padding: 13px 30px; font-size: 15px; font-weight: 600;
+  cursor: pointer; min-width: 104px; -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+.dict-stop:hover { background: #d93b40; }
+.dict-stop:active { transform: scale(0.96); }
+
 @media (prefers-reduced-motion: reduce) {
   .quick-add-item { transition: opacity 0.15s ease; transform: none; }
   .bottom-nav-primary .bottom-nav-icon { transition: none; }
+  .dict-dot { animation: none; }
+  .dictation-bar { transition: none; }
 }
 
 /* ── Touch feedback ── */

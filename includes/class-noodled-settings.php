@@ -113,6 +113,14 @@ class Noodled_Settings {
 			update_option( 'noodled_trash_retention', $clean['trash_retention'] );
 		}
 
+		// Location-note map provider
+		if ( isset( $input['map_provider'] ) ) {
+			$p = sanitize_key( $input['map_provider'] );
+			$clean['map_provider'] = in_array( $p, [ 'osm', 'mapbox', 'gmaps' ], true ) ? $p : 'osm';
+		}
+		if ( isset( $input['mapbox_token'] ) ) $clean['mapbox_token'] = sanitize_text_field( $input['mapbox_token'] );
+		if ( isset( $input['gmaps_key'] ) )    $clean['gmaps_key']    = sanitize_text_field( $input['gmaps_key'] );
+
 		// Branding
 		if ( isset( $input['brand_name'] ) )   $clean['brand_name']    = sanitize_text_field( $input['brand_name'] );
 		if ( isset( $input['brand_tagline'] ) ) $clean['brand_tagline'] = sanitize_text_field( $input['brand_tagline'] );
@@ -356,6 +364,32 @@ class Noodled_Settings {
 								/* translators: %s is the bolded "0 = keep forever" note */
 								printf( esc_html__( 'Permanently delete trashed notes (and their attachments) older than this many days. %s. Runs once a day.', 'noodled' ), '<strong>' . esc_html__( '0 = keep forever', 'noodled' ) . '</strong>' );
 							?></p>
+						</td>
+					</tr>
+					<?php $map_provider = $opts['map_provider'] ?? 'osm'; ?>
+					<tr>
+						<th><label for="noodled-map-provider"><?php esc_html_e( 'Location Note Map', 'noodled' ); ?></label></th>
+						<td>
+							<select id="noodled-map-provider" name="<?php echo self::$option_key; ?>[map_provider]">
+								<option value="osm" <?php selected( $map_provider, 'osm' ); ?>><?php esc_html_e( 'OpenStreetMap (no key required)', 'noodled' ); ?></option>
+								<option value="mapbox" <?php selected( $map_provider, 'mapbox' ); ?>><?php esc_html_e( 'Mapbox', 'noodled' ); ?></option>
+								<option value="gmaps" <?php selected( $map_provider, 'gmaps' ); ?>><?php esc_html_e( 'Google Maps', 'noodled' ); ?></option>
+							</select>
+							<p class="description"><?php esc_html_e( 'Which map to embed when a member creates a Location note. Mapbox and Google Maps need a key/token below.', 'noodled' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="noodled-mapbox-token"><?php esc_html_e( 'Mapbox Access Token', 'noodled' ); ?></label></th>
+						<td>
+							<input type="text" id="noodled-mapbox-token" name="<?php echo self::$option_key; ?>[mapbox_token]" value="<?php echo esc_attr( $opts['mapbox_token'] ?? '' ); ?>" class="regular-text" placeholder="pk.xxxxxxxx">
+							<p class="description"><?php esc_html_e( 'Only needed when Map is set to Mapbox.', 'noodled' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="noodled-gmaps-key"><?php esc_html_e( 'Google Maps API Key', 'noodled' ); ?></label></th>
+						<td>
+							<input type="text" id="noodled-gmaps-key" name="<?php echo self::$option_key; ?>[gmaps_key]" value="<?php echo esc_attr( $opts['gmaps_key'] ?? '' ); ?>" class="regular-text" placeholder="AIza...">
+							<p class="description"><?php esc_html_e( 'Only needed when Map is set to Google Maps (enable the Maps Embed API).', 'noodled' ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -728,6 +762,17 @@ class Noodled_Settings {
 
 	public static function get_landing_html(): string {
 		return get_option( 'noodled_landing_html', '' );
+	}
+
+	/** Map config for location notes, exposed to the app (provider + client keys). */
+	public static function get_map_config(): array {
+		$o        = get_option( self::$option_key, [] );
+		$provider = $o['map_provider'] ?? 'osm';
+		return [
+			'provider'    => in_array( $provider, [ 'osm', 'mapbox', 'gmaps' ], true ) ? $provider : 'osm',
+			'mapboxToken' => $o['mapbox_token'] ?? '',
+			'gmapsKey'    => $o['gmaps_key'] ?? '',
+		];
 	}
 
 	public static function is_setup_complete(): bool {

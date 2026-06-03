@@ -46,6 +46,7 @@ class Noodled_App {
 			'version'   => NOODLED_VERSION,
 			'appUrl'    => self::get_app_url(),
 			'brandName' => Noodled_Settings::get_brand_name(),
+			'map'       => Noodled_Settings::get_map_config(),
 			'user'      => [
 				'name'  => $current_user['name'],
 				'email' => $current_user['email'],

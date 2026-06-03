@@ -568,6 +568,21 @@ function dateTimeTitle() {
   catch (e) { return new Date().toLocaleString(); }
 }
 
+// Put the caret in the note body so typed/dictated text becomes note content,
+// not the title. The title is pre-filled with the date/time and stays editable.
+function focusNoteBody() {
+  const raw = document.getElementById('noteBodyRaw');
+  if (raw) { raw.focus(); return; }
+  const body = document.getElementById('noteBody');
+  if (body) {
+    body.focus();
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.selectNodeContents(body); r.collapse(false);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+}
+
 async function createNote() {
   await doSave();
   const nb = activeNotebook || 'General';
@@ -579,10 +594,7 @@ async function createNote() {
   renderContent();
   document.querySelector('.col-content')?.classList.add('open');
   closeSidebar();
-  setTimeout(() => {
-    const input = document.getElementById('titleInput');
-    if (input) { input.focus(); input.select(); }
-  }, 100);
+  setTimeout(focusNoteBody, 100);
 }
 
 // ── Quick-add speed dial (the mobile + button) ──────────────────────────────
@@ -664,8 +676,7 @@ async function quickAddVoice() {
   closeSidebar();
   // Focus the body and begin listening once the editor is in the DOM.
   setTimeout(() => {
-    const body = document.getElementById('noteBodyRaw') || document.getElementById('noteBody');
-    if (body) body.focus();
+    focusNoteBody();
     if (typeof dictating !== 'undefined' && !dictating) toggleVoiceMemo();
   }, 250);
 }
@@ -706,7 +717,7 @@ async function createNoteFromLocation(lat, lng) {
   renderContent();
   document.querySelector('.col-content')?.classList.add('open');
   closeSidebar();
-  setTimeout(() => { const t = document.getElementById('titleInput'); if (t) { t.focus(); t.select(); } }, 100);
+  setTimeout(focusNoteBody, 100);
 }
 
 function showNoteContext(event, noteId) {
@@ -1403,7 +1414,7 @@ async function createNoteFromFiles(files) {
   renderContent();
   document.querySelector('.col-content')?.classList.add('open');
   closeSidebar();
-  setTimeout(() => { const t = document.getElementById('titleInput'); if (t) { t.focus(); t.select(); } }, 100);
+  setTimeout(focusNoteBody, 100);
   /* translators: %d is the number of files added */
   showToast(sprintf( _n( '%d file added', '%d files added', ok, 'noodled' ), ok ));
 }
@@ -2474,9 +2485,46 @@ let dictating = false;
 
 function setDictateBtn(on) {
   const btn = document.getElementById('voiceBtn');
-  if (!btn) return;
-  if (on) { btn.textContent = __( 'Stop', 'noodled' ); btn.classList.add('recording'); }
-  else { btn.innerHTML = '&#127908;'; btn.classList.remove('recording'); }
+  if (btn) {
+    if (on) { btn.textContent = __( 'Stop', 'noodled' ); btn.classList.add('recording'); }
+    else { btn.innerHTML = '&#127908;'; btn.classList.remove('recording'); }
+  }
+  if (on) showDictationBar(); else hideDictationBar();
+}
+
+// A prominent "Listening…" bar with a big Stop button, shown while dictating so
+// it's obvious the mic is live and easy to stop. The interim line shows the
+// words being recognized live before they're committed to the note.
+function showDictationBar() {
+  let bar = document.getElementById('dictationBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'dictationBar';
+    bar.className = 'dictation-bar';
+    bar.setAttribute('role', 'status');
+    bar.setAttribute('aria-live', 'polite');
+    bar.innerHTML =
+      '<span class="dict-dot" aria-hidden="true"></span>' +
+      '<span class="dict-status"><span class="dict-label">' + esc(__( 'Listening…', 'noodled' )) + '</span>' +
+      '<span class="dict-interim" id="dictInterim"></span></span>' +
+      '<button type="button" class="dict-stop" onclick="stopDictation()">' + esc(__( 'Stop', 'noodled' )) + '</button>';
+    document.body.appendChild(bar);
+  }
+  requestAnimationFrame(() => bar.classList.add('show'));
+}
+
+function hideDictationBar() {
+  const bar = document.getElementById('dictationBar');
+  if (!bar) return;
+  bar.classList.remove('show');
+  const i = document.getElementById('dictInterim');
+  if (i) i.textContent = '';
+  setTimeout(() => { if (!dictating) bar.remove(); }, 260);
+}
+
+function setDictationInterim(text) {
+  const i = document.getElementById('dictInterim');
+  if (i) i.textContent = text || '';
 }
 
 // Insert dictated text at the caret of whichever editor is active.
@@ -2539,14 +2587,17 @@ function toggleVoiceMemo() {
   recognition = new SR();
   recognition.lang = navigator.language || 'en-US';
   recognition.continuous = true;
-  recognition.interimResults = false;
+  recognition.interimResults = true;
 
   recognition.onresult = (event) => {
-    let finalText = '';
+    let finalText = '', interim = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
+      const r = event.results[i];
+      if (r.isFinal) finalText += r[0].transcript;
+      else interim += r[0].transcript;
     }
     if (finalText) insertDictation(finalText);
+    setDictationInterim(interim);
   };
 
   recognition.onerror = (e) => {
@@ -2644,19 +2695,40 @@ function embedMedia(url) {
   // Vimeo
   m = url.match(/vimeo\.com\/(\d+)/);
   if (m) return `<div class="embed-container"><iframe title="${escAttr(__( 'Embedded Vimeo video', 'noodled' ))}" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
-  // OpenStreetMap location link (e.g. a location note) → embedded map with a pin
+  // OpenStreetMap location link (e.g. a location note) → embedded map with a pin,
+  // rendered with whichever provider the admin chose in WordPress settings.
   if (/openstreetmap\.org/i.test(url)) {
     const latM = url.match(/[?&#]mlat=(-?\d+(?:\.\d+)?)/i);
     const lonM = url.match(/[?&#]mlon=(-?\d+(?:\.\d+)?)/i);
-    if (latM && lonM) {
-      const lat = parseFloat(latM[1]), lng = parseFloat(lonM[1]);
-      const d = 0.008; // ~1 km box around the pin
-      const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
-      const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-      return `<div class="embed-container map-embed"><iframe title="${escAttr(__( 'Map location', 'noodled' ))}" src="${src}" frameborder="0" loading="lazy" style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe><a class="map-open" href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${esc(__( 'Open in OpenStreetMap', 'noodled' ))}</a></div>`;
-    }
+    if (latM && lonM) return mapEmbedHtml(parseFloat(latM[1]), parseFloat(lonM[1]), url);
   }
   return null;
+}
+
+// Build the embedded map for a location note. The note body always stores a
+// portable OpenStreetMap link; this just picks how to DISPLAY it based on the
+// admin's chosen provider (Mapbox/Google need a key, else falls back to OSM).
+function mapEmbedHtml(lat, lng, linkUrl) {
+  const cfg = (typeof noodledConfig !== 'undefined' && noodledConfig.map) || {};
+  const provider = cfg.provider || 'osm';
+  const open = linkUrl || ('https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=16/' + lat + '/' + lng);
+  const openLink = `<a class="map-open" href="${open.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${esc(__( 'Open in maps', 'noodled' ))}</a>`;
+  const title = escAttr(__( 'Map location', 'noodled' ));
+
+  if (provider === 'gmaps' && cfg.gmapsKey) {
+    const src = `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(cfg.gmapsKey)}&q=${lat},${lng}&zoom=16`;
+    return `<div class="embed-container map-embed"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" allowfullscreen style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
+  }
+  if (provider === 'mapbox' && cfg.mapboxToken) {
+    const tok = encodeURIComponent(cfg.mapboxToken);
+    const src = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+e5484d(${lng},${lat})/${lng},${lat},15,0/640x400@2x?access_token=${tok}`;
+    return `<div class="embed-container map-embed"><img class="map-static" src="${src}" alt="${title}" loading="lazy" style="width:100%;border-radius:8px">${openLink}</div>`;
+  }
+  // Default: OpenStreetMap embed iframe with a marker (no key required).
+  const d = 0.008; // ~1 km box around the pin
+  const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
+  return `<div class="embed-container map-embed"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
 }
 
 // ── Typewriter mode ──
@@ -2853,8 +2925,8 @@ function renderAttachmentGallery() {
   if (!activeNote) return;
   const atts = activeNote.attachments || [];
   if (!atts.length) return;
-  // Render inside the scrollable note body (not after the footer) so the gallery
-  // scrolls with the content and isn't clipped to a sliver on mobile.
+  // Render at the TOP of the scrollable note body (before the editor) so photos
+  // and files lead the note, and the gallery scrolls with the content.
   const host = document.getElementById('dropZone');
   if (!host) return;
   const images = atts.filter(a => !a._pending && isImageAttachment(a));
@@ -2900,7 +2972,7 @@ function renderAttachmentGallery() {
     item.appendChild(del);
     gallery.appendChild(item);
   });
-  host.appendChild(gallery);
+  host.insertBefore(gallery, host.firstChild);
 }
 
 // Lightbox for image attachments, captioned with stored EXIF.
