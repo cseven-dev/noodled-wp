@@ -1,15 +1,24 @@
 const CACHE_NAME = 'noodled-v6';
+// Filenames the fetch handler stale-while-revalidates (both source + minified
+// builds, so it matches whichever the page actually loads).
 const STATIC_ASSETS = [
   '/wp-content/plugins/noodled/assets/css/noodled.css',
+  '/wp-content/plugins/noodled/assets/css/noodled.min.css',
   '/wp-content/plugins/noodled/assets/js/noodled.js',
+  '/wp-content/plugins/noodled/assets/js/noodled.min.js',
+  '/wp-content/plugins/noodled/assets/manifest.json',
+  '/wp-content/plugins/noodled/assets/icon-192.png',
+];
+// Only precache assets guaranteed to exist (the JS/CSS build may be min or source).
+const PRECACHE = [
   '/wp-content/plugins/noodled/assets/manifest.json',
   '/wp-content/plugins/noodled/assets/icon-192.png',
 ];
 
-// Install: cache static assets
+// Install: precache the stable assets; JS/CSS are cached lazily on first fetch.
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE).catch(() => {}))
   );
   self.skipWaiting();
 });

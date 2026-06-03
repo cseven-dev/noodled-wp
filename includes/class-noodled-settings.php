@@ -18,7 +18,8 @@ class Noodled_Settings {
 	public static function enqueue_admin( $hook ) {
 		if ( $hook !== 'toplevel_page_noodled' ) return;
 		wp_enqueue_style( 'noodled-admin-fonts', 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap', [], null );
-		wp_enqueue_style( 'noodled-admin', NOODLED_URL . 'assets/css/admin.css', [], NOODLED_VERSION );
+		$admin_css = file_exists( NOODLED_PATH . 'assets/css/admin.min.css' ) ? 'assets/css/admin.min.css' : 'assets/css/admin.css';
+		wp_enqueue_style( 'noodled-admin', NOODLED_URL . $admin_css, [], NOODLED_VERSION );
 	}
 
 	/**

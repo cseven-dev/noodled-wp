@@ -20,6 +20,25 @@ if (Test-Path $landingSrc) {
     Write-Host "Synced landing page from lab" -ForegroundColor Green
 }
 
+# ── Minify assets ──
+# JS uses whitespace+syntax minify only (NOT identifier renaming): the app refers
+# to ~200 global functions by name via inline onclick handlers, so renaming breaks
+# it. CSS gets a full minify.
+if (Get-Command npx -ErrorAction SilentlyContinue) {
+    $jsSrc  = Join-Path $pluginDir "assets\js\noodled.js"
+    $jsMin  = Join-Path $pluginDir "assets\js\noodled.min.js"
+    $cssSrc = Join-Path $pluginDir "assets\css\noodled.css"
+    $cssMin = Join-Path $pluginDir "assets\css\noodled.min.css"
+    $admSrc = Join-Path $pluginDir "assets\css\admin.css"
+    $admMin = Join-Path $pluginDir "assets\css\admin.min.css"
+    & npx --yes esbuild $jsSrc --minify-whitespace --minify-syntax --target=es2019 "--outfile=$jsMin"  | Out-Null
+    & npx --yes esbuild $cssSrc --minify "--outfile=$cssMin" | Out-Null
+    & npx --yes esbuild $admSrc --minify "--outfile=$admMin" | Out-Null
+    Write-Host "Minified assets" -ForegroundColor Green
+} else {
+    Write-Host "npx not found - shipping source assets (the PHP loader falls back automatically)" -ForegroundColor Yellow
+}
+
 # ── Auto-increment patch version ──
 $parts = $version.Split(".")
 $parts[2] = [int]$parts[2] + 1
