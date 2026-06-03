@@ -136,7 +136,7 @@ class Noodled_App {
 .n-login-overlay.show{display:flex}
 .n-login-box{background:#1a1a1f;border:1px solid #2a2a35;border-radius:16px;padding:36px;width:380px;max-width:90vw;color:#b0b0b8}
 .n-login-box h3{color:#e8e8ef;margin:0 0 4px;font-size:16px}
-.n-login-box .sub{color:#5a5a68;font-size:12px;margin-bottom:20px}
+.n-login-box .sub{color:#9a9aa8;font-size:12px;margin-bottom:20px}
 .n-login-input{width:100%;padding:12px 16px;border:1px solid #2a2a35;border-radius:10px;background:#252530;color:#e8e8ef;font-size:16px;outline:none;margin-bottom:10px;box-sizing:border-box}
 .n-login-input:focus{border-color:{$accent};box-shadow:0 0 0 3px rgba(0,120,212,0.15)}
 .n-login-btn{width:100%;padding:12px;border:none;border-radius:10px;background:{$accent};color:#fff;font-size:14px;font-weight:600;cursor:pointer}
@@ -176,6 +176,8 @@ class Noodled_App {
 
 <script>
 let _nEmail='';
+let _nLoginReturn=null;
+function nOpenLogin(){const o=document.getElementById('nLoginOverlay');if(!o)return;_nLoginReturn=document.activeElement;o.classList.add('show');const f=document.getElementById('nEmail');if(f)setTimeout(()=>f.focus(),30);}
 function nShowStep(id){['nStepEmail','nStepPin'].forEach(s=>{const e=document.getElementById(s);if(e)e.style.display=s===id?'block':'none'});document.getElementById('nLoginMsg').textContent='';document.getElementById('nLoginMsg').className='n-login-msg'}
 function nGotPin(){const e=document.getElementById('nEmail').value.trim();if(e)_nEmail=e;nGotoPin();}
 // Go to the PIN step — only ever ask for the PIN. If we know the email we verify
@@ -183,9 +185,9 @@ function nGotPin(){const e=document.getElementById('nEmail').value.trim();if(e)_
 function nGotoPin(){const pe=document.getElementById('nPinEmail');if(pe){if(_nEmail)pe.value=_nEmail;pe.style.display='none';}nShowStep('nStepPin');const f=document.getElementById('nPin');if(f)f.focus();}
 async function nSendPin(){const email=document.getElementById('nEmail').value;if(!email)return;_nEmail=email;const btn=document.getElementById('nEmailBtn');btn.disabled=true;btn.textContent='Sending...';const msg=document.getElementById('nLoginMsg');msg.textContent='';try{const r=await fetch('{$login_api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error'}else{nGotoPin()}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error'}btn.disabled=false;btn.textContent='Continue'}
 async function nVerifyPin(){const pin=document.getElementById('nPin').value.trim();if(!pin)return;const email=(_nEmail||document.getElementById('nPinEmail').value||'').trim();const msg=document.getElementById('nLoginMsg');const btn=document.getElementById('nPinBtn');btn.disabled=true;btn.textContent='Verifying...';try{let r;if(email){r=await fetch('{$pin_api}',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,pin})});}else{r=await fetch('{$verify_api}?token='+encodeURIComponent(pin),{credentials:'same-origin'});}const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error';btn.disabled=false;btn.textContent='Sign in'}else{msg.innerHTML='&#10003; Welcome!';msg.className='n-login-msg success';setTimeout(()=>window.location.href='{$app_url}'+('{$app_url}'.includes('?')?'&':'?')+'_='+Date.now(),500)}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error';btn.disabled=false;btn.textContent='Sign in'}}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.getElementById('nStepPin');if(pin&&pin.style.display!=='none')nVerifyPin();else if(document.getElementById('nStepEmail').style.display!=='none')nSendPin()}else if(e.key==='Escape'){document.querySelectorAll('.n-login-overlay.show').forEach(o=>o.classList.remove('show'))}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.getElementById('nStepPin');if(pin&&pin.style.display!=='none')nVerifyPin();else if(document.getElementById('nStepEmail').style.display!=='none')nSendPin()}else if(e.key==='Escape'){const open=document.querySelectorAll('.n-login-overlay.show');if(open.length){open.forEach(o=>o.classList.remove('show'));if(_nLoginReturn){try{_nLoginReturn.focus();}catch(_){}_nLoginReturn=null;}}}});
 // Expired one-click link → open login modal, pre-fill the email so they don't retype it.
-(function(){const q=new URLSearchParams(location.search);if(q.get('login')==='expired'){const o=document.getElementById('nLoginOverlay');if(o)o.classList.add('show');const em=q.get('e');if(em){_nEmail=em;const ne=document.getElementById('nEmail');if(ne)ne.value=em;const pe=document.getElementById('nPinEmail');if(pe)pe.value=em;}const m=document.getElementById('nLoginMsg');if(m){m.textContent='That sign-in link expired — tap Continue to get a fresh PIN.';m.className='n-login-msg error';}}})();
+(function(){const q=new URLSearchParams(location.search);if(q.get('login')==='expired'){nOpenLogin();const em=q.get('e');if(em){_nEmail=em;const ne=document.getElementById('nEmail');if(ne)ne.value=em;const pe=document.getElementById('nPinEmail');if(pe)pe.value=em;}const m=document.getElementById('nLoginMsg');if(m){m.textContent='That sign-in link expired — tap Continue to get a fresh PIN.';m.className='n-login-msg error';}}})();
 // Inject login button into page nav (ghost style, left of Get Noodled)
 (function(){
   const cta=document.querySelector('.nav-cta');
@@ -194,11 +196,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.g
     a.type='button';
     a.textContent='Log in';
     a.className='btn btn--ghost';
-    a.onclick=function(e){e.preventDefault();document.getElementById('nLoginOverlay').classList.add('show')};
+    a.onclick=function(e){e.preventDefault();nOpenLogin();};
     cta.parentNode.insertBefore(a,cta);
     cta.style.marginLeft='8px';
   }
-  document.querySelectorAll('.noodled-open-login').forEach(el=>{el.style.cursor='pointer';el.addEventListener('click',e=>{e.preventDefault();document.getElementById('nLoginOverlay').classList.add('show')})});
+  document.querySelectorAll('.noodled-open-login').forEach(el=>{el.style.cursor='pointer';el.addEventListener('click',e=>{e.preventDefault();nOpenLogin()})});
 })();
 </script>
 HTML;

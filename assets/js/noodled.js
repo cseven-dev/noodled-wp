@@ -694,21 +694,21 @@ function renderContent() {
         <div class="toolbar-menu-wrap">
           <button class="btn btn-sm" onclick="toggleEditorMenu()" title="More tools">&#8943;</button>
           <div class="toolbar-dropdown" id="editorMenu">
-            <div class="dropdown-item" onclick="toggleMarkdownView()">${showRawMarkdown ? 'Preview mode' : 'Source mode'}</div>
-            <div class="dropdown-item" onclick="toggleFindReplace()">Find & replace</div>
-            <div class="dropdown-item" onclick="showTOC()">Table of contents</div>
-            <div class="dropdown-item" onclick="exportNote()">Export as HTML</div>
-            <div class="dropdown-item" onclick="downloadNoteMd()">Download as Markdown</div>
-            <div class="dropdown-item" onclick="printNote()">Print / Save as PDF</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? 'Preview mode' : 'Source mode'}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleFindReplace()">Find & replace</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTOC()">Table of contents</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportNote()">Export as HTML</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="downloadNoteMd()">Download as Markdown</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="printNote()">Print / Save as PDF</div>
             <div class="dropdown-sep"></div>
-            <div class="dropdown-item" onclick="toggleReadingMode()">Reading mode</div>
-            <div class="dropdown-item" onclick="toggleTypewriter()">Typewriter mode</div>
-            <div class="dropdown-item" onclick="toggleZenMode()">Zen mode</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleReadingMode()">Reading mode</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTypewriter()">Typewriter mode</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleZenMode()">Zen mode</div>
             <div class="dropdown-sep"></div>
-            <div class="dropdown-item" onclick="showHistory()">Version history</div>
-            <div class="dropdown-item" onclick="setWordGoal()">Word count goal</div>
-            <div class="dropdown-item" onclick="saveAsTemplate()">Save as template</div>
-            <div class="dropdown-item" onclick="showReadingPrefs()">Reading preferences</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showHistory()">Version history</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="setWordGoal()">Word count goal</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="saveAsTemplate()">Save as template</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showReadingPrefs()">Reading preferences</div>
             <div class="dropdown-sep"></div>
             <div class="dropdown-item dropdown-danger" onclick="deleteCurrentNote()">Delete note</div>
           </div>
@@ -1307,7 +1307,7 @@ async function renderManageUsers() {
     const drop = u.role === 'member'
       ? `<label class="mu-drop"><input type="checkbox" ${u.drop ? 'checked' : ''} onchange="muDrop(${u.id}, this.checked)"> drop</label>` : '';
     h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)} · ${esc(u.role)}</span><span class="mu-pin" id="mu-pin-${u.id}"></span></div>
-      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">PIN</button><button class="btn btn-sm" onclick="muRemove(${u.id})">&#10005;</button></div></div>`;
+      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">PIN</button><button class="btn btn-sm" aria-label="Remove ${escAttr(u.display_name || u.email || 'member')}" onclick="muRemove(${u.id})">&#10005;</button></div></div>`;
   });
   h += `<div class="mu-head">Invite someone</div>
     <div class="mu-invite">
@@ -1501,11 +1501,12 @@ function renderMarkdown(text) {
         const isSep = /^\|[\s:-]+\|/.test(nextLine);
         const cells = trimmed.split('|').filter((_, j, a) => j > 0 && j < a.length - 1).map(c => c.trim());
         if (isSep) {
-          out.push('<table><thead><tr>' + cells.map(c => `<th>${inlineFormat(escLine(c))}</th>`).join('') + '</tr></thead><tbody>');
+          out.push('<table><thead><tr>' + cells.map(c => `<th scope="col">${inlineFormat(escLine(c))}</th>`).join('') + '</tr></thead><tbody>');
           i++; // skip separator line
         } else {
-          out.push('<table><tbody>');
-          out.push('<tr>' + cells.map(c => `<td>${inlineFormat(escLine(c))}</td>`).join('') + '</tr>');
+          // No separator row: treat the first row as the header so the table still
+          // exposes column headers to assistive tech.
+          out.push('<table><thead><tr>' + cells.map(c => `<th scope="col">${inlineFormat(escLine(c))}</th>`).join('') + '</tr></thead><tbody>');
         }
       } else {
         const cells = trimmed.split('|').filter((_, j, a) => j > 0 && j < a.length - 1).map(c => c.trim());
@@ -1878,7 +1879,7 @@ function showHistory() {
     <div class="modal" style="max-width:500px">
       <h3>Note History</h3>
       <div style="max-height:300px;overflow-y:auto">
-        ${history.map((h, i) => `<div class="history-item" onclick="restoreHistory(${i})" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
+        ${history.map((h, i) => `<div class="history-item" role="button" tabindex="0" onclick="restoreHistory(${i})" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
           <div style="font-size:12px;color:var(--text-muted)">${relativeTime(h.time)} — ${h.title}</div>
           <div style="font-size:11px;color:var(--text);margin-top:4px">${esc((h.body || '').substring(0, 100))}...</div>
         </div>`).join('')}
@@ -2048,7 +2049,7 @@ function showTemplates() {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal"><h3>New from Template</h3>
       <div style="max-height:300px;overflow-y:auto">
-        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="Delete template" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
+        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" role="button" tabindex="0" aria-label="Create note from ${escAttr(t.name)} template" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="Delete template" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
@@ -2189,7 +2190,7 @@ function showColorPicker(noteId) {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal"><h3>Note Color</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${noteColors.map((c, i) => `<div onclick="setNoteColor(${noteId},'${c}');document.getElementById('modalContainer').innerHTML='';" style="width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid var(--border);${c ? 'background:' + c : 'background:var(--bg-input)'}" title="${noteColorNames[i]}"></div>`).join('')}
+        ${noteColors.map((c, i) => `<div role="button" tabindex="0" aria-label="${noteColorNames[i]}" onclick="setNoteColor(${noteId},'${c}');document.getElementById('modalContainer').innerHTML='';" style="width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid var(--border);${c ? 'background:' + c : 'background:var(--bg-input)'}" title="${noteColorNames[i]}"></div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
@@ -2391,7 +2392,7 @@ function showTOC() {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal"><h3>Table of Contents</h3>
       <div style="max-height:350px;overflow-y:auto">
-        ${headings.map(h => `<div class="toc-item" style="padding-left:${(h.level - 1) * 16}px" onclick="jumpToHeading(${h.line});document.getElementById('modalContainer').innerHTML='';">${esc(h.text)}</div>`).join('')}
+        ${headings.map(h => `<div class="toc-item" role="button" tabindex="0" style="padding-left:${(h.level - 1) * 16}px" onclick="jumpToHeading(${h.line});document.getElementById('modalContainer').innerHTML='';">${esc(h.text)}</div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:12px">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
@@ -3370,9 +3371,9 @@ function showReadingPrefs() {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal" style="min-width:320px"><h3>Reading preferences</h3>
       <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">Font size</label>
-      <input type="range" id="rpSize" min="13" max="22" step="1" value="${p.size || 16}" style="width:100%">
+      <input type="range" id="rpSize" aria-label="Font size" min="13" max="22" step="1" value="${p.size || 16}" style="width:100%">
       <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">Line height</label>
-      <input type="range" id="rpLh" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
+      <input type="range" id="rpLh" aria-label="Line height" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
       <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> Serif body font</label>
       <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpNarrow" ${p.narrow ? 'checked' : ''}> Narrow reading column</label>
       <div class="modal-buttons" style="margin-top:16px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Done</button></div>

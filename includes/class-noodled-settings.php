@@ -185,7 +185,7 @@ class Noodled_Settings {
 		$theme   = self::admin_theme();
 		$other   = $theme === 'dark' ? 'light' : 'dark';
 		$brand   = self::get_brand_name();
-		$noodle  = '<svg viewBox="0 0 30 30" fill="none"><path d="M5 19 C5 11, 12 8, 15 13 C17 16, 12 20, 11 16 C10 12, 17 9, 21 13 C24 16, 23 21, 26 19" stroke-width="3" stroke-linecap="round"/></svg>';
+		$noodle  = '<svg viewBox="0 0 30 30" fill="none" aria-hidden="true" focusable="false"><path d="M5 19 C5 11, 12 8, 15 13 C17 16, 12 20, 11 16 C10 12, 17 9, 21 13 C24 16, 23 21, 26 19" stroke-width="3" stroke-linecap="round"/></svg>';
 		?>
 		<div class="wrap"><div class="nood-admin" data-nood-theme="<?php echo esc_attr( $theme ); ?>">
 			<div class="nood-bar">

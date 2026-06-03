@@ -26,6 +26,9 @@
 </head>
 <body>
 
+<a class="skip-link" href="#colContent">Skip to content</a>
+<h1 class="sr-only"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?> notes</h1>
+
 <!-- Splash -->
 <div class="splash" id="splash">
   <div class="splash-logo"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></div>
@@ -37,7 +40,7 @@
 <div class="offline-banner" id="offlineBanner">You're offline — changes will save when you reconnect</div>
 
 <!-- Top toolbar — clean and minimal -->
-<div class="toolbar">
+<header class="toolbar" role="banner">
   <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu" aria-label="Open menu">&#9776;</button>
   <button class="btn-icon mobile-back" onclick="closeNote()" title="Back" aria-label="Back to notes">&#8592;</button>
   <span class="logo" onclick="closeNote()" role="button" tabindex="0" aria-label="Close note and go home" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
@@ -60,39 +63,39 @@
     <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn" aria-label="More actions">&#8942;</button>
     <div class="toolbar-dropdown" id="appMenu">
       <?php if ( ! empty( $config['user']['owner'] ) ) : ?>
-      <div class="dropdown-item" onclick="manageUsers()">&#128101; Manage people</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageUsers()">&#128101; Manage people</div>
       <div class="dropdown-sep"></div>
       <?php endif; ?>
-      <div class="dropdown-item" onclick="showTemplates()">New from template</div>
-      <div class="dropdown-item" onclick="openDailyJournal()">Daily journal</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTemplates()">New from template</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openDailyJournal()">Daily journal</div>
       <div class="dropdown-sep"></div>
-      <div class="dropdown-item" onclick="showFocusOptions()">Focus timer</div>
-      <div class="dropdown-item" onclick="showTagCloud()">Browse tags</div>
-      <div class="dropdown-item" onclick="manageTags()">Manage tags</div>
-      <div class="dropdown-item" onclick="showLinkGraph()">Note links</div>
-      <div class="dropdown-item" onclick="showStats()">Statistics</div>
-      <div class="dropdown-item" onclick="toggleQuickCapture()">Quick capture</div>
-      <div class="dropdown-item" onclick="uploadFiles()">Add files</div>
-      <div class="dropdown-item" onclick="importEvernote()">Import from Evernote</div>
-      <div class="dropdown-item" onclick="exportBackup()">Export backup (.zip)</div>
-      <div class="dropdown-item" onclick="importBackup()">Import backup (.zip)</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showFocusOptions()">Focus timer</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTagCloud()">Browse tags</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageTags()">Manage tags</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showLinkGraph()">Note links</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showStats()">Statistics</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleQuickCapture()">Quick capture</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="uploadFiles()">Add files</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importEvernote()">Import from Evernote</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportBackup()">Export backup (.zip)</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importBackup()">Import backup (.zip)</div>
       <div class="dropdown-sep"></div>
-      <div class="dropdown-item" onclick="showShortcutsHelp()">Keyboard shortcuts</div>
-      <div class="dropdown-item" onclick="toggleTheme()">Toggle theme</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showShortcutsHelp()">Keyboard shortcuts</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTheme()">Toggle theme</div>
       <div class="dropdown-sep"></div>
-      <div class="dropdown-item" onclick="doLogout()">Logout</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="doLogout()">Logout</div>
     </div>
   </div>
   <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn" aria-label="Toggle theme">&#9680;</button>
-</div>
+</header>
 
 <!-- Main 3-column layout -->
 <div class="main">
 
   <!-- Col 1: Notebooks -->
-  <div class="col-notebooks">
+  <nav class="col-notebooks" aria-label="Notebooks">
     <div class="header">
-      <span>Notebooks</span>
+      <h2 style="margin:0;font:inherit;letter-spacing:inherit;text-transform:inherit">Notebooks</h2>
       <button class="btn-icon btn-sm" onclick="createNotebook()" title="New notebook">+</button>
     </div>
     <div class="nb-all active" id="nbAll" role="button" tabindex="0" aria-label="All notes" onclick="selectNotebook(null)">All Notes</div>
@@ -106,7 +109,7 @@
         <span class="count" id="trashCount">0</span>
       </div>
     </div>
-  </div>
+  </nav>
 
   <!-- Col 2: Note list -->
   <div class="col-notes">
@@ -128,13 +131,13 @@
   </div>
 
   <!-- Col 3: Content -->
-  <div class="col-content" id="colContent">
+  <main class="col-content" id="colContent" tabindex="-1">
     <div class="empty-state" id="emptyState">
       <div class="empty-icon">&#128221;</div>
       <div class="empty-title">No note selected</div>
       <div class="empty-sub">Pick a note from the list or create a new one</div>
     </div>
-  </div>
+  </main>
 </div>
 
 <!-- Mobile bottom nav -->

@@ -1398,3 +1398,14 @@ body.editor-narrow .content-body { max-width: 720px; margin-left: auto; margin-r
 .ctx-item:focus, .dropdown-item:focus {
   outline: 2px solid var(--accent); outline-offset: -2px; background: var(--bg-item-hover);
 }
+
+/* Stronger, hue-independent focus ring for text fields (was border-colour only). */
+.search-box input:focus, .content-title-input:focus, .find-replace-bar input:focus, #qcInput:focus {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--accent);
+}
+
+/* Screen-reader-only text + skip link (WCAG 1.3.1 / 2.4.1). */
+.sr-only { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.skip-link { position:absolute; left:8px; top:-48px; z-index:10001; background:var(--accent); color:#fff; padding:8px 14px; border-radius:0 0 6px 6px; transition:top .15s; }
+.skip-link:focus { top:0; }
