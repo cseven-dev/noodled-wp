@@ -461,11 +461,12 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   border-radius: 18px;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--rule);
-  padding: 30px 32px 28px;
+  padding: 40px 32px 28px;
   width: min(420px, 92%);
   margin-left: auto;
-  /* Subtle card lean; the note text gets its own extra tilt below. */
+  /* Subtle card lean; the whole card (text included) rides this one angle. */
   transform: rotate(-3deg);
+  backface-visibility: hidden;
 }
 /* stacked-deck look: the backings sit squarely BEHIND the front card at the
    same angle (no extra rotation), just offset down-right so they peek as a
@@ -476,9 +477,19 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
 }
 .type-card::before { transform: translate(6px, 12px); }
 .type-card::after  { transform: translate(12px, 24px); }
-.type-card.land { animation: tcLand .52s var(--ease); }
-/* keep the card's -4deg lean through the land animation (no flicker to flat). */
-@keyframes tcLand { from { transform: translateY(-16px) scale(.975) rotate(-3deg); opacity: .55; } to { transform: translateY(0) scale(1) rotate(-3deg); opacity: 1; } }
+.type-card.land { animation: tcLand .66s var(--ease); }
+/* A new note flips in like a card being turned over, with a quick flicker.
+   Every frame keeps the resting -3deg z-lean so the card lands at its angle. */
+@keyframes tcLand {
+  0%   { transform: perspective(1000px) translateY(-12px) rotateY(82deg) rotate(-3deg) scale(.95); opacity: 0; }
+  22%  { opacity: .25; }
+  38%  { opacity: 1; }
+  46%  { transform: perspective(1000px) translateY(0) rotateY(-14deg) rotate(-3deg) scale(1.015); opacity: .55; }
+  58%  { opacity: 1; }
+  70%  { transform: perspective(1000px) rotateY(7deg) rotate(-3deg) scale(1); opacity: .8; }
+  82%  { opacity: 1; }
+  100% { transform: perspective(1000px) translateY(0) rotateY(0deg) rotate(-3deg) scale(1); opacity: 1; }
+}
 .type-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .type-card__top .tdot { width: 11px; height: 11px; border-radius: 50%; }
 .type-card__title { margin-left: 8px; font-size: 13px; color: var(--slate); font-weight: 600; }
