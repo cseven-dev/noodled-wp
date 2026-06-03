@@ -194,7 +194,7 @@ function renderNotebooks() {
     const color = nbColors[i % nbColors.length];
     const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="Shared with you">&#128279;</span>' : '';
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="Read only">&#128274;</span>' : '';
-    return `<div class="nb-item${active}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
+    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="Notebook ${esc(label)}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
@@ -242,7 +242,7 @@ async function showShareDialog(nb) {
       <div class="modal" style="min-width:380px">
         <h3>Share "${esc(nb.name)}"</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Enter their email to grant access</p>
-        <input id="shareEmail" placeholder="Email address" autofocus>
+        <input id="shareEmail" placeholder="Email address" aria-label="Email address to share with" autofocus>
         <div style="display:flex;gap:8px;margin-bottom:16px">
           <label style="font-size:12px;color:var(--text)"><input type="checkbox" id="shareWrite"> Can edit</label>
         </div>
@@ -305,7 +305,7 @@ function showNoteShareDialog(noteId) {
         <h3>Share "${esc(title)}"</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Give another noodled user access to just this note.</p>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="nShareEmail" placeholder="Email address" style="flex:1" autofocus>
+          <input id="nShareEmail" placeholder="Email address" aria-label="Email address to share with" style="flex:1" autofocus>
           <label style="font-size:12px;white-space:nowrap"><input type="checkbox" id="nShareWrite"> Can edit</label>
           <button class="btn btn-sm btn-accent" onclick="doNoteShare(${noteId})">Share</button>
         </div>
@@ -494,6 +494,7 @@ function renderNoteItem(n) {
     const colorStyle = noteColor ? `border-left:3px solid ${noteColor}` : '';
     return `
       <div class="note-item ${isActive ? 'active' : ''}" data-note-id="${n.id}" style="${colorStyle}"
+           role="button" tabindex="0" aria-label="Open note: ${escAttr(n.title || 'Untitled')}"
            onclick="${bulkMode ? `toggleBulkSelect(${n.id}, event)` : `handleNoteTap(event, ${n.id})`}"
            oncontextmenu="event.preventDefault(); showNoteContext(event, ${n.id})">
         <div class="title">${checkbox}${pin}${star}${sharedBadge}${highlightMatch(n.title, searchQuery)}${badge}</div>
@@ -955,11 +956,20 @@ function toggleToolbarMore() {
   document.querySelector('.content-toolbar')?.classList.toggle('expanded');
 }
 
+// Expose dropdown items as keyboard-operable menu items and focus the first.
+function armDropdownMenu(menu) {
+  menu.setAttribute('role', 'menu');
+  const items = menu.querySelectorAll('.dropdown-item');
+  items.forEach(it => { it.setAttribute('role', 'menuitem'); it.tabIndex = 0; });
+  setTimeout(() => { if (items[0]) items[0].focus(); }, 0);
+}
+
 function toggleAppMenu() {
   const menu = document.getElementById('appMenu');
   if (menu) menu.classList.toggle('show');
   // Close on next click
   if (menu?.classList.contains('show')) {
+    armDropdownMenu(menu);
     setTimeout(() => document.addEventListener('click', () => menu.classList.remove('show'), { once: true }), 10);
   }
 }
@@ -968,6 +978,7 @@ function toggleEditorMenu() {
   const menu = document.getElementById('editorMenu');
   if (menu) menu.classList.toggle('show');
   if (menu?.classList.contains('show')) {
+    armDropdownMenu(menu);
     setTimeout(() => document.addEventListener('click', () => menu.classList.remove('show'), { once: true }), 10);
   }
 }
@@ -1300,8 +1311,8 @@ async function renderManageUsers() {
   });
   h += `<div class="mu-head">Invite someone</div>
     <div class="mu-invite">
-      <input id="muEmail" type="email" inputmode="email" placeholder="email" class="login-input" style="margin:0">
-      <input id="muName" type="text" placeholder="name (optional)" class="login-input" style="margin:0">
+      <input id="muEmail" type="email" inputmode="email" placeholder="email" aria-label="Member email" class="login-input" style="margin:0">
+      <input id="muName" type="text" placeholder="name (optional)" aria-label="Member name (optional)" class="login-input" style="margin:0">
       <div class="mu-invite-row">
         <label class="mu-drop"><input type="checkbox" id="muInviteDrop"> drop folder</label>
         <button class="btn btn-sm btn-accent" onclick="muInvite()">Invite</button>
@@ -1388,7 +1399,7 @@ function handleGlobalKey(e) {
 function showQuickOpen() {
   const el = document.getElementById('modalContainer');
   const allNotes = notes;
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal" style="min-width:400px"><h3>Quick Open</h3><input id="qoInput" placeholder="Type to search notes..." autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal" style="min-width:400px"><h3>Quick Open</h3><input id="qoInput" placeholder="Type to search notes..." aria-label="Search notes to open" autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
   let qoHighlight = 0, qoResults = [];
   function qoFilter() {
     const q = document.getElementById('qoInput').value.toLowerCase();
@@ -1443,15 +1454,15 @@ function renderMarkdown(text) {
         if (target) return `<a href="#" class="wikilink" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
         return `<a href="#" class="wikilink broken" onclick="event.preventDefault()">${esc(title)}</a>`;
       })
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener">${txt}</a>`)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="Opens in a new tab">${txt}</a>`)
       // Autolink bare URLs (not already inside a markdown link's href/text).
-      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${url}</a>`)
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="Opens in a new tab">${url}</a>`)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\[(\d+:\d+(?::\d+)?)\]\s*/g, '<span class="timestamp">[$1]</span> ')
-      .replace(/(^|\s)#([a-zA-Z][\w-]*)/g, '$1<span class="tag" onclick="filterByTag(\'$2\')">#$2</span>');
+      .replace(/(^|\s)#([a-zA-Z][\w-]*)/g, '$1<span class="tag" role="button" tabindex="0" aria-label="Filter by tag $2" onclick="filterByTag(\'$2\')">#$2</span>');
   }
 
   for (let i = 0; i < lines.length; i++) {
@@ -1472,7 +1483,7 @@ function renderMarkdown(text) {
       if (!inList || listType !== 'check') { closeList(); out.push('<ul class="checklist">'); inList = true; listType = 'check'; }
       const checked = checkMatch[1].toLowerCase() === 'x';
       const checkIdx = out.filter(l => l.includes('type="checkbox"')).length;
-      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
+      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[2])}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
       continue;
     }
     const bulletMatch = trimmed.match(/^-\s+(.+)$/);
@@ -1555,7 +1566,7 @@ function setStatus(msg) {
 function showPrompt(title, label, defaultVal = '') {
   return new Promise(resolve => {
     const el = document.getElementById('modalContainer');
-    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${title}</h3><label style="font-size:12px;color:var(--text-muted)">${label}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">Cancel</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">OK</button></div></div></div>`;
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${title}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${label}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">Cancel</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">OK</button></div></div></div>`;
     window.resolve_modal = (val) => { el.innerHTML = ''; resolve(val); };
     const inp = document.getElementById('modalInput');
     inp.focus();
@@ -1579,10 +1590,15 @@ function showContextMenu(event, items) {
     const div = document.createElement('div');
     div.className = 'ctx-item' + (item.danger ? ' danger' : '');
     div.textContent = item.label;
+    div.setAttribute('role', 'menuitem');
+    div.tabIndex = 0;
     div.addEventListener('click', () => { closeContextMenu(); item.action(); });
     menu.appendChild(div);
   });
+  menu.setAttribute('role', 'menu');
   el.appendChild(menu);
+  // Focus the first item so the menu is keyboard navigable on open.
+  setTimeout(() => { const f = menu.querySelector('.ctx-item'); if (f) f.focus(); }, 0);
   document.addEventListener('click', closeContextMenu, { once: true });
 }
 
@@ -2009,7 +2025,7 @@ function showTagCloud() {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal"><h3>Tags</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:300px;overflow-y:auto">
-        ${tags.map(t => `<span class="tag-chip" onclick="document.getElementById('modalContainer').innerHTML=''; document.getElementById('searchInput').value='#${t}'; onSearch();">#${esc(t)}</span>`).join('')}
+        ${tags.map(t => `<span class="tag-chip" role="button" tabindex="0" aria-label="Filter by tag ${esc(t)}" onclick="document.getElementById('modalContainer').innerHTML=''; document.getElementById('searchInput').value='#${t}'; onSearch();">#${esc(t)}</span>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
@@ -2419,10 +2435,10 @@ async function shareNoteLink(noteId) {
 function embedMedia(url) {
   // YouTube
   let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-  if (m) return `<div class="embed-container"><iframe src="https://www.youtube.com/embed/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  if (m) return `<div class="embed-container"><iframe title="Embedded YouTube video" src="https://www.youtube.com/embed/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
   // Vimeo
   m = url.match(/vimeo\.com\/(\d+)/);
-  if (m) return `<div class="embed-container"><iframe src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  if (m) return `<div class="embed-container"><iframe title="Embedded Vimeo video" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
   return null;
 }
 
@@ -2516,8 +2532,8 @@ function toggleFindReplace() {
   bar.id = 'findReplaceBar';
   bar.className = 'find-replace-bar';
   bar.innerHTML = `
-    <input id="frFind" placeholder="Find..." oninput="highlightFindsInContent()">
-    <input id="frReplace" placeholder="Replace...">
+    <input id="frFind" placeholder="Find..." aria-label="Find text" oninput="highlightFindsInContent()">
+    <input id="frReplace" placeholder="Replace..." aria-label="Replace with">
     <button class="btn btn-sm" onclick="doReplace(false)">Replace</button>
     <button class="btn btn-sm" onclick="doReplace(true)">All</button>
     <button class="btn btn-sm" onclick="toggleFindReplace()">&#10005;</button>
@@ -2695,7 +2711,9 @@ function renderLightbox() {
   const a = _lbImages[_lbIndex];
   if (!a) return;
   lbResetZoom();
-  document.getElementById('lbImg').src = a.url;
+  const lbImg = document.getElementById('lbImg');
+  lbImg.src = a.url;
+  lbImg.alt = a.filename || a.name || 'Attachment image';
   document.getElementById('lbCaption').innerHTML = lightboxCaption(a);
   const nav = _lbImages.length > 1;
   document.querySelectorAll('#noodledLightbox .lb-nav').forEach(b => b.style.display = nav ? '' : 'none');
@@ -3263,6 +3281,17 @@ function noodledPolishInit() {
   document.addEventListener('keydown', acNav, true); // capture: handle before the editor's own Enter
   document.addEventListener('input', editorAutocomplete);
   document.addEventListener('keydown', noteNavKey);   // arrow-key note-list navigation
+  // Make any element we expose with role=button/menuitem/option operable by
+  // keyboard: Enter or Space fires its click (skips native controls).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    const t = e.target;
+    if (!t || typeof t.matches !== 'function') return;
+    if (!t.matches('[role="button"], [role="menuitem"], [role="option"]')) return;
+    if (t.matches('a[href], button, input, textarea, select')) return;
+    e.preventDefault();
+    t.click();
+  });
   setupInstallPrompt();
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', noodledPolishInit);

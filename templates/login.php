@@ -24,7 +24,7 @@
   --bg-card: #1a1a1f;
   --bg-input: #252530;
   --text: #b0b0b8;
-  --text-muted: #5a5a68;
+  --text-muted: #9a9aac; /* >= 4.5:1 on the dark cards (was #5a5a68, ~2.9:1) */
   --text-bright: #e8e8ef;
   --accent: <?php echo esc_attr( Noodled_Settings::get_accent_color() ); ?>;
   --accent-hover: #2563eb;
@@ -154,6 +154,14 @@ body::before {
 
 .login-btn:hover { background: var(--accent-hover); }
 .login-btn:active { transform: scale(0.98); }
+
+/* Link-styled buttons (were <a href="#">; now real, keyboard-operable buttons). */
+.login-link-btn {
+  background: none; border: none; padding: 4px; margin: 0 auto; display: inline-block;
+  color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: inherit;
+}
+.login-link-btn:hover { color: var(--text-bright); }
+.login-link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .login-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
 
 .login-msg {
@@ -221,14 +229,14 @@ body::before {
       <div class="card-title">Sign in</div>
       <div class="card-sub">We'll send a PIN to your email</div>
       <form onsubmit="handleLogin(event)">
-        <input class="login-input" type="email" id="emailInput" placeholder="you@example.com" required autofocus>
+        <input class="login-input" type="email" id="emailInput" placeholder="you@example.com" aria-label="Email address" required autofocus>
         <button class="login-btn" type="submit" id="loginBtn">Continue</button>
       </form>
     </div>
 
     <?php if ( Noodled_Settings::allow_registration() ) : ?>
     <div style="margin-top:12px;text-align:center" id="regLink">
-      <a href="#" onclick="showStep('stepRegister')" style="color:var(--text-muted);font-size:12px;text-decoration:none">Don't have an account? Create one</a>
+      <button type="button" class="login-link-btn" onclick="showStep('stepRegister')">Don't have an account? Create one</button>
     </div>
     <?php endif; ?>
 
@@ -236,11 +244,11 @@ body::before {
       <div class="card-title">Enter PIN</div>
       <div class="card-sub">Check your email for a 6-digit code</div>
       <form onsubmit="handlePin(event)">
-        <input class="login-input" type="text" id="pinInput" placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus style="text-align:center;font-size:24px;letter-spacing:8px">
+        <input class="login-input" type="text" id="pinInput" placeholder="000000" aria-label="6-digit PIN" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus style="text-align:center;font-size:24px;letter-spacing:8px">
         <button class="login-btn" type="submit" id="pinBtn">Sign in</button>
       </form>
       <div style="margin-top:12px;text-align:center">
-        <a href="#" onclick="backToEmail()" style="color:var(--text-muted);font-size:12px;text-decoration:none">Use a different email</a>
+        <button type="button" class="login-link-btn" onclick="backToEmail()">Use a different email</button>
       </div>
     </div>
 
@@ -255,12 +263,12 @@ body::before {
       <div class="card-title">Create account</div>
       <div class="card-sub">Enter your details to get started</div>
       <form onsubmit="handleRegister(event)">
-        <input class="login-input" type="text" id="regName" placeholder="Your name" required>
-        <input class="login-input" type="email" id="regEmail" placeholder="Email address" required>
+        <input class="login-input" type="text" id="regName" placeholder="Your name" aria-label="Your name" required>
+        <input class="login-input" type="email" id="regEmail" placeholder="Email address" aria-label="Email address" required>
         <button class="login-btn" type="submit" id="regBtn">Create account</button>
       </form>
       <div style="margin-top:12px;text-align:center">
-        <a href="#" onclick="showStep('stepEmail')" style="color:var(--text-muted);font-size:12px;text-decoration:none">Already have an account? Sign in</a>
+        <button type="button" class="login-link-btn" onclick="showStep('stepEmail')">Already have an account? Sign in</button>
       </div>
     </div>
     <?php endif; ?>

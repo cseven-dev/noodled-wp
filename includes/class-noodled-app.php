@@ -145,29 +145,30 @@ class Noodled_App {
 .n-login-msg{margin-top:12px;font-size:13px;text-align:center;min-height:20px}
 .n-login-msg.error{color:#f87171}
 .n-login-msg.success{color:#34d399}
-.n-login-link{color:#9a9aa8;font-size:13.5px;text-decoration:none;display:block;text-align:center;margin-top:12px}
+.n-login-link{color:#9a9aa8;font-size:13.5px;text-decoration:none;display:block;text-align:center;margin-top:12px;background:none;border:none;cursor:pointer;font-family:inherit;width:100%}
+.n-login-link:focus-visible{outline:2px solid {$accent};outline-offset:2px;border-radius:4px}
 .n-login-link:hover{color:#e8e8ef}
 .n-login-link.lg{font-size:15px;font-weight:600;color:{$accent};margin-top:18px}
 .n-login-link.lg:hover{filter:brightness(1.15)}
 .n-pin-input{text-align:center;font-size:24px;letter-spacing:8px}
 </style>
 
-<div class="n-login-overlay" id="nLoginOverlay" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="n-login-overlay" id="nLoginOverlay" role="dialog" aria-modal="true" aria-labelledby="nLoginTitle" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="n-login-box">
     <div id="nStepEmail">
-      <h3>Sign in to {$brand}</h3>
+      <h3 id="nLoginTitle">Sign in to {$brand}</h3>
       <div class="sub">We'll send a PIN to your email</div>
-      <input class="n-login-input" type="email" id="nEmail" placeholder="you@example.com">
+      <input class="n-login-input" type="email" id="nEmail" placeholder="you@example.com" aria-label="Email address">
       <button class="n-login-btn" id="nEmailBtn" onclick="nSendPin()">Continue</button>
-      <a href="#" class="n-login-link lg" onclick="event.preventDefault();nGotPin()">Already have a PIN? Sign in &rarr;</a>
+      <button type="button" class="n-login-link lg" onclick="nGotPin()">Already have a PIN? Sign in &rarr;</button>
     </div>
     <div id="nStepPin" style="display:none">
       <h3>Enter your PIN</h3>
       <div class="sub">The 6-digit code from your noodle email</div>
-      <input class="n-login-input" type="email" id="nPinEmail" placeholder="you@example.com">
-      <input class="n-login-input n-pin-input" type="text" id="nPin" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+      <input class="n-login-input" type="email" id="nPinEmail" placeholder="you@example.com" aria-label="Email address">
+      <input class="n-login-input n-pin-input" type="text" id="nPin" placeholder="000000" aria-label="6-digit PIN" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
       <button class="n-login-btn" id="nPinBtn" onclick="nVerifyPin()">Sign in</button>
-      <a href="#" class="n-login-link" onclick="event.preventDefault();nShowStep('nStepEmail')">Need a new PIN?</a>
+      <button type="button" class="n-login-link" onclick="nShowStep('nStepEmail')">Need a new PIN?</button>
     </div>
     <div class="n-login-msg" id="nLoginMsg"></div>
   </div>
@@ -182,15 +183,15 @@ function nGotPin(){const e=document.getElementById('nEmail').value.trim();if(e)_
 function nGotoPin(){const pe=document.getElementById('nPinEmail');if(pe){if(_nEmail)pe.value=_nEmail;pe.style.display='none';}nShowStep('nStepPin');const f=document.getElementById('nPin');if(f)f.focus();}
 async function nSendPin(){const email=document.getElementById('nEmail').value;if(!email)return;_nEmail=email;const btn=document.getElementById('nEmailBtn');btn.disabled=true;btn.textContent='Sending...';const msg=document.getElementById('nLoginMsg');msg.textContent='';try{const r=await fetch('{$login_api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error'}else{nGotoPin()}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error'}btn.disabled=false;btn.textContent='Continue'}
 async function nVerifyPin(){const pin=document.getElementById('nPin').value.trim();if(!pin)return;const email=(_nEmail||document.getElementById('nPinEmail').value||'').trim();const msg=document.getElementById('nLoginMsg');const btn=document.getElementById('nPinBtn');btn.disabled=true;btn.textContent='Verifying...';try{let r;if(email){r=await fetch('{$pin_api}',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,pin})});}else{r=await fetch('{$verify_api}?token='+encodeURIComponent(pin),{credentials:'same-origin'});}const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error';btn.disabled=false;btn.textContent='Sign in'}else{msg.innerHTML='&#10003; Welcome!';msg.className='n-login-msg success';setTimeout(()=>window.location.href='{$app_url}'+('{$app_url}'.includes('?')?'&':'?')+'_='+Date.now(),500)}}catch(e){msg.textContent='Something went wrong';msg.className='n-login-msg error';btn.disabled=false;btn.textContent='Sign in'}}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.getElementById('nStepPin');if(pin&&pin.style.display!=='none')nVerifyPin();else if(document.getElementById('nStepEmail').style.display!=='none')nSendPin()}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.getElementById('nStepPin');if(pin&&pin.style.display!=='none')nVerifyPin();else if(document.getElementById('nStepEmail').style.display!=='none')nSendPin()}else if(e.key==='Escape'){document.querySelectorAll('.n-login-overlay.show').forEach(o=>o.classList.remove('show'))}});
 // Expired one-click link → open login modal, pre-fill the email so they don't retype it.
 (function(){const q=new URLSearchParams(location.search);if(q.get('login')==='expired'){const o=document.getElementById('nLoginOverlay');if(o)o.classList.add('show');const em=q.get('e');if(em){_nEmail=em;const ne=document.getElementById('nEmail');if(ne)ne.value=em;const pe=document.getElementById('nPinEmail');if(pe)pe.value=em;}const m=document.getElementById('nLoginMsg');if(m){m.textContent='That sign-in link expired — tap Continue to get a fresh PIN.';m.className='n-login-msg error';}}})();
 // Inject login button into page nav (ghost style, left of Get Noodled)
 (function(){
   const cta=document.querySelector('.nav-cta');
   if(cta){
-    const a=document.createElement('a');
-    a.href='#';
+    const a=document.createElement('button');
+    a.type='button';
     a.textContent='Log in';
     a.className='btn btn--ghost';
     a.onclick=function(e){e.preventDefault();document.getElementById('nLoginOverlay').classList.add('show')};
@@ -215,15 +216,15 @@ HTML;
 .ngn-msg.success{color:#15803d;font-weight:600}
 </style>
 <!-- Noodled "Get a noodle" Request Overlay -->
-<div class="n-login-overlay" id="nReqOverlay" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="n-login-overlay" id="nReqOverlay" role="dialog" aria-modal="true" aria-labelledby="nReqTitle" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="n-login-box">
     <div id="nReqForm">
-      <h3>Get a noodle</h3>
+      <h3 id="nReqTitle">Get a noodle</h3>
       <div class="sub">Request access to {$brand}. We'll email you a login PIN once you're approved.</div>
-      <input class="n-login-input" type="text" id="nReqName" placeholder="Your name">
-      <input class="n-login-input" type="email" id="nReqEmail" placeholder="you@example.com">
+      <input class="n-login-input" type="text" id="nReqName" placeholder="Your name" aria-label="Your name">
+      <input class="n-login-input" type="email" id="nReqEmail" placeholder="you@example.com" aria-label="Email address">
       <button class="n-login-btn" id="nReqBtn" onclick="nRequestNoodle()">Request a noodle</button>
-      <a href="#" class="n-login-link" onclick="event.preventDefault();document.getElementById('nReqOverlay').classList.remove('show');document.getElementById('nLoginOverlay').classList.add('show')">Already have one? Sign in</a>
+      <button type="button" class="n-login-link" onclick="document.getElementById('nReqOverlay').classList.remove('show');document.getElementById('nLoginOverlay').classList.add('show')">Already have one? Sign in</button>
     </div>
     <div class="n-login-msg" id="nReqMsg"></div>
   </div>
@@ -294,8 +295,8 @@ HTML;
 		// Replace the desktop "Download the plugin" button with the inline signup form
 		$getnoodle_form = <<<HTML
 <form class="ngn-form reveal d2" id="nGetForm" onsubmit="return nGetNoodle(event)">
-          <input type="text" id="nGetName" class="ngn-input" placeholder="Your name" autocomplete="name">
-          <input type="email" id="nGetEmail" class="ngn-input" placeholder="you@example.com" autocomplete="email" required>
+          <input type="text" id="nGetName" class="ngn-input" placeholder="Your name" aria-label="Your name" autocomplete="name">
+          <input type="email" id="nGetEmail" class="ngn-input" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
           <button type="submit" class="btn btn--lg" id="nGetBtn">Get a noodle</button>
           <div class="ngn-msg" id="nGetMsg"></div>
         </form>

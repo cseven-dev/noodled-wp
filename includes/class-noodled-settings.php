@@ -307,9 +307,9 @@ class Noodled_Settings {
 				<input type="hidden" name="<?php echo self::$option_key; ?>[_tab]" value="general">
 				<table class="form-table">
 					<tr>
-						<th>App URL Path</th>
+						<th><label for="noodled-app-path">App URL Path</label></th>
 						<td>
-							<input type="text" name="<?php echo self::$option_key; ?>[app_path]" value="<?php echo esc_attr( $opts['app_path'] ?? 'noodled' ); ?>" class="regular-text">
+							<input type="text" id="noodled-app-path" name="<?php echo self::$option_key; ?>[app_path]" value="<?php echo esc_attr( $opts['app_path'] ?? 'noodled' ); ?>" class="regular-text">
 							<p class="description"><?php echo esc_html( home_url( '/' ) ); ?><strong><?php echo esc_html( $opts['app_path'] ?? 'noodled' ); ?></strong>/</p>
 						</td>
 					</tr>
@@ -326,16 +326,16 @@ class Noodled_Settings {
 						</td>
 					</tr>
 					<tr>
-						<th>Request Notifications</th>
+						<th><label for="noodled-notify-email">Request Notifications</label></th>
 						<td>
-							<input type="email" name="<?php echo self::$option_key; ?>[notify_email]" value="<?php echo esc_attr( $opts['notify_email'] ?? '' ); ?>" class="regular-text" placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
+							<input type="email" id="noodled-notify-email" name="<?php echo self::$option_key; ?>[notify_email]" value="<?php echo esc_attr( $opts['notify_email'] ?? '' ); ?>" class="regular-text" placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
 							<p class="description">Where to email new noodle requests. Defaults to the site admin email.</p>
 						</td>
 					</tr>
 					<tr>
-						<th>Auto-empty Trash</th>
+						<th><label for="noodled-trash-retention">Auto-empty Trash</label></th>
 						<td>
-							<input type="number" min="0" max="3650" name="<?php echo self::$option_key; ?>[trash_retention]" value="<?php echo esc_attr( (int) ( $opts['trash_retention'] ?? 0 ) ); ?>" class="small-text"> days
+							<input type="number" id="noodled-trash-retention" min="0" max="3650" name="<?php echo self::$option_key; ?>[trash_retention]" value="<?php echo esc_attr( (int) ( $opts['trash_retention'] ?? 0 ) ); ?>" class="small-text"> days
 							<p class="description">Permanently delete trashed notes (and their attachments) older than this many days. <strong>0 = keep forever</strong>. Runs once a day.</p>
 						</td>
 					</tr>
@@ -377,7 +377,7 @@ class Noodled_Settings {
 						<td>
 							<?php if ( $has_landing ) : ?>
 								<p style="color:green;margin-bottom:8px">&#10003; Landing page is set.
-								<a href="#" onclick="if(confirm('Remove landing page?')){fetch('<?php echo esc_url( rest_url( 'noodled/v1/admin/landing' ) ); ?>',{method:'DELETE',headers:{'X-WP-Nonce':'<?php echo wp_create_nonce( 'wp_rest' ); ?>'},credentials:'same-origin'}).then(()=>location.reload())}">Remove</a></p>
+								<button type="button" class="button-link" style="color:#b32d2e" onclick="if(confirm('Remove landing page?')){fetch('<?php echo esc_url( rest_url( 'noodled/v1/admin/landing' ) ); ?>',{method:'DELETE',headers:{'X-WP-Nonce':'<?php echo wp_create_nonce( 'wp_rest' ); ?>'},credentials:'same-origin'}).then(()=>location.reload())}">Remove</button></p>
 							<?php else : ?>
 								<p style="margin-bottom:8px">Upload an HTML file to show as a landing page for visitors.</p>
 							<?php endif; ?>
@@ -404,7 +404,7 @@ class Noodled_Settings {
 		<?php if ( $pending ) : ?>
 		<h2>Pending requests <span class="awaiting-mod"><span class="pending-count"><?php echo count( $pending ); ?></span></span></h2>
 		<table class="widefat striped" style="max-width:860px;margin-bottom:24px">
-			<thead><tr><th>Email</th><th>Name</th><th>Requested</th><th></th></tr></thead>
+			<thead><tr><th>Email</th><th>Name</th><th>Requested</th><th>Actions</th></tr></thead>
 			<tbody>
 			<?php foreach ( $pending as $u ) : ?>
 				<tr>
@@ -443,7 +443,7 @@ class Noodled_Settings {
 					</td>
 					<td>
 						<button class="button button-small" onclick="noodledSendPin(<?php echo (int) $u['id']; ?>)">Send PIN</button>
-						<span class="noodled-pin" id="pin-<?php echo (int) $u['id']; ?>" style="margin:0 6px;font-size:12px"></span>
+						<span class="noodled-pin" id="pin-<?php echo (int) $u['id']; ?>" role="status" aria-live="polite" style="margin:0 6px;font-size:12px"></span>
 						<button class="button button-small" onclick="noodledDeleteUser(<?php echo (int) $u['id']; ?>)">Remove</button>
 					</td>
 				</tr>
@@ -453,13 +453,13 @@ class Noodled_Settings {
 
 		<h3>Invite</h3>
 		<div style="display:flex;gap:8px;align-items:center;max-width:860px;margin-bottom:8px;flex-wrap:wrap">
-			<input type="email" id="invite-email" placeholder="Email" class="regular-text" style="flex:1;min-width:160px">
-			<input type="text" id="invite-name" placeholder="Name (optional)" class="regular-text" style="flex:1;min-width:140px">
-			<select id="invite-role"><option value="member">Member</option><option value="admin">Admin</option></select>
+			<input type="email" id="invite-email" placeholder="Email" aria-label="Invite email" class="regular-text" style="flex:1;min-width:160px">
+			<input type="text" id="invite-name" placeholder="Name (optional)" aria-label="Invite name (optional)" class="regular-text" style="flex:1;min-width:140px">
+			<select id="invite-role" aria-label="Invite role"><option value="member">Member</option><option value="admin">Admin</option></select>
 			<label style="white-space:nowrap"><input type="checkbox" id="invite-drop"> Drop folder</label>
 			<button type="button" class="button button-primary" onclick="noodledInvite()">Invite</button>
 		</div>
-		<span id="invite-status"></span>
+		<span id="invite-status" role="status" aria-live="polite"></span>
 
 		<p class="description" style="max-width:860px;margin-top:24px">Notes are private per user. Members share their own notebooks and notes from inside the app. <strong>Drop folder</strong> is the one exception: enabling it gives the member a folder whose contents are shared read/write with you, shown in your account under their name.</p>
 
@@ -570,7 +570,7 @@ class Noodled_Settings {
 				<h2>From GitHub</h2>
 				<p>Pull all notes from your connected GitHub repository.</p>
 				<button type="button" class="button button-primary" id="noodled-import-btn" onclick="noodledGitImport()">Import from GitHub</button>
-				<span id="noodled-import-status"></span>
+				<span id="noodled-import-status" role="status" aria-live="polite"></span>
 				<script>
 				async function noodledGitImport() {
 					const btn = document.getElementById('noodled-import-btn');
@@ -745,8 +745,8 @@ class Noodled_Settings {
 		.setup-btn:hover{background:#006abc}
 		.setup-header{text-align:center;margin-bottom:32px}
 		.setup-header h1{font-size:28px;margin:0}
-		.setup-header p{color:#888;font-size:14px;margin:8px 0 0}
-		.setup-step{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+		.setup-header p{color:#595959;font-size:14px;margin:8px 0 0}
+		.setup-step{font-size:11px;color:#6c6c6c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
 		</style>
 		<div class="setup-wrap">
 			<div class="setup-header">
@@ -761,16 +761,16 @@ class Noodled_Settings {
 					<div class="setup-step">Step 1 — Branding</div>
 					<h2>Make it yours</h2>
 					<p>Customize the name and look. Change anytime in Noodled > Branding.</p>
-					<div class="setup-field"><label>App Name</label><input type="text" name="brand_name" value="noodled"></div>
-					<div class="setup-field"><label>Tagline</label><input type="text" name="brand_tagline" value="Your notes, everywhere"></div>
-					<div class="setup-field"><label>Accent Color</label><input type="color" name="accent_color" value="#0078d4"></div>
+					<div class="setup-field"><label for="setup-brand-name">App Name</label><input id="setup-brand-name" type="text" name="brand_name" value="noodled"></div>
+					<div class="setup-field"><label for="setup-brand-tagline">Tagline</label><input id="setup-brand-tagline" type="text" name="brand_tagline" value="Your notes, everywhere"></div>
+					<div class="setup-field"><label for="setup-accent-color">Accent Color</label><input id="setup-accent-color" type="color" name="accent_color" value="#0078d4"></div>
 				</div>
 
 				<div class="setup-card">
 					<div class="setup-step">Step 2 — Access</div>
 					<h2>Where and who</h2>
 					<p>Pick the URL and decide who can sign up.</p>
-					<div class="setup-field"><label>App URL Path</label><input type="text" name="app_path" value="noodled"><span style="font-size:12px;color:#888"><?php echo esc_html( home_url( '/' ) ); ?>noodled/</span></div>
+					<div class="setup-field"><label for="setup-app-path">App URL Path</label><input id="setup-app-path" type="text" name="app_path" value="noodled"><span style="font-size:12px;color:#595959"><?php echo esc_html( home_url( '/' ) ); ?>noodled/</span></div>
 					<div class="setup-check"><label><input type="checkbox" name="takeover_homepage"> Also use as site homepage</label></div>
 					<div class="setup-check"><label><input type="checkbox" name="allow_registration"> Allow open registration</label></div>
 					<div class="setup-check"><label><input type="checkbox" name="require_approval"> Require admin approval</label></div>
@@ -780,15 +780,15 @@ class Noodled_Settings {
 					<div class="setup-step">Step 3 — GitHub Sync (optional)</div>
 					<h2>Connect to desktop</h2>
 					<p>Sync notes with a GitHub repo. Skip this and set it up later in Noodled > Sync.</p>
-					<div class="setup-field"><label>Repository Owner</label><input type="text" name="github_owner" placeholder="your-username"></div>
-					<div class="setup-field"><label>Repository Name</label><input type="text" name="github_repo" value="noodled-notes"></div>
-					<div class="setup-field"><label>Access Token</label><input type="password" name="github_token" placeholder="ghp_..."></div>
-					<div class="setup-field"><label>Branch</label><input type="text" name="github_branch" value="main"></div>
+					<div class="setup-field"><label for="setup-gh-owner">Repository Owner</label><input id="setup-gh-owner" type="text" name="github_owner" placeholder="your-username"></div>
+					<div class="setup-field"><label for="setup-gh-repo">Repository Name</label><input id="setup-gh-repo" type="text" name="github_repo" value="noodled-notes"></div>
+					<div class="setup-field"><label for="setup-gh-token">Access Token</label><input id="setup-gh-token" type="password" name="github_token" placeholder="ghp_..."></div>
+					<div class="setup-field"><label for="setup-gh-branch">Branch</label><input id="setup-gh-branch" type="text" name="github_branch" value="main"></div>
 				</div>
 
 				<div style="text-align:center">
 					<button type="submit" class="setup-btn">Finish Setup</button>
-					<p style="margin-top:12px"><a href="<?php echo esc_url( admin_url( 'admin.php?page=noodled' ) ); ?>" style="color:#888;font-size:12px">Skip</a></p>
+					<p style="margin-top:12px"><a href="<?php echo esc_url( admin_url( 'admin.php?page=noodled' ) ); ?>" style="color:#595959;font-size:12px">Skip</a></p>
 				</div>
 			</form>
 		</div>

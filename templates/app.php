@@ -40,7 +40,7 @@
 <div class="toolbar">
   <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu" aria-label="Open menu">&#9776;</button>
   <button class="btn-icon mobile-back" onclick="closeNote()" title="Back" aria-label="Back to notes">&#8592;</button>
-  <span class="logo" onclick="closeNote()" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
+  <span class="logo" onclick="closeNote()" role="button" tabindex="0" aria-label="Close note and go home" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
   <span class="logo-version">v<?php echo NOODLED_VERSION; ?></span>
   <button class="btn btn-sm hide-mobile" id="newNoteBtn" onclick="createNote()" title="New note">+ New Note</button>
   <button class="btn btn-sm hide-mobile" id="addFilesBtn" onclick="uploadFiles()" title="Add files to this note (or a new one)">+ Files</button>
@@ -49,7 +49,7 @@
   <span class="spacer"></span>
   <div class="focus-timer" id="focusTimer">
     <span id="focusTime">25:00</span>
-    <button class="btn btn-sm" onclick="stopFocusTimer()" style="padding:2px 6px;font-size:10px">&#10005;</button>
+    <button class="btn btn-sm" onclick="stopFocusTimer()" aria-label="Stop focus timer" style="padding:2px 6px;font-size:10px">&#10005;</button>
   </div>
   <span class="status" id="status"></span>
   <button class="btn btn-sm" onclick="syncPull()" id="syncPullBtn" title="Sync with GitHub">Sync</button>
@@ -95,13 +95,13 @@
       <span>Notebooks</span>
       <button class="btn-icon btn-sm" onclick="createNotebook()" title="New notebook">+</button>
     </div>
-    <div class="nb-all active" id="nbAll" onclick="selectNotebook(null)">All Notes</div>
+    <div class="nb-all active" id="nbAll" role="button" tabindex="0" aria-label="All notes" onclick="selectNotebook(null)">All Notes</div>
     <div class="nb-list" id="nbList"></div>
     <div style="border-top:1px solid var(--border);margin-top:auto;padding-top:4px">
-      <div class="nb-item" id="nbStarred" onclick="showStarred()">
+      <div class="nb-item" id="nbStarred" role="button" tabindex="0" aria-label="Starred notes" onclick="showStarred()">
         <span class="nb-name">&#9733; Starred</span>
       </div>
-      <div class="nb-item" id="nbTrash" onclick="selectTrash()">
+      <div class="nb-item" id="nbTrash" role="button" tabindex="0" aria-label="Trash" onclick="selectTrash()">
         <span class="nb-name">&#128465; Trash</span>
         <span class="count" id="trashCount">0</span>
       </div>
@@ -140,22 +140,22 @@
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" id="bottomNav">
   <button class="bottom-nav-item" onclick="closeNote(); closeSidebar();">
-    <span class="bottom-nav-icon">&#128196;</span>
+    <span class="bottom-nav-icon" aria-hidden="true">&#128196;</span>
     <span class="bottom-nav-label">Notes</span>
   </button>
   <button class="bottom-nav-item" onclick="document.getElementById('searchInput').focus(); closeNote();">
-    <span class="bottom-nav-icon">&#128269;</span>
+    <span class="bottom-nav-icon" aria-hidden="true">&#128269;</span>
     <span class="bottom-nav-label">Search</span>
   </button>
   <button class="bottom-nav-item bottom-nav-primary" onclick="createNote()" aria-label="New note">
-    <span class="bottom-nav-icon">&#43;</span>
+    <span class="bottom-nav-icon" aria-hidden="true">&#43;</span>
   </button>
   <button class="bottom-nav-item" onclick="syncPull()">
-    <span class="bottom-nav-icon">&#8635;</span>
+    <span class="bottom-nav-icon" aria-hidden="true">&#8635;</span>
     <span class="bottom-nav-label">Sync</span>
   </button>
   <button class="bottom-nav-item" onclick="toggleSidebar()">
-    <span class="bottom-nav-icon">&#9776;</span>
+    <span class="bottom-nav-icon" aria-hidden="true">&#9776;</span>
     <span class="bottom-nav-label">Menu</span>
   </button>
 </nav>
@@ -167,7 +167,7 @@
 <div class="quick-capture" id="quickCapture">
   <input type="text" id="qcInput" placeholder="Quick thought..." aria-label="Quick capture" onkeydown="if(event.key==='Enter'){submitQuickCapture();} if(event.key==='Escape'){toggleQuickCapture();}">
   <button class="btn btn-sm" onclick="submitQuickCapture()">Save</button>
-  <button class="btn btn-sm" onclick="toggleQuickCapture()">&#10005;</button>
+  <button class="btn btn-sm" onclick="toggleQuickCapture()" aria-label="Close quick capture">&#10005;</button>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
