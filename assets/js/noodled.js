@@ -470,6 +470,59 @@ function cycleSort() {
   filterNotes();
 }
 
+// Wrap search-term matches in the open note's body with <mark>, scroll to the
+// first, and clear them the moment the user starts editing. Marks serialize away
+// harmlessly (htmlToMarkdown keeps the text, drops the tag), so it's safe.
+function highlightSearchInBody() {
+  const q = (searchQuery || '').trim();
+  const el = document.getElementById('noteBody');
+  if (!q || !el) return;
+  const toks = q.split(/\s+/).filter(Boolean).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!toks.length) return;
+  const test = new RegExp('(' + toks.join('|') + ')', 'i');
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      if (!n.nodeValue || !test.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+      const p = n.parentNode;
+      if (!p || p.nodeName === 'MARK' || p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE') return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const targets = [];
+  let node;
+  while ((node = walker.nextNode())) targets.push(node);
+  const reg = new RegExp('(' + toks.join('|') + ')', 'gi');
+  targets.forEach(textNode => {
+    const s = textNode.nodeValue;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    reg.lastIndex = 0;
+    while ((m = reg.exec(s))) {
+      if (m.index > last) frag.appendChild(document.createTextNode(s.slice(last, m.index)));
+      const mk = document.createElement('mark');
+      mk.className = 'search-hl';
+      mk.textContent = m[0];
+      frag.appendChild(mk);
+      last = m.index + m[0].length;
+      if (m.index === reg.lastIndex) reg.lastIndex++;
+    }
+    if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+    textNode.parentNode.replaceChild(frag, textNode);
+  });
+  const first = el.querySelector('.search-hl');
+  if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.addEventListener('input', clearSearchHighlights, { once: true });
+}
+
+function clearSearchHighlights() {
+  const el = document.getElementById('noteBody');
+  if (!el) return;
+  el.querySelectorAll('mark.search-hl').forEach(mk => {
+    mk.parentNode.replaceChild(document.createTextNode(mk.textContent), mk);
+  });
+  el.normalize();
+}
+
 function highlightMatch(text, query) {
   if (!query) return esc(text);
   const escaped = esc(text);
@@ -495,6 +548,7 @@ function dateGroup(dateStr) {
 
 function renderNoteList() {
   const el = document.getElementById('noteList');
+  setupNoteSwipe();
   const countEl = document.getElementById('noteCount');
   const q = (document.getElementById('searchInput') || {}).value || '';
   const searching = !!q.trim();
@@ -549,6 +603,50 @@ function emptyListHtml(query) {
     <div class="empty-sub">${esc(__( 'Create your first note to get started.', 'noodled' ))}</div>
     <button class="btn btn-sm btn-accent" style="margin-top:12px" onclick="createNote()">${esc(__( '+ New note', 'noodled' ))}</button>
   </div>`;
+}
+
+// ── Swipe actions on note rows (mobile): right = pin, left = delete ──
+let _swipe = null;
+function setupNoteSwipe() {
+  const list = document.getElementById('noteList');
+  if (!list || list._swipeWired) return;
+  list._swipeWired = true;
+  list.addEventListener('touchstart', (e) => {
+    const row = e.target.closest('.note-item');
+    if (!row || bulkMode) { _swipe = null; return; }
+    const t = e.touches[0];
+    _swipe = { row, id: +row.dataset.noteId, x0: t.clientX, y0: t.clientY, dx: 0, active: false };
+  }, { passive: true });
+  list.addEventListener('touchmove', (e) => {
+    if (!_swipe) return;
+    const t = e.touches[0];
+    const dx = t.clientX - _swipe.x0, dy = t.clientY - _swipe.y0;
+    if (!_swipe.active) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { _swipe = null; return; } // vertical scroll wins
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) _swipe.active = true;
+      else return;
+    }
+    _swipe.dx = dx;
+    const clamped = Math.max(-110, Math.min(110, dx));
+    _swipe.row.style.transition = 'none';
+    _swipe.row.style.transform = `translateX(${clamped}px)`;
+    _swipe.row.classList.toggle('swipe-del', dx < -28);
+    _swipe.row.classList.toggle('swipe-pin', dx > 28);
+    e.preventDefault();
+  }, { passive: false });
+  const end = () => {
+    if (!_swipe) return;
+    const { row, id, dx, active } = _swipe;
+    _swipe = null;
+    row.style.transition = '';
+    row.style.transform = '';
+    row.classList.remove('swipe-del', 'swipe-pin');
+    if (!active) return;
+    if (dx <= -72) { haptic([10, 30, 10]); deleteNote(id); }
+    else if (dx >= 72) { togglePin(id); }
+  };
+  list.addEventListener('touchend', end);
+  list.addEventListener('touchcancel', end);
 }
 
 // Shimmer placeholder rows shown while a notebook's notes load.
@@ -1011,6 +1109,8 @@ function renderContent() {
   updateWordCount();
   renderBacklinks();
   renderAttachmentGallery();
+  // Opened from a search? Briefly highlight the matches in the body.
+  if ((searchQuery || '').trim()) setTimeout(highlightSearchInBody, 40);
   // Fade in transition
   el.classList.remove('note-fade');
   void el.offsetWidth; // trigger reflow
@@ -1971,6 +2071,7 @@ function setOnline(online) {
 // count, else hidden.
 function updateOfflineBanner() {
   const el = document.getElementById('offlineBanner');
+  updateSyncPill();
   if (!el) return;
   const n = saveQueue.length;
   if (!_isOnline) {
@@ -1983,6 +2084,28 @@ function updateOfflineBanner() {
   } else {
     el.classList.remove('show');
   }
+}
+
+// ── Sync-status pill (toolbar): Offline / Saving… / Saved <time ago> ──
+let _saving = false;
+let _lastSavedAt = null;
+let _syncPillTimer = null;
+function markSaved() { _lastSavedAt = Date.now(); _saving = false; updateSyncPill(); }
+function updateSyncPill() {
+  const el = document.getElementById('syncPill');
+  if (!el) return;
+  el.classList.remove('offline', 'saving', 'saved');
+  let label;
+  if (!_isOnline) { el.classList.add('offline'); label = __( 'Offline', 'noodled' ); }
+  else if (_saving || saveQueue.length) { el.classList.add('saving'); label = __( 'Saving…', 'noodled' ); }
+  else {
+    el.classList.add('saved');
+    /* translators: %s is a relative time like "2m ago" */
+    label = _lastSavedAt ? sprintf( __( 'Saved %s', 'noodled' ), relativeTime(new Date(_lastSavedAt).toISOString()) ) : __( 'Saved', 'noodled' );
+  }
+  el.innerHTML = '<span class="sync-dot" aria-hidden="true"></span>' + esc(label);
+  // Keep the "x ago" fresh without spamming work.
+  if (!_syncPillTimer) _syncPillTimer = setInterval(updateSyncPill, 30000);
 }
 
 const SAVE_QUEUE_KEY = 'noodled_save_queue';
@@ -3048,6 +3171,9 @@ function toggleZenMode() {
 let saveIndicatorTimer = null;
 
 function showSaveIndicator(state) {
+  // Drive the toolbar sync pill regardless of whether the inline indicator exists.
+  if (state === 'saving') { _saving = true; updateSyncPill(); }
+  else markSaved();
   const el = document.getElementById('saveIndicator');
   if (!el) return;
   if (state === 'saving') {

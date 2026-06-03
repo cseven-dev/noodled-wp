@@ -936,6 +936,36 @@ body.reading-mode .rendered-content { cursor: default; }
   .save-indicator.saved-flash { animation: none; }
 }
 
+/* ── In-note search highlight (when opened from a search) ── */
+mark.search-hl { background: rgba(245, 200, 66, 0.45); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* ── Swipe actions on note rows (mobile) ── */
+.note-item { position: relative; transition: transform 0.18s ease, background 0.12s ease; }
+.note-item.swipe-del { background: rgba(231, 76, 60, 0.18); }
+.note-item.swipe-pin { background: rgba(59, 130, 246, 0.18); }
+.note-item.swipe-del::after {
+  content: '🗑'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  font-size: 18px; pointer-events: none;
+}
+.note-item.swipe-pin::after {
+  content: '📌'; position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  font-size: 18px; pointer-events: none;
+}
+
+/* ── Sync-status pill ── */
+.sync-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-muted); padding: 3px 8px;
+  border-radius: 12px; white-space: nowrap; user-select: none;
+}
+.sync-pill:empty { display: none; }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.sync-pill.saved .sync-dot { background: #2ecc71; }
+.sync-pill.saving .sync-dot { background: var(--accent); animation: dictPulse 1s ease-in-out infinite; }
+.sync-pill.offline { color: var(--red); }
+.sync-pill.offline .sync-dot { background: var(--red); }
+@media (max-width: 768px) { .sync-pill { display: none; } }
+
 /* ── Dictation "Listening" bar ── */
 .dictation-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;

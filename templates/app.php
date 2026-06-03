@@ -67,6 +67,7 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
     <button class="btn btn-sm" onclick="stopFocusTimer()" aria-label="<?php esc_attr_e( 'Stop focus timer', 'noodled' ); ?>" style="padding:2px 6px;font-size:10px"><span aria-hidden="true">&#10005;</span></button>
   </div>
   <span class="status" id="status"></span>
+  <div class="sync-pill" id="syncPill" aria-live="polite"></div>
   <button class="btn btn-sm" onclick="syncPull()" id="syncPullBtn" title="<?php esc_attr_e( 'Sync with GitHub', 'noodled' ); ?>"><?php esc_html_e( 'Sync', 'noodled' ); ?></button>
   <?php if ( Noodled_Plaud::is_configured() ) : ?>
   <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="<?php esc_attr_e( 'Import Plaud recordings', 'noodled' ); ?>"><?php esc_html_e( 'Plaud', 'noodled' ); ?></button>
