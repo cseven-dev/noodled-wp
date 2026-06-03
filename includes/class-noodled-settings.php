@@ -188,6 +188,7 @@ class Noodled_Settings {
 		$noodle  = '<svg viewBox="0 0 30 30" fill="none" aria-hidden="true" focusable="false"><path d="M5 19 C5 11, 12 8, 15 13 C17 16, 12 20, 11 16 C10 12, 17 9, 21 13 C24 16, 23 21, 26 19" stroke-width="3" stroke-linecap="round"/></svg>';
 		?>
 		<div class="wrap"><div class="nood-admin" data-nood-theme="<?php echo esc_attr( $theme ); ?>">
+			<h1 class="screen-reader-text"><?php echo esc_html( $brand ); ?> dashboard</h1>
 			<div class="nood-bar">
 				<div class="nood-brand"><?php echo $noodle; // phpcs:ignore ?>
 					<span style="display:flex;flex-direction:column;line-height:1.05"><b><?php echo esc_html( $brand ); ?></b><span>control room</span></span>
@@ -197,13 +198,13 @@ class Noodled_Settings {
 				<a class="nood-link" href="<?php echo esc_url( admin_url() ); ?>">WP&nbsp;Admin &#8599;</a>
 			</div>
 			<div class="nood-wrap">
-				<div class="nood-tabs">
+				<nav class="nood-tabs" aria-label="Noodled sections">
 					<?php foreach ( $tabs as $k => $label ) :
 						$url = admin_url( 'admin.php?page=noodled&tab=' . $k );
 						?>
-						<a href="<?php echo esc_url( $url ); ?>" class="<?php echo $tab === $k ? 'active' : ''; ?>"><?php echo esc_html( $label ) . ( $k === 'users' ? $bubble : '' ); ?></a>
+						<a href="<?php echo esc_url( $url ); ?>" class="<?php echo $tab === $k ? 'active' : ''; ?>"<?php echo $tab === $k ? ' aria-current="page"' : ''; ?>><?php echo esc_html( $label ) . ( $k === 'users' ? $bubble : '' ); ?></a>
 					<?php endforeach; ?>
-				</div>
+				</nav>
 				<?php
 				switch ( $tab ) {
 					case 'users':    self::render_user_management(); break;
@@ -260,17 +261,18 @@ class Noodled_Settings {
 			[ 'v' => 'v' . NOODLED_VERSION,             'l' => 'Version' ],
 		];
 		?>
-		<div class="nood-cards">
+		<h2 class="screen-reader-text">At a glance</h2>
+			<div class="nood-cards">
 			<?php foreach ( $cards as $c ) : ?>
 			<div class="noodled-card<?php echo ! empty( $c['hot'] ) ? ' noodled-card--hot' : ''; ?>">
-				<h3<?php echo ! empty( $c['small'] ) ? ' style="font-size:17px"' : ''; ?>><?php echo $c['v']; ?></h3>
+				<div class="noodled-card-value"<?php echo ! empty( $c['small'] ) ? ' style="font-size:17px"' : ''; ?>><?php echo $c['v']; ?></div>
 				<p><?php echo esc_html( $c['l'] ); ?></p>
 			</div>
 			<?php endforeach; ?>
 		</div>
 
 		<div class="nood-panel">
-			<h3>Notes created</h3>
+			<h2>Notes created</h2>
 			<div class="nood-panel-sub">Last 14 days</div>
 			<div class="nood-chart">
 				<?php foreach ( $days as $date => $count ) :

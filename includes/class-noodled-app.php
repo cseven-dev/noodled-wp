@@ -163,7 +163,7 @@ class Noodled_App {
       <button type="button" class="n-login-link lg" onclick="nGotPin()">Already have a PIN? Sign in &rarr;</button>
     </div>
     <div id="nStepPin" style="display:none">
-      <h3>Enter your PIN</h3>
+      <h3 id="nPinTitle">Enter your PIN</h3>
       <div class="sub">The 6-digit code from your noodle email</div>
       <input class="n-login-input" type="email" id="nPinEmail" placeholder="you@example.com" aria-label="Email address">
       <input class="n-login-input n-pin-input" type="text" id="nPin" placeholder="000000" aria-label="6-digit PIN" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
@@ -178,7 +178,7 @@ class Noodled_App {
 let _nEmail='';
 let _nLoginReturn=null;
 function nOpenLogin(){const o=document.getElementById('nLoginOverlay');if(!o)return;_nLoginReturn=document.activeElement;o.classList.add('show');const f=document.getElementById('nEmail');if(f)setTimeout(()=>f.focus(),30);}
-function nShowStep(id){['nStepEmail','nStepPin'].forEach(s=>{const e=document.getElementById(s);if(e)e.style.display=s===id?'block':'none'});document.getElementById('nLoginMsg').textContent='';document.getElementById('nLoginMsg').className='n-login-msg'}
+function nShowStep(id){['nStepEmail','nStepPin'].forEach(s=>{const e=document.getElementById(s);if(e)e.style.display=s===id?'block':'none'});const ov=document.getElementById('nLoginOverlay');if(ov)ov.setAttribute('aria-labelledby',id==='nStepPin'?'nPinTitle':'nLoginTitle');document.getElementById('nLoginMsg').textContent='';document.getElementById('nLoginMsg').className='n-login-msg'}
 function nGotPin(){const e=document.getElementById('nEmail').value.trim();if(e)_nEmail=e;nGotoPin();}
 // Go to the PIN step — only ever ask for the PIN. If we know the email we verify
 // email+PIN; if not, we verify by the PIN alone (same as the magic link).

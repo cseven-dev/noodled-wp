@@ -41,8 +41,8 @@
 
 <!-- Top toolbar — clean and minimal -->
 <header class="toolbar" role="banner">
-  <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu" aria-label="Open menu">&#9776;</button>
-  <button class="btn-icon mobile-back" onclick="closeNote()" title="Back" aria-label="Back to notes">&#8592;</button>
+  <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu" aria-label="Open menu"><span aria-hidden="true">&#9776;</span></button>
+  <button class="btn-icon mobile-back" onclick="closeNote()" title="Back" aria-label="Back to notes"><span aria-hidden="true">&#8592;</span></button>
   <span class="logo" onclick="closeNote()" role="button" tabindex="0" aria-label="Close note and go home" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
   <span class="logo-version">v<?php echo NOODLED_VERSION; ?></span>
   <button class="btn btn-sm hide-mobile" id="newNoteBtn" onclick="createNote()" title="New note">+ New Note</button>
@@ -52,7 +52,7 @@
   <span class="spacer"></span>
   <div class="focus-timer" id="focusTimer">
     <span id="focusTime">25:00</span>
-    <button class="btn btn-sm" onclick="stopFocusTimer()" aria-label="Stop focus timer" style="padding:2px 6px;font-size:10px">&#10005;</button>
+    <button class="btn btn-sm" onclick="stopFocusTimer()" aria-label="Stop focus timer" style="padding:2px 6px;font-size:10px"><span aria-hidden="true">&#10005;</span></button>
   </div>
   <span class="status" id="status"></span>
   <button class="btn btn-sm" onclick="syncPull()" id="syncPullBtn" title="Sync with GitHub">Sync</button>
@@ -60,15 +60,15 @@
   <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="Import Plaud recordings">Plaud</button>
   <?php endif; ?>
   <div class="toolbar-menu-wrap">
-    <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn" aria-label="More actions">&#8942;</button>
-    <div class="toolbar-dropdown" id="appMenu">
+    <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn" aria-label="More actions" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8942;</span></button>
+    <div class="toolbar-dropdown" id="appMenu" role="menu" aria-labelledby="appMenuBtn">
       <?php if ( ! empty( $config['user']['owner'] ) ) : ?>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageUsers()">&#128101; Manage people</div>
-      <div class="dropdown-sep"></div>
+      <div class="dropdown-sep" role="separator"></div>
       <?php endif; ?>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTemplates()">New from template</div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openDailyJournal()">Daily journal</div>
-      <div class="dropdown-sep"></div>
+      <div class="dropdown-sep" role="separator"></div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showFocusOptions()">Focus timer</div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTagCloud()">Browse tags</div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageTags()">Manage tags</div>
@@ -79,14 +79,14 @@
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importEvernote()">Import from Evernote</div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportBackup()">Export backup (.zip)</div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importBackup()">Import backup (.zip)</div>
-      <div class="dropdown-sep"></div>
+      <div class="dropdown-sep" role="separator"></div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showShortcutsHelp()">Keyboard shortcuts</div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTheme()">Toggle theme</div>
-      <div class="dropdown-sep"></div>
+      <div class="dropdown-sep" role="separator"></div>
       <div class="dropdown-item" role="menuitem" tabindex="0" onclick="doLogout()">Logout</div>
     </div>
   </div>
-  <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn" aria-label="Toggle theme">&#9680;</button>
+  <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn" aria-label="Toggle theme"><span aria-hidden="true">&#9680;</span></button>
 </header>
 
 <!-- Main 3-column layout -->
@@ -170,7 +170,7 @@
 <div class="quick-capture" id="quickCapture">
   <input type="text" id="qcInput" placeholder="Quick thought..." aria-label="Quick capture" onkeydown="if(event.key==='Enter'){submitQuickCapture();} if(event.key==='Escape'){toggleQuickCapture();}">
   <button class="btn btn-sm" onclick="submitQuickCapture()">Save</button>
-  <button class="btn btn-sm" onclick="toggleQuickCapture()" aria-label="Close quick capture">&#10005;</button>
+  <button class="btn btn-sm" onclick="toggleQuickCapture()" aria-label="Close quick capture"><span aria-hidden="true">&#10005;</span></button>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>

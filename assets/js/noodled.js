@@ -151,7 +151,12 @@ function applyTheme(mode) {
   config.theme = mode;
   document.documentElement.setAttribute('data-theme', effectiveTheme(mode));
   const btn = document.getElementById('themeBtn');
-  if (btn) { btn.title = 'Theme: ' + mode + ' (click to change)'; btn.innerHTML = mode === 'auto' ? '&#9681;' : (mode === 'light' ? '&#9728;' : '&#9680;'); }
+  if (btn) {
+    btn.title = 'Theme: ' + mode + ' (click to change)';
+    btn.setAttribute('aria-label', 'Theme: ' + mode + '. Click to change.');
+    const glyph = mode === 'auto' ? '&#9681;' : (mode === 'light' ? '&#9728;' : '&#9680;');
+    btn.innerHTML = '<span aria-hidden="true">' + glyph + '</span>';
+  }
 }
 // When in auto mode, follow live OS changes.
 if (_systemDark) { try { _systemDark.addEventListener('change', () => { if (config.theme === 'auto') applyTheme('auto'); }); } catch (e) {} }
@@ -683,17 +688,17 @@ function renderContent() {
              placeholder="Note title" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();document.getElementById(showRawMarkdown?'noteBodyRaw':'noteBody')?.focus();}">
       <span class="save-indicator" id="saveIndicator"></span>
       <div class="editor-actions">
-        <button class="btn btn-sm" onclick="insertBullet()" title="Bullet list">&#9679;</button>
-        <button class="btn btn-sm" onclick="insertChecklistItem()" title="Checklist">&#9744;</button>
-        <button class="btn btn-sm" onclick="insertHeading()" title="Heading">H</button>
-        <span class="toolbar-divider"></span>
-        <button class="btn btn-sm" onclick="copyBody()" title="Copy">&#128203;</button>
-        <button class="btn btn-sm" onclick="uploadFiles()" title="Add files">&#128206;</button>
-        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="Dictate">&#127908;</button>
-        <span class="toolbar-divider"></span>
+        <button class="btn btn-sm" onclick="insertBullet()" title="Bullet list" aria-label="Bullet list"><span aria-hidden="true">&#9679;</span></button>
+        <button class="btn btn-sm" onclick="insertChecklistItem()" title="Checklist" aria-label="Checklist"><span aria-hidden="true">&#9744;</span></button>
+        <button class="btn btn-sm" onclick="insertHeading()" title="Heading" aria-label="Heading">H</button>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <button class="btn btn-sm" onclick="copyBody()" title="Copy" aria-label="Copy note"><span aria-hidden="true">&#128203;</span></button>
+        <button class="btn btn-sm" onclick="uploadFiles()" title="Add files" aria-label="Add files"><span aria-hidden="true">&#128206;</span></button>
+        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="Dictate" aria-label="Dictate"><span aria-hidden="true">&#127908;</span></button>
+        <span class="toolbar-divider" aria-hidden="true"></span>
         <div class="toolbar-menu-wrap">
-          <button class="btn btn-sm" onclick="toggleEditorMenu()" title="More tools">&#8943;</button>
-          <div class="toolbar-dropdown" id="editorMenu">
+          <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="More tools" aria-label="More tools" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
+          <div class="toolbar-dropdown" id="editorMenu" role="menu" aria-labelledby="editorMenuBtn">
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? 'Preview mode' : 'Source mode'}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleFindReplace()">Find & replace</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTOC()">Table of contents</div>
@@ -961,25 +966,30 @@ function armDropdownMenu(menu) {
   menu.setAttribute('role', 'menu');
   const items = menu.querySelectorAll('.dropdown-item');
   items.forEach(it => { it.setAttribute('role', 'menuitem'); it.tabIndex = 0; });
+  menu.querySelectorAll('.dropdown-sep').forEach(s => s.setAttribute('role', 'separator'));
   setTimeout(() => { if (items[0]) items[0].focus(); }, 0);
 }
 
 function toggleAppMenu() {
   const menu = document.getElementById('appMenu');
   if (menu) menu.classList.toggle('show');
+  const open = !!menu?.classList.contains('show');
+  document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', open ? 'true' : 'false');
   // Close on next click
-  if (menu?.classList.contains('show')) {
+  if (open) {
     armDropdownMenu(menu);
-    setTimeout(() => document.addEventListener('click', () => menu.classList.remove('show'), { once: true }), 10);
+    setTimeout(() => document.addEventListener('click', () => { menu.classList.remove('show'); document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', 'false'); }, { once: true }), 10);
   }
 }
 
 function toggleEditorMenu() {
   const menu = document.getElementById('editorMenu');
   if (menu) menu.classList.toggle('show');
-  if (menu?.classList.contains('show')) {
+  const open = !!menu?.classList.contains('show');
+  document.getElementById('editorMenuBtn')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
     armDropdownMenu(menu);
-    setTimeout(() => document.addEventListener('click', () => menu.classList.remove('show'), { once: true }), 10);
+    setTimeout(() => document.addEventListener('click', () => { menu.classList.remove('show'); document.getElementById('editorMenuBtn')?.setAttribute('aria-expanded', 'false'); }, { once: true }), 10);
   }
 }
 
@@ -1840,7 +1850,7 @@ document.addEventListener('paste', e => {
   if (/^https?:\/\/\S+$/.test(text.trim())) {
     e.preventDefault();
     const url = text.trim();
-    document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
+    document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener noreferrer" title="Opens in a new tab">${url}</a>`);
     schedSave();
     return;
   }
@@ -2498,7 +2508,7 @@ function showStats() {
   const heatmap = Object.entries(days).reverse().map(([date, count]) => {
     const pct = Math.round(count / maxActivity * 100);
     const label = date.slice(5);
-    return `<div title="${date}: ${count} notes" style="width:20px;height:20px;border-radius:3px;background:var(--accent);opacity:${Math.max(0.1, pct / 100)}" title="${label}"></div>`;
+    return `<div title="${date}: ${count} notes" aria-label="${date}: ${count} notes" style="width:20px;height:20px;border-radius:3px;background:var(--accent);opacity:${Math.max(0.1, pct / 100)}"></div>`;
   }).join('');
 
   const el = document.getElementById('modalContainer');
