@@ -126,7 +126,10 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
   <!-- Col 2: Note list -->
   <div class="col-notes">
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="<?php esc_attr_e( 'Search notes...', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Search notes', 'noodled' ); ?>" oninput="onSearch()">
+      <span class="search-input-wrap">
+        <input type="text" id="searchInput" placeholder="<?php esc_attr_e( 'Search notes...', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Search notes', 'noodled' ); ?>" oninput="onSearch()">
+        <button class="search-clear" id="searchClear" type="button" onclick="clearSearch()" aria-label="<?php esc_attr_e( 'Clear search', 'noodled' ); ?>" hidden>&#10005;</button>
+      </span>
       <button class="sort-btn" id="sortBtn" onclick="cycleSort()" title="<?php esc_attr_e( 'Change sort order', 'noodled' ); ?>"><?php esc_html_e( 'Modified', 'noodled' ); ?></button>
     </div>
     <div class="pull-indicator" id="pullIndicator">&#8595; <?php esc_html_e( 'Pull to refresh', 'noodled' ); ?></div>

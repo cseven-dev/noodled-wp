@@ -1,7 +1,7 @@
 {
   "name": "Noodled",
   "slug": "noodled",
-  "version": "1.1.109",
+  "version": "1.1.110",
   "download_url": "https://c7.ca/noodled/noodled.zip",
   "author": "Simon",
   "author_homepage": "https://cseven.ca",
@@ -11,9 +11,10 @@
   "requires_php": "8.0",
   "sections": {
     "description": "A full web version of the noodled note-taking app. Markdown notes with rich editing, family sharing, PIN login, GitHub sync, Plaud voice import, and 50+ power tools. Install on any WordPress site.",
-    "changelog": "<h4>1.1.109</h4><ul><li>Security: hardened note rendering against stored XSS in markdown links/images</li><li>Security: attachment uploads now use a strict type allowlist with real content verification (blocks disguised scripts and .htaccess uploads)</li><li>Security: private file proxy sends safer headers and downloads unknown types</li><li>Security: landing-page upload now CSRF-protected</li><li>Fix: attachment gallery no longer disappears after editing actions</li><li>Fix: shared drop folders reuse the same notebook instead of duplicating</li><li>Fix: permanent delete and empty-trash now clean up attachment files</li><li>Fix: dictation no longer errors when a note closes mid-recording</li><li>Accessibility and mobile polish across the app, admin, and landing page</li></ul>"
+    "changelog": "<h4>1.1.110</h4><ul><li>Security: hardened note rendering against stored XSS in markdown links/images</li><li>Security: attachment uploads now use a strict type allowlist with real content verification (blocks disguised scripts and .htaccess uploads)</li><li>Security: private file proxy sends safer headers and downloads unknown types</li><li>Security: landing-page upload now CSRF-protected</li><li>Fix: attachment gallery no longer disappears after editing actions</li><li>Fix: shared drop folders reuse the same notebook instead of duplicating</li><li>Fix: permanent delete and empty-trash now clean up attachment files</li><li>Fix: dictation no longer errors when a note closes mid-recording</li><li>Accessibility and mobile polish across the app, admin, and landing page</li></ul>"
   }
 }
+
 
 
 

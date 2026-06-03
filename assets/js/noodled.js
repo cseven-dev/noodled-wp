@@ -226,6 +226,7 @@ async function selectNotebook(name) {
   viewingStarred = false;
   activeNotebook = name;
   renderNotebooks();
+  renderNoteListSkeleton(); // shimmer while the new notebook's notes load
   await loadNotes();
 }
 
@@ -379,7 +380,7 @@ async function renameNotebook(name) {
 
 async function deleteNotebook(name) {
   /* translators: %s is the notebook name */
-  if (!confirm(sprintf( __( 'Delete notebook "%s" and all its notes?', 'noodled' ), name ))) return;
+  if (!(await showConfirm(sprintf( __( 'Delete notebook "%s" and all its notes?', 'noodled' ), name ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   await api.delete_notebook(name);
   if (activeNotebook === name) activeNotebook = null;
   activeNote = null;
@@ -456,7 +457,10 @@ function filterNotes() {
   renderNoteList();
 }
 
-function onSearch() { filterNotes(); }
+function onSearch() { updateSearchClear(); filterNotes(); }
+
+// Light haptic tap on supported devices (mobile). Silently no-ops elsewhere.
+function haptic(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern || 8); } catch (e) {} }
 
 function cycleSort() {
   const modes = ['modified', 'created', 'alpha'];
@@ -491,6 +495,20 @@ function dateGroup(dateStr) {
 
 function renderNoteList() {
   const el = document.getElementById('noteList');
+  const countEl = document.getElementById('noteCount');
+  const q = (document.getElementById('searchInput') || {}).value || '';
+  const searching = !!q.trim();
+
+  const setCount = (n) => { if (countEl) countEl.textContent = searching
+    ? sprintf( _n( '%d result', '%d results', n, 'noodled' ), n )
+    : sprintf( _n( '%d note', '%d notes', n, 'noodled' ), n ); };
+
+  if (!filteredNotes.length) {
+    el.innerHTML = emptyListHtml(q.trim());
+    setCount(0);
+    return;
+  }
+
   const cover = activeNotebook ? getNotebookCover(activeNotebook) : '';
   const coverHtml = cover ? `<div class="nb-cover" style="background-image:url('${cover}')"></div>` : '';
   // Group by date when browsing (not searching, default sort, not trash).
@@ -505,7 +523,57 @@ function renderNoteList() {
     out.push(renderNoteItem(n));
   });
   el.innerHTML = coverHtml + out.join('');
-  document.getElementById('noteCount').textContent = sprintf( _n( '%d note', '%d notes', filteredNotes.length, 'noodled' ), filteredNotes.length );
+  setCount(filteredNotes.length);
+}
+
+// Context-aware empty state for the note list.
+function emptyListHtml(query) {
+  if (query) {
+    return `<div class="empty-state list-empty">
+      <div class="empty-icon" aria-hidden="true">&#128269;</div>
+      <div class="empty-title">${esc(__( 'No matching notes', 'noodled' ))}</div>
+      <div class="empty-sub">${esc(sprintf( __( 'Nothing matches "%s".', 'noodled' ), query ))}</div>
+      <button class="btn btn-sm" style="margin-top:12px" onclick="clearSearch()">${esc(__( 'Clear search', 'noodled' ))}</button>
+    </div>`;
+  }
+  if (viewingTrash) {
+    return `<div class="empty-state list-empty"><div class="empty-icon" aria-hidden="true">&#128465;</div><div class="empty-title">${esc(__( 'Trash is empty', 'noodled' ))}</div><div class="empty-sub">${esc(__( 'Deleted notes show up here.', 'noodled' ))}</div></div>`;
+  }
+  const where = activeNotebook
+    /* translators: %s is the notebook name */
+    ? sprintf( __( 'No notes in %s yet', 'noodled' ), activeNotebook )
+    : __( 'No notes yet', 'noodled' );
+  return `<div class="empty-state list-empty">
+    <div class="empty-icon" aria-hidden="true">&#127837;</div>
+    <div class="empty-title">${esc(where)}</div>
+    <div class="empty-sub">${esc(__( 'Create your first note to get started.', 'noodled' ))}</div>
+    <button class="btn btn-sm btn-accent" style="margin-top:12px" onclick="createNote()">${esc(__( '+ New note', 'noodled' ))}</button>
+  </div>`;
+}
+
+// Shimmer placeholder rows shown while a notebook's notes load.
+function renderNoteListSkeleton() {
+  const el = document.getElementById('noteList');
+  if (!el) return;
+  let rows = '';
+  for (let i = 0; i < 7; i++) {
+    rows += '<div class="skel-row"><div class="skel-line skel-title"></div><div class="skel-line skel-meta"></div><div class="skel-line skel-prev"></div></div>';
+  }
+  el.innerHTML = rows;
+}
+
+function clearSearch() {
+  const inp = document.getElementById('searchInput');
+  if (inp) inp.value = '';
+  searchQuery = '';
+  updateSearchClear();
+  filterNotes();
+}
+
+function updateSearchClear() {
+  const inp = document.getElementById('searchInput');
+  const btn = document.getElementById('searchClear');
+  if (inp && btn) btn.hidden = !inp.value.trim();
 }
 
 function renderNoteItem(n) {
@@ -627,6 +695,7 @@ async function createNote() {
 function quickAddOpen() {
   const c = document.getElementById('quickAddContainer');
   if (!c || c.dataset.open === '1') return;
+  haptic();
   const items = [
     { icon: '📝', label: __( 'New note', 'noodled' ),         sub: __( 'Blank note', 'noodled' ),        run: quickAddNote },
     { icon: '📎', label: __( 'Photo or document', 'noodled' ), sub: __( 'Upload files', 'noodled' ),      run: quickAddFiles },
@@ -782,10 +851,16 @@ function showNoteContext(event, noteId) {
 }
 
 async function togglePin(noteId) {
-  const note = filteredNotes.find(n => n.id === noteId);
+  const note = notes.find(n => n.id === noteId) || filteredNotes.find(n => n.id === noteId);
   if (!note) return;
-  await api.toggle_pin(note.notebook, noteId);
-  await loadNotes();
+  const prev = !!note.pinned;
+  // Optimistic: flip locally and re-sort instantly (notes/filteredNotes share
+  // object refs), then reconcile with the server in the background.
+  note.pinned = !prev;
+  haptic();
+  filterNotes();
+  try { await api.toggle_pin(note.notebook, noteId); }
+  catch (e) { note.pinned = prev; filterNotes(); showToast(__( 'Could not update pin', 'noodled' )); }
 }
 
 async function copyNoteText(noteId) {
@@ -811,13 +886,28 @@ async function deleteNote(noteId) {
 }
 
 async function moveNote(noteId, toNotebook) {
-  const note = filteredNotes.find(n => n.id === noteId);
+  const note = notes.find(n => n.id === noteId) || filteredNotes.find(n => n.id === noteId);
   if (!note) return;
-  await api.move_note(note.notebook, noteId, toNotebook);
-  await loadNotebooks();
-  await loadNotes();
-  /* translators: %s is the destination notebook name */
-  showToast(sprintf( __( 'Moved to %s', 'noodled' ), toNotebook ));
+  const fromNotebook = note.notebook;
+  if (fromNotebook === toNotebook) return;
+  // Optimistic: drop the row from the current notebook view immediately (unless
+  // we're in an All/Search view that still includes it), then reconcile.
+  if (activeNotebook && activeNotebook !== toNotebook) {
+    notes = notes.filter(n => n.id !== noteId);
+  } else {
+    note.notebook = toNotebook;
+  }
+  filterNotes();
+  try {
+    await api.move_note(fromNotebook, noteId, toNotebook);
+    loadNotebooks(); // refresh notebook counts in the background
+    /* translators: %s is the destination notebook name */
+    showToast(sprintf( __( 'Moved to %s', 'noodled' ), toNotebook ));
+    return;
+  } catch (e) {
+    showToast(__( 'Could not move note', 'noodled' ));
+    await loadNotes();
+  }
 }
 
 async function selectTrash() {
@@ -843,7 +933,7 @@ async function restoreNote(noteId) {
 }
 
 async function permanentDelete(noteId) {
-  if (!confirm(__( 'Permanently delete this note? This cannot be undone.', 'noodled' ))) return;
+  if (!(await showConfirm(__( 'Permanently delete this note? This cannot be undone.', 'noodled' ), { danger: true, okLabel: __( 'Delete permanently', 'noodled' ) }))) return;
   await api.permanent_delete(noteId);
   if (activeNote && activeNote.id === noteId) { activeNote = null; renderContent(); }
   notes = await api.get_trash();
@@ -1184,7 +1274,7 @@ async function deleteCurrentNote() {
   if (!activeNote) return;
   if (typeof dictating !== 'undefined' && dictating) stopDictation();
   /* translators: %s is the note title */
-  if (!confirm(sprintf( __( 'Delete "%s"?', 'noodled' ), activeNote.title ))) return;
+  if (!(await showConfirm(sprintf( __( 'Delete "%s"?', 'noodled' ), activeNote.title ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   const deletedId = activeNote.id;
   await api.delete_note(activeNote.notebook, activeNote.id);
   activeNote = null;
@@ -1444,7 +1534,7 @@ async function createNoteFromFiles(files) {
 
 // Delete an attachment (from a gallery × or the lightbox trash button).
 async function deleteAttachment(id) {
-  if (!confirm(__( 'Delete this attachment?', 'noodled' ))) return;
+  if (!(await showConfirm(__( 'Delete this attachment?', 'noodled' ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   try { await api.delete_attachment(id); }
   catch (e) { showToast(__( 'Delete failed', 'noodled' )); return; }
   if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(a => a.id !== id);
@@ -1547,7 +1637,7 @@ async function renderManageUsers() {
 }
 
 async function muApprove(id) { try { await api.admin_approve(id); } catch (e) { showToast(__( 'Failed', 'noodled' )); } renderManageUsers(); }
-async function muRemove(id) { if (!confirm(__( 'Remove this person? Their notes stay but they lose access.', 'noodled' ))) return; try { await api.admin_delete_user(id); } catch (e) { showToast(__( 'Failed', 'noodled' )); } renderManageUsers(); }
+async function muRemove(id) { if (!(await showConfirm(__( 'Remove this person? Their notes stay but they lose access.', 'noodled' ), { danger: true, okLabel: __( 'Remove', 'noodled' ) }))) return; try { await api.admin_delete_user(id); } catch (e) { showToast(__( 'Failed', 'noodled' )); } renderManageUsers(); }
 async function muDrop(id, on) { try { const r = await api.admin_set_drop(id, on); if (r && r.error) showToast(r.error); } catch (e) { showToast(__( 'Failed', 'noodled' )); } }
 async function muPin(id) {
   const out = document.getElementById('mu-pin-' + id); if (out) out.textContent = '…';
@@ -1575,6 +1665,7 @@ async function muInvite() {
 // ── Checkbox toggle ──
 async function toggleCheck(checkIndex) {
   if (!activeNote) return;
+  haptic();
   const el = document.getElementById('noteBody');
   if (el) activeNote.body = htmlToMarkdown(el);
   const lines = activeNote.body.split('\n');
@@ -1807,6 +1898,34 @@ function showPrompt(title, label, defaultVal = '') {
       if (e.key === 'Enter') window.resolve_modal(inp.value);
       if (e.key === 'Escape') window.resolve_modal(null);
     });
+  });
+}
+
+// Themed confirm dialog (replaces the browser's native confirm()). Resolves true
+// on OK, false on Cancel/Escape/overlay-click.
+function showConfirm(message, opts = {}) {
+  return new Promise(resolve => {
+    const el = document.getElementById('modalContainer');
+    const okLabel = opts.okLabel || __( 'OK', 'noodled' );
+    const cancelLabel = opts.cancelLabel || __( 'Cancel', 'noodled' );
+    const okClass = opts.danger ? 'btn-danger' : 'btn-accent';
+    const done = (val) => { el.innerHTML = ''; document.removeEventListener('keydown', onKey, true); resolve(val); };
+    window.resolve_confirm = done;
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); done(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+    }
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){resolve_confirm(false);}">
+      <div class="confirm-box" role="alertdialog" aria-modal="true" aria-label="${escAttr(message)}">
+        <p>${esc(message)}</p>
+        <div class="modal-buttons">
+          <button class="btn btn-sm" onclick="resolve_confirm(false)">${esc(cancelLabel)}</button>
+          <button class="btn btn-sm ${okClass}" onclick="resolve_confirm(true)">${esc(okLabel)}</button>
+        </div>
+      </div>
+    </div>`;
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(() => { const b = el.querySelector('.btn-accent, .btn-danger'); if (b) b.focus(); }, 0);
   });
 }
 
@@ -2162,7 +2281,7 @@ function toggleBulkSelect(noteId, e) {
 async function bulkDelete() {
   if (!bulkSelected.size) return;
   /* translators: %d is the number of notes selected for deletion */
-  if (!confirm(sprintf( _n( 'Delete %d note?', 'Delete %d notes?', bulkSelected.size, 'noodled' ), bulkSelected.size ))) return;
+  if (!(await showConfirm(sprintf( _n( 'Delete %d note?', 'Delete %d notes?', bulkSelected.size, 'noodled' ), bulkSelected.size ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   for (const id of bulkSelected) {
     const note = notes.find(n => n.id === id);
     if (note) await api.delete_note(note.notebook, id);
@@ -2936,6 +3055,9 @@ function showSaveIndicator(state) {
     el.textContent = '';
   } else {
     el.className = 'save-indicator saved';
+    // Retrigger the little pulse each save.
+    void el.offsetWidth;
+    el.classList.add('saved-flash');
     el.textContent = '✓';
     clearTimeout(saveIndicatorTimer);
     saveIndicatorTimer = setTimeout(() => { el.className = 'save-indicator'; }, 3000);
@@ -3106,7 +3228,7 @@ function closeLightbox() {
 async function deleteLightboxImage() {
   const a = _lbImages[_lbIndex];
   if (!a) return;
-  if (!confirm(__( 'Delete this image?', 'noodled' ))) return;
+  if (!(await showConfirm(__( 'Delete this image?', 'noodled' ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   try { await api.delete_attachment(a.id); }
   catch (e) { showToast(__( 'Delete failed', 'noodled' )); return; }
   if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(x => x.id !== a.id);
@@ -3790,7 +3912,7 @@ async function renameTag(tag) {
 }
 async function deleteTag(tag) {
   /* translators: %s is the tag name */
-  if (!confirm(sprintf( __( 'Remove #%s from all notes? (The notes stay; only the tag is removed.)', 'noodled' ), tag ))) return;
+  if (!(await showConfirm(sprintf( __( 'Remove #%s from all notes? (The notes stay; only the tag is removed.)', 'noodled' ), tag ), { danger: true, okLabel: __( 'Remove', 'noodled' ) }))) return;
   /* translators: %s is the tag name */
   await _rewriteTag(tag, (m, pre) => pre, sprintf( __( 'Removed #%s', 'noodled' ), tag ));
 }
