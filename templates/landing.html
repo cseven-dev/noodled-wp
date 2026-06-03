@@ -464,8 +464,8 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   padding: 30px 32px 28px;
   width: min(420px, 92%);
   margin-left: auto;
-  /* Lean the whole card (text included) so the note matches its own card. */
-  transform: rotate(-18deg);
+  /* Subtle card lean; the note text gets its own extra tilt below. */
+  transform: rotate(-3deg);
 }
 /* fanned-deck look + each new note "lands" on the pile. The backings pivot from
    the top edge so they splay DOWNWARD behind the card — clear of the floating
@@ -479,11 +479,11 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
 .type-card::after  { transform: translate(8px, 26px) rotate(-4deg); }
 .type-card.land { animation: tcLand .52s var(--ease); }
 /* keep the card's -4deg lean through the land animation (no flicker to flat). */
-@keyframes tcLand { from { transform: translateY(-16px) scale(.975) rotate(-18deg); opacity: .55; } to { transform: translateY(0) scale(1) rotate(-18deg); opacity: 1; } }
+@keyframes tcLand { from { transform: translateY(-16px) scale(.975) rotate(-3deg); opacity: .55; } to { transform: translateY(0) scale(1) rotate(-3deg); opacity: 1; } }
 .type-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .type-card__top .tdot { width: 11px; height: 11px; border-radius: 50%; }
 .type-card__title { margin-left: 8px; font-size: 13px; color: var(--slate); font-weight: 600; }
-.type-body { font-size: 16px; line-height: 1.7; min-height: 188px; }
+.type-body { font-size: 16px; line-height: 1.7; min-height: 188px; transform: rotate(-5deg); transform-origin: left center; }
 .type-body h3 { font-family: var(--font-display); font-size: 21px; font-weight: 900; margin: 0 0 8px; letter-spacing: -.01em; }
 .type-body .ti { color: var(--slate); }
 .type-body .tt { display: inline-block; font-size: 12px; font-weight: 600; color: var(--n-blue); background: var(--n-blue-soft); padding: 1px 8px; border-radius: 999px; }
