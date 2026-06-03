@@ -233,6 +233,11 @@ html.dark [data-tip]::before { border-top-color: #20242C; }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; overflow-x: clip; }
+/* Honor the OS "reduce motion" setting: no wiggle, flip, draw, or smooth scroll. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition-duration: .001ms !important; }
+}
 body {
   margin: 0;
   background: var(--paper);
@@ -1188,6 +1193,53 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
     </div>
   </section>
 
+  <!-- ============================ FAQ ============================ -->
+  <style>
+    .faq__list { max-width: 760px; margin: 30px auto 0; }
+    .faq details { border: 1px solid var(--rule); border-radius: 14px; background: var(--white); margin-bottom: 12px; box-shadow: var(--shadow-sm); }
+    .faq summary { cursor: pointer; list-style: none; padding: 17px 20px; font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; color: var(--n-blue); font-size: 24px; line-height: 1; flex: none; transition: transform .2s var(--ease); }
+    .faq details[open] summary::after { transform: rotate(45deg); }
+    .faq summary:focus-visible { outline: 2px solid var(--n-blue); outline-offset: 2px; border-radius: 14px; }
+    .faq__a { padding: 0 20px 18px; color: var(--slate); line-height: 1.62; font-size: 15.5px; }
+    .faq__a b { color: var(--ink); }
+  </style>
+  <section class="faq" id="faq">
+    <div class="wrap">
+      <div class="reveal" style="text-align:center">
+        <span class="eyebrow">Questions, answered straight</span>
+        <h2>The bits people ask</h2>
+      </div>
+      <div class="faq__list reveal d1">
+        <details>
+          <summary>Is it actually free?</summary>
+          <div class="faq__a">Yes. The plugin is free to download and use. No seats, no per-note limits, no trial clock. If we ever add a paid tier it'll be for extras — the core stays free and the plugin never disables itself.</div>
+        </details>
+        <details>
+          <summary>Where do my notes actually live?</summary>
+          <div class="faq__a">On <b>your</b> WordPress install, as plain <b>.md</b> files (with optional bidirectional GitHub sync). No third-party cloud, no lock-in. If Noodled disappeared tomorrow you'd still have every note in a format any editor can open.</div>
+        </details>
+        <details>
+          <summary>Do I need to be technical to set it up?</summary>
+          <div class="faq__a">If you can install a WordPress plugin, you can run Noodled. Upload the zip, activate, and visit <b>/noodled</b>. There's a first-run setup that walks you through the rest.</div>
+        </details>
+        <details>
+          <summary>Does it work offline and on my phone?</summary>
+          <div class="faq__a">Both. It installs as a PWA ("Add to home screen"), reads your previously-opened notes offline, and queues any edits to sync the moment you're back online.</div>
+        </details>
+        <details>
+          <summary>Can my family or team use it too?</summary>
+          <div class="faq__a">Yes — invite people with a one-click PIN email (no passwords). Everyone's notes are private by default; you choose exactly which notebooks or notes to share, and there's no admin "god-view" of other people's notes.</div>
+        </details>
+        <details>
+          <summary>How is this different from Notion or Evernote?</summary>
+          <div class="faq__a">Those are someone else's servers holding your thinking. Noodled is local-first and self-hosted: plain files you own, on infrastructure you control, with the editor power-tools (wiki-links, voice memos, templates, 50+ tools) layered on top — not the other way around.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
   <!-- ============================ FINAL CTA ============================ -->
   <section class="finalcta" id="get">
     <div class="wrap">
@@ -1351,6 +1403,10 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
     const onUpdate = opts.onUpdate || function () {};
     const caret = opts.caret !== false;
     return new Promise((resolve) => {
+      // Reduced motion: drop the whole line in at once, no per-character typing.
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.innerHTML = html; onUpdate(html); return resolve();
+      }
       let i = 0;
       el.innerHTML = "";
       const caretEl = document.createElement("span");
@@ -1441,6 +1497,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
 
     function eraseAll(speed) {
       return new Promise(resolve => {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { body.innerHTML = ""; setCounts(""); return resolve(); }
         (function step() {
           const txt = body.textContent || "";
           if (!txt.length) { body.innerHTML = ""; setCounts(""); return resolve(); }
@@ -1500,6 +1557,7 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
     };
     function eraseAll(speed) {
       return new Promise(resolve => {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { body.innerHTML = ""; setCounts(""); return resolve(); }
         (function step() {
           const txt = body.textContent || "";
           if (!txt.length) { body.innerHTML = ""; setCounts(""); return resolve(); }

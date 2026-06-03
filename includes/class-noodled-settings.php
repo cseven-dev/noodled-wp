@@ -107,6 +107,10 @@ class Noodled_Settings {
 			$clean['require_approval']   = ! empty( $input['require_approval'] ) ? '1' : '';
 		}
 		if ( isset( $input['notify_email'] ) ) $clean['notify_email'] = sanitize_email( $input['notify_email'] );
+		if ( isset( $input['trash_retention'] ) ) {
+			$clean['trash_retention'] = max( 0, (int) $input['trash_retention'] );
+			update_option( 'noodled_trash_retention', $clean['trash_retention'] );
+		}
 
 		// Branding
 		if ( isset( $input['brand_name'] ) )   $clean['brand_name']    = sanitize_text_field( $input['brand_name'] );
@@ -326,6 +330,13 @@ class Noodled_Settings {
 						<td>
 							<input type="email" name="<?php echo self::$option_key; ?>[notify_email]" value="<?php echo esc_attr( $opts['notify_email'] ?? '' ); ?>" class="regular-text" placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
 							<p class="description">Where to email new noodle requests. Defaults to the site admin email.</p>
+						</td>
+					</tr>
+					<tr>
+						<th>Auto-empty Trash</th>
+						<td>
+							<input type="number" min="0" max="3650" name="<?php echo self::$option_key; ?>[trash_retention]" value="<?php echo esc_attr( (int) ( $opts['trash_retention'] ?? 0 ) ); ?>" class="small-text"> days
+							<p class="description">Permanently delete trashed notes (and their attachments) older than this many days. <strong>0 = keep forever</strong>. Runs once a day.</p>
 						</td>
 					</tr>
 				</table>

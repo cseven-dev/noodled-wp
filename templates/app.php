@@ -68,6 +68,7 @@
       <div class="dropdown-sep"></div>
       <div class="dropdown-item" onclick="showFocusOptions()">Focus timer</div>
       <div class="dropdown-item" onclick="showTagCloud()">Browse tags</div>
+      <div class="dropdown-item" onclick="manageTags()">Manage tags</div>
       <div class="dropdown-item" onclick="showLinkGraph()">Note links</div>
       <div class="dropdown-item" onclick="showStats()">Statistics</div>
       <div class="dropdown-item" onclick="toggleQuickCapture()">Quick capture</div>

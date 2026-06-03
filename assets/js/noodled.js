@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     config = { theme: 'dark' };
   }
   applyTheme(config.theme || 'dark');
+  applyReadingPrefs();
 
   try {
     await loadNotebooks();
@@ -371,7 +372,18 @@ async function deleteNotebook(name) {
 
 // ── Notes ──
 async function loadNotes() {
-  notes = await api.get_notes(activeNotebook);
+  try {
+    notes = await api.get_notes(activeNotebook);
+    // Cache for offline reading (keyed by notebook scope).
+    try { localStorage.setItem('noodled_notes_cache', JSON.stringify({ nb: activeNotebook, notes })); } catch (e) {}
+  } catch (e) {
+    // Offline / fetch failed → fall back to the last cached copy so notes stay readable.
+    try {
+      const c = JSON.parse(localStorage.getItem('noodled_notes_cache') || 'null');
+      if (c && c.nb === activeNotebook && Array.isArray(c.notes)) { notes = c.notes; showToast('Offline — showing cached notes'); }
+      else throw e;
+    } catch (_) { throw e; }
+  }
   filterNotes();
 }
 
@@ -504,7 +516,14 @@ async function selectNote(noteId) {
   if (item) item.classList.add('loading');
 
   await doSave();
-  activeNote = await api.get_note(null, noteId);
+  try {
+    activeNote = await api.get_note(null, noteId);
+  } catch (e) {
+    // Offline → read from the cached list copy (body only, no attachments).
+    const c = notes.find(n => n.id === noteId);
+    if (c) { activeNote = { ...c }; showToast('Offline — showing cached note'); }
+    else throw e;
+  }
   trackRecentNote(noteId);
   renderNoteList();
   renderContent();
@@ -687,6 +706,8 @@ function renderContent() {
             <div class="dropdown-sep"></div>
             <div class="dropdown-item" onclick="showHistory()">Version history</div>
             <div class="dropdown-item" onclick="setWordGoal()">Word count goal</div>
+            <div class="dropdown-item" onclick="saveAsTemplate()">Save as template</div>
+            <div class="dropdown-item" onclick="showReadingPrefs()">Reading preferences</div>
             <div class="dropdown-sep"></div>
             <div class="dropdown-item dropdown-danger" onclick="deleteCurrentNote()">Delete note</div>
           </div>
@@ -1401,7 +1422,7 @@ function renderMarkdown(text) {
   if (!text) return '';
   const lines = text.split('\n');
   const out = [];
-  let inCodeBlock = false, codeBuffer = [], inList = false, listType = '';
+  let inCodeBlock = false, codeBuffer = [], inList = false, listType = '', codeLang = '';
 
   function closeList() { if (inList) { out.push(listType === 'check' ? '</ul>' : `</${listType}>`); inList = false; listType = ''; } }
   function escLine(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -1436,8 +1457,8 @@ function renderMarkdown(text) {
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     if (raw.trimStart().startsWith('```')) {
-      if (inCodeBlock) { out.push('<pre><code>' + codeBuffer.map(escLine).join('\n') + '</code></pre>'); codeBuffer = []; inCodeBlock = false; }
-      else { closeList(); inCodeBlock = true; }
+      if (inCodeBlock) { out.push(codeBlockHtml(codeBuffer, codeLang)); codeBuffer = []; inCodeBlock = false; codeLang = ''; }
+      else { closeList(); inCodeBlock = true; codeLang = raw.trim().slice(3).trim(); }
       continue;
     }
     if (inCodeBlock) { codeBuffer.push(raw); continue; }
@@ -1493,7 +1514,7 @@ function renderMarkdown(text) {
     out.push(`<p>${inlineFormat(escLine(raw))}</p>`);
   }
   closeList();
-  if (inCodeBlock) out.push('<pre><code>' + codeBuffer.map(escLine).join('\n') + '</code></pre>');
+  if (inCodeBlock) out.push(codeBlockHtml(codeBuffer, codeLang));
   let html = out.join('\n');
   html = html.replace(/<\/blockquote>\n<blockquote>/g, '<br>');
   html = html.replace(/<\/(h[1-3]|ul|ol|pre|blockquote|hr)>\n<br>\n/g, '</$1>\n');
@@ -2011,7 +2032,7 @@ function showTemplates() {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal"><h3>New from Template</h3>
       <div style="max-height:300px;overflow-y:auto">
-        ${templates.map((t, i) => `<div class="template-item" onclick="createFromTemplate(${i})">${esc(t.name)}</div>`).join('')}
+        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="Delete template" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
@@ -3241,9 +3262,195 @@ function noodledPolishInit() {
   document.addEventListener('keydown', editorSlashKey);
   document.addEventListener('keydown', acNav, true); // capture: handle before the editor's own Enter
   document.addEventListener('input', editorAutocomplete);
+  document.addEventListener('keydown', noteNavKey);   // arrow-key note-list navigation
+  setupInstallPrompt();
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', noodledPolishInit);
 else noodledPolishInit();
+
+/* ============================================================
+   POLISH FEATURES — ROUND 3
+   ============================================================ */
+
+// ── Code blocks: lightweight highlighting + copy button ──────
+function codeBlockHtml(lines, lang) {
+  const code = lines.join('\n');
+  const label = lang ? `<span class="cb-lang">${esc(lang)}</span>` : '<span class="cb-lang"></span>';
+  return `<div class="code-block"><div class="cb-head" contenteditable="false">${label}`
+    + `<button class="cb-copy" type="button" onclick="copyCodeBlock(this)">Copy</button></div>`
+    + `<pre><code>${highlightCode(code)}</code></pre></div>`;
+}
+function highlightCode(code) {
+  const e = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const KW = /^(function|const|let|var|return|if|else|elif|for|while|do|switch|case|break|continue|class|new|this|typeof|instanceof|import|export|from|as|default|async|await|try|catch|finally|throw|extends|super|yield|public|private|protected|static|void|int|string|bool|boolean|float|double|def|lambda|None|True|False|nil|fn|use|pub|mut|match|impl|struct|enum|interface|type|namespace|echo|print|require|require_once|include|foreach|endforeach|endif|endwhile|null|true|false|undefined|in|of|is|not|and|or)$/;
+  const re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b\d[\d_.]*\b)|([A-Za-z_$][\w$]*)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(code))) {
+    out += e(code.slice(last, m.index));
+    if (m[1]) out += `<span class="tok-com">${e(m[1])}</span>`;
+    else if (m[2]) out += `<span class="tok-str">${e(m[2])}</span>`;
+    else if (m[3]) out += `<span class="tok-num">${e(m[3])}</span>`;
+    else out += KW.test(m[4]) ? `<span class="tok-kw">${e(m[4])}</span>` : e(m[4]);
+    last = re.lastIndex;
+  }
+  out += e(code.slice(last));
+  return out;
+}
+function copyCodeBlock(btn) {
+  const block = btn.closest('.code-block');
+  const code = block && block.querySelector('code');
+  if (!code) return;
+  navigator.clipboard.writeText(code.innerText).then(() => {
+    btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1500);
+  }).catch(() => showToast('Copy failed'));
+}
+
+// ── Note-list keyboard navigation (↑/↓ select, Enter open, Del trash) ──
+let _navIndex = -1;
+function noteNavKey(e) {
+  const tag = e.target.tagName;
+  if (e.target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (document.querySelector('#modalContainer .modal-overlay')) return; // a dialog owns the keys
+  if (!filteredNotes.length) return;
+  if (_navIndex >= filteredNotes.length) _navIndex = filteredNotes.length - 1;
+  if (e.key === 'ArrowDown') { e.preventDefault(); _navIndex = Math.min((_navIndex < 0 ? -1 : _navIndex) + 1, filteredNotes.length - 1); paintNav(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _navIndex = Math.max((_navIndex < 0 ? 0 : _navIndex) - 1, 0); paintNav(); }
+  else if (e.key === 'Enter' && _navIndex >= 0) { e.preventDefault(); selectNote(filteredNotes[_navIndex].id); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && _navIndex >= 0) { e.preventDefault(); deleteNote(filteredNotes[_navIndex].id); }
+}
+function paintNav() {
+  document.querySelectorAll('.note-item.nav-focus').forEach(el => el.classList.remove('nav-focus'));
+  const n = filteredNotes[_navIndex]; if (!n) return;
+  const el = document.querySelector(`.note-item[data-note-id="${n.id}"]`);
+  if (el) { el.classList.add('nav-focus'); el.scrollIntoView({ block: 'nearest' }); }
+}
+
+// ── Editor reading preferences ───────────────────────────────
+function applyReadingPrefs() {
+  const p = (config && config.editor_prefs) || {};
+  const root = document.documentElement;
+  root.style.setProperty('--editor-font', (p.size || 16) + 'px');
+  root.style.setProperty('--editor-lh', p.lh || 1.7);
+  document.body.classList.toggle('editor-serif', !!p.serif);
+  document.body.classList.toggle('editor-narrow', !!p.narrow);
+}
+function showReadingPrefs() {
+  const p = (config.editor_prefs = config.editor_prefs || {});
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal" style="min-width:320px"><h3>Reading preferences</h3>
+      <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">Font size</label>
+      <input type="range" id="rpSize" min="13" max="22" step="1" value="${p.size || 16}" style="width:100%">
+      <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">Line height</label>
+      <input type="range" id="rpLh" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
+      <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> Serif body font</label>
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpNarrow" ${p.narrow ? 'checked' : ''}> Narrow reading column</label>
+      <div class="modal-buttons" style="margin-top:16px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Done</button></div>
+    </div></div>`;
+  const upd = () => {
+    p.size = +document.getElementById('rpSize').value;
+    p.lh = +document.getElementById('rpLh').value;
+    p.serif = document.getElementById('rpSerif').checked;
+    p.narrow = document.getElementById('rpNarrow').checked;
+    applyReadingPrefs();
+    clearTimeout(showReadingPrefs._t);
+    showReadingPrefs._t = setTimeout(() => api.set_config('editor_prefs', p).catch(() => {}), 400);
+  };
+  ['rpSize', 'rpLh', 'rpSerif', 'rpNarrow'].forEach(id => document.getElementById(id).addEventListener('input', upd));
+}
+
+// ── Tag manager (rename / delete a tag across all notes) ─────
+function manageTags() {
+  const menu = document.getElementById('appMenu'); if (menu) menu.classList.remove('show');
+  const tags = getAllTags();
+  const counts = {};
+  notes.forEach(n => ((n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []).forEach(t => { const k = t.trim().slice(1); counts[k] = (counts[k] || 0) + 1; }));
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal" style="min-width:360px"><h3>Manage tags</h3>
+      <div style="max-height:50vh;overflow:auto">${tags.length ? tags.map(t => `
+        <div class="mt-row" style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)">
+          <span style="flex:1">#${esc(t)} <span style="color:var(--text-muted);font-size:11px">${counts[t] || 0}</span></span>
+          <button class="btn btn-sm" onclick="renameTag('${esc(t)}')">Rename</button>
+          <button class="btn btn-sm" style="color:var(--red)" onclick="deleteTag('${esc(t)}')">Delete</button>
+        </div>`).join('') : '<p style="color:var(--text-muted);font-size:13px">No tags yet.</p>'}</div>
+      <div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button></div>
+    </div></div>`;
+}
+function _tagRe(tag) { return new RegExp('(^|\\s)#' + tag.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&') + '(?![\\w-])', 'g'); }
+async function _rewriteTag(tag, replacer, doneMsg) {
+  const hits = notes.filter(n => _tagRe(tag).test(n.body || ''));
+  if (!hits.length) { showToast('No notes use that tag'); return; }
+  document.getElementById('modalContainer').innerHTML = '';
+  showToast(`Updating ${hits.length} note${hits.length !== 1 ? 's' : ''}…`);
+  for (const n of hits) {
+    const body = (n.body || '').replace(_tagRe(tag), replacer);
+    try { await api.save_note(n.notebook, n.id, n.title, body, { force: true }); } catch (e) {}
+  }
+  await loadNotes();
+  if (activeNote && hits.some(h => h.id === activeNote.id)) { try { activeNote = await api.get_note(null, activeNote.id); renderContent(); } catch (e) {} }
+  showToast(doneMsg);
+}
+async function renameTag(tag) {
+  const next = (await showPrompt('Rename tag', 'New name for #' + tag, tag) || '').trim().replace(/^#/, '');
+  if (!next || next === tag) return;
+  const clean = next.replace(/[^\w-]/g, '');
+  await _rewriteTag(tag, (m, pre) => pre + '#' + clean, `Renamed #${tag} → #${clean}`);
+}
+async function deleteTag(tag) {
+  if (!confirm(`Remove #${tag} from all notes? (The notes stay; only the tag is removed.)`)) return;
+  await _rewriteTag(tag, (m, pre) => pre, `Removed #${tag}`);
+}
+
+// ── Save the current note as a reusable template ─────────────
+async function saveAsTemplate() {
+  if (!activeNote) { showToast('Open a note first'); return; }
+  const name = (await showPrompt('Save as template', 'Template name:', activeNote.title || '') || '').trim();
+  if (!name) return;
+  const tpls = (config.templates && config.templates.length) ? config.templates.slice() : defaultTemplates.slice();
+  tpls.push({ name, body: activeNote.body || '', custom: true });
+  config.templates = tpls;
+  api.set_config('templates', tpls).catch(() => {});
+  showToast('Template saved');
+}
+function deleteTemplate(i) {
+  const tpls = (config.templates && config.templates.length) ? config.templates.slice() : defaultTemplates.slice();
+  if (!tpls[i]) return;
+  tpls.splice(i, 1);
+  config.templates = tpls;
+  api.set_config('templates', tpls).catch(() => {});
+  showTemplates();
+}
+
+// ── PWA install prompt ───────────────────────────────────────
+let _deferredInstall = null;
+function setupInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    _deferredInstall = e;
+    if (localStorage.getItem('noodled_install_dismissed')) return;
+    showInstallBanner();
+  });
+  window.addEventListener('appinstalled', () => { hideInstallBanner(); _deferredInstall = null; });
+}
+function showInstallBanner() {
+  let b = document.getElementById('installBanner');
+  if (!b) { b = document.createElement('div'); b.id = 'installBanner'; b.className = 'install-banner'; document.body.appendChild(b); }
+  b.innerHTML = `<span>Install ${esc(noodledConfig.brandName || 'noodled')} for quick access &amp; offline notes</span>
+    <button class="btn btn-sm btn-accent" id="installYes">Install</button>
+    <button class="btn btn-sm" id="installNo">Not now</button>`;
+  b.querySelector('#installYes').onclick = doInstall;
+  b.querySelector('#installNo').onclick = () => { localStorage.setItem('noodled_install_dismissed', '1'); hideInstallBanner(); };
+  b.classList.add('show');
+}
+function hideInstallBanner() { const b = document.getElementById('installBanner'); if (b) b.classList.remove('show'); }
+async function doInstall() {
+  if (!_deferredInstall) return;
+  _deferredInstall.prompt();
+  try { await _deferredInstall.userChoice; } catch (e) {}
+  _deferredInstall = null; hideInstallBanner();
+}
 
 /* ── Undo-delete toast ─────────────────────────────────────── */
 function showUndoToast(msg, onUndo) {

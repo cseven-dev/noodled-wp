@@ -1338,6 +1338,40 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 
 .cmdp-head { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); padding: 12px 14px 4px; }
 
+/* ── Code blocks: highlight + copy ── */
+.code-block { position: relative; margin: 12px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg-content, #16181c); }
+.code-block .cb-head { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; background: rgba(127,127,127,.08); border-bottom: 1px solid var(--border); }
+.code-block .cb-lang { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.code-block .cb-copy { font-size: 11px; padding: 2px 9px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; }
+.code-block .cb-copy:hover { color: var(--text); border-color: var(--accent); }
+.code-block pre { margin: 0; padding: 12px 14px; overflow-x: auto; }
+.code-block code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.55; }
+.tok-kw { color: #c792ea; } .tok-str { color: #c3e88d; } .tok-num { color: #f78c6c; } .tok-com { color: var(--text-muted); font-style: italic; }
+[data-theme="light"] .tok-kw { color: #8e24aa; } [data-theme="light"] .tok-str { color: #2e7d32; } [data-theme="light"] .tok-num { color: #d84315; }
+
+/* ── Keyboard-focused note in the list ── */
+.note-item.nav-focus { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }
+
+/* ── PWA install banner ── */
+.install-banner {
+  position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%) translateY(16px);
+  z-index: 11500; display: none; align-items: center; gap: 12px; max-width: 92vw;
+  background: var(--bg-panel, #1c1f26); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.5); font-size: 13px;
+}
+.install-banner.show { display: inline-flex; animation: undoIn .2s ease forwards; }
+
+/* ── Editor reading preferences ── */
+.rendered-content, .raw-markdown { font-size: var(--editor-font, 16px); line-height: var(--editor-lh, 1.7); }
+body.editor-serif .rendered-content, body.editor-serif .raw-markdown { font-family: Georgia, 'Times New Roman', serif; }
+body.editor-narrow .content-body { max-width: 720px; margin-left: auto; margin-right: auto; }
+
+/* ── Respect reduced-motion: kill non-essential animation ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  .splash-loader, .gal-spinner { animation: none !important; }
+}
+
 /* ── Print / Save as PDF a single note ── */
 #printArea { display: none; }
 @media print {

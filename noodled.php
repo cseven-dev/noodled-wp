@@ -3,7 +3,7 @@
  * Plugin Name: Noodled
  * Plugin URI:  https://github.com/cseven-dev/noodled-wp
  * Description: A full web version of the noodled note-taking app with family sharing, magic-link login, and GitHub sync.
- * Version:     1.1.95
+ * Version:     1.1.96
  * Author:      Simon
  * License:     GPL-2.0-or-later
  * Text Domain: noodled
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // "Cannot redeclare class" and a 500 on every page.
 if ( defined( 'NOODLED_VERSION' ) ) return;
 
-define( 'NOODLED_VERSION', '1.1.95' );
+define( 'NOODLED_VERSION', '1.1.96' );
 define( 'NOODLED_FILE', __FILE__ );
 define( 'NOODLED_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NOODLED_URL', plugin_dir_url( __FILE__ ) );
@@ -118,11 +118,36 @@ function noodled_init() {
 		Noodled_REST::init();
 		Noodled_Sync::init();
 		Noodled_Auth::init();
+
+		// Daily trash auto-empty (no-op unless an admin sets a retention period).
+		if ( ! wp_next_scheduled( 'noodled_daily_cleanup' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'noodled_daily_cleanup' );
+		}
 	} catch ( \Throwable $e ) {
 		noodled_fail_safe( $e, 'init' );
 	}
 }
 add_action( 'plugins_loaded', 'noodled_init' );
+
+/**
+ * Permanently delete notes that have sat in the trash longer than the admin's
+ * configured retention period (and their attachment files/rows). Disabled by
+ * default (0 days = keep forever).
+ */
+add_action( 'noodled_daily_cleanup', 'noodled_run_cleanup' );
+function noodled_run_cleanup() {
+	$days = (int) get_option( 'noodled_trash_retention', 0 );
+	if ( $days <= 0 ) return;
+	global $wpdb;
+	$t      = $wpdb->prefix . 'noodled_notes';
+	$cutoff = gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS );
+	$ids    = $wpdb->get_col( $wpdb->prepare(
+		"SELECT id FROM {$t} WHERE deleted_at IS NOT NULL AND deleted_at < %s", $cutoff
+	) );
+	foreach ( $ids as $id ) {
+		Noodled_Notes::permanent_delete( (int) $id );
+	}
+}
 
 /**
  * One-time migration to per-user-private noodles:
@@ -184,4 +209,5 @@ function noodled_activate() {
 register_deactivation_hook( __FILE__, 'noodled_deactivate' );
 function noodled_deactivate() {
 	flush_rewrite_rules();
+	wp_clear_scheduled_hook( 'noodled_daily_cleanup' );
 }
