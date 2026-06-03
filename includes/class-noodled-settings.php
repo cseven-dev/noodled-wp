@@ -360,17 +360,17 @@ class Noodled_Settings {
 				<?php settings_fields( 'noodled_branding' ); ?>
 				<table class="form-table">
 					<tr>
-						<th>App Name</th>
-						<td><input type="text" name="<?php echo self::$option_key; ?>[brand_name]" value="<?php echo esc_attr( $opts['brand_name'] ?? 'noodled' ); ?>" class="regular-text"></td>
+						<th><label for="noodled-brand-name">App Name</label></th>
+						<td><input type="text" id="noodled-brand-name" name="<?php echo self::$option_key; ?>[brand_name]" value="<?php echo esc_attr( $opts['brand_name'] ?? 'noodled' ); ?>" class="regular-text"></td>
 					</tr>
 					<tr>
-						<th>Tagline</th>
-						<td><input type="text" name="<?php echo self::$option_key; ?>[brand_tagline]" value="<?php echo esc_attr( $opts['brand_tagline'] ?? 'Your notes, everywhere' ); ?>" class="regular-text"></td>
+						<th><label for="noodled-brand-tagline">Tagline</label></th>
+						<td><input type="text" id="noodled-brand-tagline" name="<?php echo self::$option_key; ?>[brand_tagline]" value="<?php echo esc_attr( $opts['brand_tagline'] ?? 'Your notes, everywhere' ); ?>" class="regular-text"></td>
 					</tr>
 					<tr>
-						<th>Accent Color</th>
+						<th><label for="noodled-accent-color">Accent Color</label></th>
 						<td>
-							<input type="color" name="<?php echo self::$option_key; ?>[accent_color]" value="<?php echo esc_attr( $opts['accent_color'] ?? '#0078d4' ); ?>" style="width:60px;height:34px;padding:2px;cursor:pointer">
+							<input type="color" id="noodled-accent-color" name="<?php echo self::$option_key; ?>[accent_color]" value="<?php echo esc_attr( $opts['accent_color'] ?? '#0078d4' ); ?>" style="width:60px;height:34px;padding:2px;cursor:pointer">
 							<span style="color:#666;margin-left:8px">Default: #0078d4</span>
 						</td>
 					</tr>
@@ -383,7 +383,7 @@ class Noodled_Settings {
 							<?php else : ?>
 								<p style="margin-bottom:8px">Upload an HTML file to show as a landing page for visitors.</p>
 							<?php endif; ?>
-							<input type="file" name="landing_html" accept=".html,.htm">
+							<input type="file" name="landing_html" accept=".html,.htm" aria-label="Upload landing page HTML file">
 							<?php wp_nonce_field( 'noodled_landing_upload', 'noodled_landing_nonce' ); ?>
 							<p class="description">A login modal is automatically injected.</p>
 						</td>
@@ -558,7 +558,7 @@ class Noodled_Settings {
 				<p>Export your notes from Evernote desktop as an <code>.enex</code> file, then upload it here. Members can also import their own from inside the app (toolbar &rarr; Import).</p>
 				<form method="post" enctype="multipart/form-data">
 					<?php wp_nonce_field( 'noodled_evernote_import' ); ?>
-					<input type="file" name="enex_file" accept=".enex" style="margin-right:8px">
+					<input type="file" name="enex_file" accept=".enex" aria-label="Choose Evernote .enex file to import" style="margin-right:8px">
 					<button type="submit" class="button button-primary">Import</button>
 				</form>
 				<p class="description" style="margin-top:8px">Notes are created in an "Evernote Import" notebook (or grouped by first tag). Attachments, checklists, and tables are converted. Duplicates are skipped.</p>
@@ -615,11 +615,11 @@ class Noodled_Settings {
 			<form method="post" action="options.php">
 				<?php settings_fields( 'noodled_sync' ); ?>
 				<table class="form-table">
-					<tr><th>Repository Owner</th><td><input type="text" name="<?php echo self::$option_key; ?>[github_owner]" value="<?php echo esc_attr( $opts['github_owner'] ?? '' ); ?>" class="regular-text"></td></tr>
-					<tr><th>Repository Name</th><td><input type="text" name="<?php echo self::$option_key; ?>[github_repo]" value="<?php echo esc_attr( $opts['github_repo'] ?? 'noodled-notes' ); ?>" class="regular-text"></td></tr>
-					<tr><th>Personal Access Token</th><td><input type="password" name="<?php echo self::$option_key; ?>[github_token]" value="<?php echo esc_attr( $opts['github_token'] ?? '' ); ?>" class="regular-text"></td></tr>
-					<tr><th>Branch</th><td><input type="text" name="<?php echo self::$option_key; ?>[github_branch]" value="<?php echo esc_attr( $opts['github_branch'] ?? 'main' ); ?>" class="regular-text"></td></tr>
-					<tr><th>Webhook Secret</th><td><input type="password" name="<?php echo self::$option_key; ?>[webhook_secret]" value="<?php echo esc_attr( $opts['webhook_secret'] ?? '' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-owner">Repository Owner</label></th><td><input type="text" id="noodled-gh-owner" name="<?php echo self::$option_key; ?>[github_owner]" value="<?php echo esc_attr( $opts['github_owner'] ?? '' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-repo">Repository Name</label></th><td><input type="text" id="noodled-gh-repo" name="<?php echo self::$option_key; ?>[github_repo]" value="<?php echo esc_attr( $opts['github_repo'] ?? 'noodled-notes' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-token">Personal Access Token</label></th><td><input type="password" id="noodled-gh-token" name="<?php echo self::$option_key; ?>[github_token]" value="<?php echo esc_attr( $opts['github_token'] ?? '' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-branch">Branch</label></th><td><input type="text" id="noodled-gh-branch" name="<?php echo self::$option_key; ?>[github_branch]" value="<?php echo esc_attr( $opts['github_branch'] ?? 'main' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-webhook-secret">Webhook Secret</label></th><td><input type="password" id="noodled-webhook-secret" name="<?php echo self::$option_key; ?>[webhook_secret]" value="<?php echo esc_attr( $opts['webhook_secret'] ?? '' ); ?>" class="regular-text"></td></tr>
 				</table>
 				<?php submit_button( 'Save Sync Settings' ); ?>
 			</form>

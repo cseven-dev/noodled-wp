@@ -197,8 +197,8 @@ function renderNotebooks() {
     const label = nb.label || nb.name;
     const active = activeNotebook === name ? ' active' : '';
     const color = nbColors[i % nbColors.length];
-    const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="Shared with you">&#128279;</span>' : '';
-    const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="Read only">&#128274;</span>' : '';
+    const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="Shared with you" aria-hidden="true">&#128279;</span><span class="sr-only">(shared with you)</span>' : '';
+    const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="Read only" aria-hidden="true">&#128274;</span><span class="sr-only">(read only)</span>' : '';
     return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="Notebook ${esc(label)}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
@@ -494,12 +494,15 @@ function renderNoteItem(n) {
     const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${tasks.done} of ${tasks.total} tasks done">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
     const time = relativeTime(n.modified || n.created);
     const fullDate = n.modified || n.created || '';
-    const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
+    const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" aria-label="Select note: ${escAttr(n.title || 'Untitled')}" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
     const noteColor = getNoteColor(n.id);
     const colorStyle = noteColor ? `border-left:3px solid ${noteColor}` : '';
+    // In bulk mode the row contains a real checkbox, so it must NOT be a role=button
+    // (a button can't contain interactive descendants); the checkbox is the control.
+    const rowRole = bulkMode ? '' : `role="button" tabindex="0" aria-label="Open note: ${escAttr(n.title || 'Untitled')}"`;
     return `
       <div class="note-item ${isActive ? 'active' : ''}" data-note-id="${n.id}" style="${colorStyle}"
-           role="button" tabindex="0" aria-label="Open note: ${escAttr(n.title || 'Untitled')}"
+           ${rowRole}
            onclick="${bulkMode ? `toggleBulkSelect(${n.id}, event)` : `handleNoteTap(event, ${n.id})`}"
            oncontextmenu="event.preventDefault(); showNoteContext(event, ${n.id})">
         <div class="title">${checkbox}${pin}${star}${sharedBadge}${highlightMatch(n.title, searchQuery)}${badge}</div>
