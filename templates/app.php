@@ -26,8 +26,11 @@
 </head>
 <body>
 
-<a class="skip-link" href="#colContent">Skip to content</a>
-<h1 class="sr-only"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?> notes</h1>
+<a class="skip-link" href="#colContent"><?php esc_html_e( 'Skip to content', 'noodled' ); ?></a>
+<h1 class="sr-only"><?php
+/* translators: %s is the site/brand name. */
+echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand_name() ) );
+?></h1>
 
 <!-- Splash -->
 <div class="splash" id="splash">
@@ -37,75 +40,75 @@
 </div>
 
 <!-- Offline banner -->
-<div class="offline-banner" id="offlineBanner">You're offline — changes will save when you reconnect</div>
+<div class="offline-banner" id="offlineBanner"><?php esc_html_e( "You're offline — changes will save when you reconnect", 'noodled' ); ?></div>
 
 <!-- Top toolbar — clean and minimal -->
 <header class="toolbar" role="banner">
-  <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="Menu" aria-label="Open menu"><span aria-hidden="true">&#9776;</span></button>
-  <button class="btn-icon mobile-back" onclick="closeNote()" title="Back" aria-label="Back to notes"><span aria-hidden="true">&#8592;</span></button>
-  <span class="logo" onclick="closeNote()" role="button" tabindex="0" aria-label="Close note and go home" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
+  <button class="btn-icon mobile-menu" onclick="toggleSidebar()" title="<?php esc_attr_e( 'Menu', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Open menu', 'noodled' ); ?>"><span aria-hidden="true">&#9776;</span></button>
+  <button class="btn-icon mobile-back" onclick="closeNote()" title="<?php esc_attr_e( 'Back', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Back to notes', 'noodled' ); ?>"><span aria-hidden="true">&#8592;</span></button>
+  <span class="logo" onclick="closeNote()" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Close note and go home', 'noodled' ); ?>" style="cursor:pointer"><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></span>
   <span class="logo-version">v<?php echo NOODLED_VERSION; ?></span>
-  <button class="btn btn-sm hide-mobile" id="newNoteBtn" onclick="createNote()" title="New note">+ New Note</button>
-  <button class="btn btn-sm hide-mobile" id="addFilesBtn" onclick="uploadFiles()" title="Add files to this note (or a new one)">+ Files</button>
+  <button class="btn btn-sm hide-mobile" id="newNoteBtn" onclick="createNote()" title="<?php esc_attr_e( 'New note', 'noodled' ); ?>"><?php esc_html_e( '+ New Note', 'noodled' ); ?></button>
+  <button class="btn btn-sm hide-mobile" id="addFilesBtn" onclick="uploadFiles()" title="<?php esc_attr_e( 'Add files to this note (or a new one)', 'noodled' ); ?>"><?php esc_html_e( '+ Files', 'noodled' ); ?></button>
   <input type="file" id="filesInput" multiple style="display:none" onchange="handleFiles(this)">
   <input type="file" id="enexImportInput" accept=".enex" style="display:none" onchange="handleEvernoteImport(this)">
   <span class="spacer"></span>
   <div class="focus-timer" id="focusTimer">
     <span id="focusTime">25:00</span>
-    <button class="btn btn-sm" onclick="stopFocusTimer()" aria-label="Stop focus timer" style="padding:2px 6px;font-size:10px"><span aria-hidden="true">&#10005;</span></button>
+    <button class="btn btn-sm" onclick="stopFocusTimer()" aria-label="<?php esc_attr_e( 'Stop focus timer', 'noodled' ); ?>" style="padding:2px 6px;font-size:10px"><span aria-hidden="true">&#10005;</span></button>
   </div>
   <span class="status" id="status"></span>
-  <button class="btn btn-sm" onclick="syncPull()" id="syncPullBtn" title="Sync with GitHub">Sync</button>
+  <button class="btn btn-sm" onclick="syncPull()" id="syncPullBtn" title="<?php esc_attr_e( 'Sync with GitHub', 'noodled' ); ?>"><?php esc_html_e( 'Sync', 'noodled' ); ?></button>
   <?php if ( Noodled_Plaud::is_configured() ) : ?>
-  <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="Import Plaud recordings">Plaud</button>
+  <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="<?php esc_attr_e( 'Import Plaud recordings', 'noodled' ); ?>"><?php esc_html_e( 'Plaud', 'noodled' ); ?></button>
   <?php endif; ?>
   <div class="toolbar-menu-wrap">
-    <button class="btn-icon" onclick="toggleAppMenu()" title="Menu" id="appMenuBtn" aria-label="More actions" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8942;</span></button>
+    <button class="btn-icon" onclick="toggleAppMenu()" title="<?php esc_attr_e( 'Menu', 'noodled' ); ?>" id="appMenuBtn" aria-label="<?php esc_attr_e( 'More actions', 'noodled' ); ?>" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8942;</span></button>
     <div class="toolbar-dropdown" id="appMenu" role="menu" aria-labelledby="appMenuBtn">
       <?php if ( ! empty( $config['user']['owner'] ) ) : ?>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageUsers()">&#128101; Manage people</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageUsers()">&#128101; <?php esc_html_e( 'Manage people', 'noodled' ); ?></div>
       <div class="dropdown-sep" role="separator"></div>
       <?php endif; ?>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTemplates()">New from template</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openDailyJournal()">Daily journal</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTemplates()"><?php esc_html_e( 'New from template', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openDailyJournal()"><?php esc_html_e( 'Daily journal', 'noodled' ); ?></div>
       <div class="dropdown-sep" role="separator"></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showFocusOptions()">Focus timer</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTagCloud()">Browse tags</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageTags()">Manage tags</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showLinkGraph()">Note links</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showStats()">Statistics</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleQuickCapture()">Quick capture</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="uploadFiles()">Add files</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importEvernote()">Import from Evernote</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportBackup()">Export backup (.zip)</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importBackup()">Import backup (.zip)</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showFocusOptions()"><?php esc_html_e( 'Focus timer', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTagCloud()"><?php esc_html_e( 'Browse tags', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageTags()"><?php esc_html_e( 'Manage tags', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showLinkGraph()"><?php esc_html_e( 'Note links', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showStats()"><?php esc_html_e( 'Statistics', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleQuickCapture()"><?php esc_html_e( 'Quick capture', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="uploadFiles()"><?php esc_html_e( 'Add files', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importEvernote()"><?php esc_html_e( 'Import from Evernote', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportBackup()"><?php esc_html_e( 'Export backup (.zip)', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importBackup()"><?php esc_html_e( 'Import backup (.zip)', 'noodled' ); ?></div>
       <div class="dropdown-sep" role="separator"></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showShortcutsHelp()">Keyboard shortcuts</div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTheme()">Toggle theme</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showShortcutsHelp()"><?php esc_html_e( 'Keyboard shortcuts', 'noodled' ); ?></div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTheme()"><?php esc_html_e( 'Toggle theme', 'noodled' ); ?></div>
       <div class="dropdown-sep" role="separator"></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="doLogout()">Logout</div>
+      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="doLogout()"><?php esc_html_e( 'Logout', 'noodled' ); ?></div>
     </div>
   </div>
-  <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn" aria-label="Toggle theme"><span aria-hidden="true">&#9680;</span></button>
+  <button class="btn-icon" onclick="toggleTheme()" title="<?php esc_attr_e( 'Toggle theme', 'noodled' ); ?>" id="themeBtn" aria-label="<?php esc_attr_e( 'Toggle theme', 'noodled' ); ?>"><span aria-hidden="true">&#9680;</span></button>
 </header>
 
 <!-- Main 3-column layout -->
 <div class="main">
 
   <!-- Col 1: Notebooks -->
-  <nav class="col-notebooks" aria-label="Notebooks">
+  <nav class="col-notebooks" aria-label="<?php esc_attr_e( 'Notebooks', 'noodled' ); ?>">
     <div class="header">
-      <h2 style="margin:0;font:inherit;letter-spacing:inherit;text-transform:inherit">Notebooks</h2>
-      <button class="btn-icon btn-sm" onclick="createNotebook()" title="New notebook">+</button>
+      <h2 style="margin:0;font:inherit;letter-spacing:inherit;text-transform:inherit"><?php esc_html_e( 'Notebooks', 'noodled' ); ?></h2>
+      <button class="btn-icon btn-sm" onclick="createNotebook()" title="<?php esc_attr_e( 'New notebook', 'noodled' ); ?>">+</button>
     </div>
-    <div class="nb-all active" id="nbAll" role="button" tabindex="0" aria-label="All notes" onclick="selectNotebook(null)">All Notes</div>
+    <div class="nb-all active" id="nbAll" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'All notes', 'noodled' ); ?>" onclick="selectNotebook(null)"><?php esc_html_e( 'All Notes', 'noodled' ); ?></div>
     <div class="nb-list" id="nbList"></div>
     <div style="border-top:1px solid var(--border);margin-top:auto;padding-top:4px">
-      <div class="nb-item" id="nbStarred" role="button" tabindex="0" aria-label="Starred notes" onclick="showStarred()">
-        <span class="nb-name">&#9733; Starred</span>
+      <div class="nb-item" id="nbStarred" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Starred notes', 'noodled' ); ?>" onclick="showStarred()">
+        <span class="nb-name">&#9733; <?php esc_html_e( 'Starred', 'noodled' ); ?></span>
       </div>
-      <div class="nb-item" id="nbTrash" role="button" tabindex="0" aria-label="Trash" onclick="selectTrash()">
-        <span class="nb-name">&#128465; Trash</span>
+      <div class="nb-item" id="nbTrash" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Trash', 'noodled' ); ?>" onclick="selectTrash()">
+        <span class="nb-name">&#128465; <?php esc_html_e( 'Trash', 'noodled' ); ?></span>
         <span class="count" id="trashCount">0</span>
       </div>
     </div>
@@ -114,19 +117,19 @@
   <!-- Col 2: Note list -->
   <div class="col-notes">
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Search notes..." aria-label="Search notes" oninput="onSearch()">
-      <button class="sort-btn" id="sortBtn" onclick="cycleSort()" title="Change sort order">Modified</button>
+      <input type="text" id="searchInput" placeholder="<?php esc_attr_e( 'Search notes...', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Search notes', 'noodled' ); ?>" oninput="onSearch()">
+      <button class="sort-btn" id="sortBtn" onclick="cycleSort()" title="<?php esc_attr_e( 'Change sort order', 'noodled' ); ?>"><?php esc_html_e( 'Modified', 'noodled' ); ?></button>
     </div>
-    <div class="pull-indicator" id="pullIndicator">&#8595; Pull to refresh</div>
+    <div class="pull-indicator" id="pullIndicator">&#8595; <?php esc_html_e( 'Pull to refresh', 'noodled' ); ?></div>
     <div class="note-list" id="noteList"></div>
     <div class="note-count" id="noteCount">
-      <button class="btn-icon" onclick="toggleBulkMode()" title="Select multiple" aria-label="Select multiple notes" style="font-size:11px;float:right">&#9745;</button>
+      <button class="btn-icon" onclick="toggleBulkMode()" title="<?php esc_attr_e( 'Select multiple', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Select multiple notes', 'noodled' ); ?>" style="font-size:11px;float:right">&#9745;</button>
     </div>
     <div class="bulk-bar" id="bulkBar">
-      <span><span id="bulkCount">0</span> selected</span>
-      <button class="btn btn-sm" onclick="bulkMove()">Move</button>
-      <button class="btn btn-sm" onclick="bulkDelete()" style="color:var(--red)">Delete</button>
-      <button class="btn btn-sm" onclick="toggleBulkMode()">Cancel</button>
+      <span><span id="bulkCount">0</span> <?php esc_html_e( 'selected', 'noodled' ); ?></span>
+      <button class="btn btn-sm" onclick="bulkMove()"><?php esc_html_e( 'Move', 'noodled' ); ?></button>
+      <button class="btn btn-sm" onclick="bulkDelete()" style="color:var(--red)"><?php esc_html_e( 'Delete', 'noodled' ); ?></button>
+      <button class="btn btn-sm" onclick="toggleBulkMode()"><?php esc_html_e( 'Cancel', 'noodled' ); ?></button>
     </div>
   </div>
 
@@ -134,8 +137,8 @@
   <main class="col-content" id="colContent" tabindex="-1">
     <div class="empty-state" id="emptyState">
       <div class="empty-icon">&#128221;</div>
-      <div class="empty-title">No note selected</div>
-      <div class="empty-sub">Pick a note from the list or create a new one</div>
+      <div class="empty-title"><?php esc_html_e( 'No note selected', 'noodled' ); ?></div>
+      <div class="empty-sub"><?php esc_html_e( 'Pick a note from the list or create a new one', 'noodled' ); ?></div>
     </div>
   </main>
 </div>
@@ -144,22 +147,22 @@
 <nav class="bottom-nav" id="bottomNav">
   <button class="bottom-nav-item" onclick="closeNote(); closeSidebar();">
     <span class="bottom-nav-icon" aria-hidden="true">&#128196;</span>
-    <span class="bottom-nav-label">Notes</span>
+    <span class="bottom-nav-label"><?php esc_html_e( 'Notes', 'noodled' ); ?></span>
   </button>
   <button class="bottom-nav-item" onclick="document.getElementById('searchInput').focus(); closeNote();">
     <span class="bottom-nav-icon" aria-hidden="true">&#128269;</span>
-    <span class="bottom-nav-label">Search</span>
+    <span class="bottom-nav-label"><?php esc_html_e( 'Search', 'noodled' ); ?></span>
   </button>
-  <button class="bottom-nav-item bottom-nav-primary" onclick="createNote()" aria-label="New note">
+  <button class="bottom-nav-item bottom-nav-primary" onclick="createNote()" aria-label="<?php esc_attr_e( 'New note', 'noodled' ); ?>">
     <span class="bottom-nav-icon" aria-hidden="true">&#43;</span>
   </button>
   <button class="bottom-nav-item" onclick="syncPull()">
     <span class="bottom-nav-icon" aria-hidden="true">&#8635;</span>
-    <span class="bottom-nav-label">Sync</span>
+    <span class="bottom-nav-label"><?php esc_html_e( 'Sync', 'noodled' ); ?></span>
   </button>
   <button class="bottom-nav-item" onclick="toggleSidebar()">
     <span class="bottom-nav-icon" aria-hidden="true">&#9776;</span>
-    <span class="bottom-nav-label">Menu</span>
+    <span class="bottom-nav-label"><?php esc_html_e( 'Menu', 'noodled' ); ?></span>
   </button>
 </nav>
 
@@ -168,9 +171,9 @@
 
 <!-- Quick capture -->
 <div class="quick-capture" id="quickCapture">
-  <input type="text" id="qcInput" placeholder="Quick thought..." aria-label="Quick capture" onkeydown="if(event.key==='Enter'){submitQuickCapture();} if(event.key==='Escape'){toggleQuickCapture();}">
-  <button class="btn btn-sm" onclick="submitQuickCapture()">Save</button>
-  <button class="btn btn-sm" onclick="toggleQuickCapture()" aria-label="Close quick capture"><span aria-hidden="true">&#10005;</span></button>
+  <input type="text" id="qcInput" placeholder="<?php esc_attr_e( 'Quick thought...', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Quick capture', 'noodled' ); ?>" onkeydown="if(event.key==='Enter'){submitQuickCapture();} if(event.key==='Escape'){toggleQuickCapture();}">
+  <button class="btn btn-sm" onclick="submitQuickCapture()"><?php esc_html_e( 'Save', 'noodled' ); ?></button>
+  <button class="btn btn-sm" onclick="toggleQuickCapture()" aria-label="<?php esc_attr_e( 'Close quick capture', 'noodled' ); ?>"><span aria-hidden="true">&#10005;</span></button>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>

@@ -46,8 +46,8 @@ class Noodled_Settings {
 		$bubble  = $pending ? ' <span class="awaiting-mod"><span class="pending-count">' . (int) $pending . '</span></span>' : '';
 
 		add_menu_page(
-			'Noodled',
-			'Noodled' . $bubble,
+			__( 'Noodled', 'noodled' ),
+			__( 'Noodled', 'noodled' ) . $bubble,
 			'manage_options',
 			'noodled',
 			[ __CLASS__, 'page_dashboard' ],
@@ -58,19 +58,19 @@ class Noodled_Settings {
 		// Everything (Overview, Users, Branding, Import, Sync, Settings) is a tab on
 		// the single Dashboard page now — no separate submenu items.
 		if ( ! self::is_setup_complete() ) {
-			add_submenu_page( null, 'Setup', 'Setup', 'manage_options', 'noodled-setup', [ __CLASS__, 'render_setup' ] );
+			add_submenu_page( null, __( 'Setup', 'noodled' ), __( 'Setup', 'noodled' ), 'manage_options', 'noodled-setup', [ __CLASS__, 'render_setup' ] );
 		}
 	}
 
 	/** Tab definitions for the Dashboard. */
 	private static function tabs(): array {
 		return [
-			'overview' => 'Overview',
-			'users'    => 'Users',
-			'branding' => 'Branding',
-			'import'   => 'Import',
-			'sync'     => 'Sync',
-			'settings' => 'Settings',
+			'overview' => __( 'Overview', 'noodled' ),
+			'users'    => __( 'Users', 'noodled' ),
+			'branding' => __( 'Branding', 'noodled' ),
+			'import'   => __( 'Import', 'noodled' ),
+			'sync'     => __( 'Sync', 'noodled' ),
+			'settings' => __( 'Settings', 'noodled' ),
 		];
 	}
 
@@ -143,7 +143,7 @@ class Noodled_Settings {
 		$html = file_get_contents( $_FILES['landing_html']['tmp_name'] );
 		if ( $html ) {
 			update_option( 'noodled_landing_html', $html, false );
-			add_settings_error( 'noodled_branding', 'landing_uploaded', 'Landing page uploaded.', 'success' );
+			add_settings_error( 'noodled_branding', 'landing_uploaded', __( 'Landing page uploaded.', 'noodled' ), 'success' );
 		}
 	}
 
@@ -156,7 +156,9 @@ class Noodled_Settings {
 		if ( isset( $result['error'] ) ) {
 			add_settings_error( 'noodled_import', 'import_error', $result['error'], 'error' );
 		} else {
-			add_settings_error( 'noodled_import', 'import_done', "Imported {$result['imported']} notes. Skipped {$result['skipped']} duplicates. {$result['errors']} errors.", 'success' );
+			/* translators: 1: number of notes imported, 2: number of duplicate notes skipped, 3: number of errors */
+			$message = sprintf( __( 'Imported %1$d notes. Skipped %2$d duplicates. %3$d errors.', 'noodled' ), $result['imported'], $result['skipped'], $result['errors'] );
+			add_settings_error( 'noodled_import', 'import_done', $message, 'success' );
 		}
 	}
 
@@ -188,17 +190,20 @@ class Noodled_Settings {
 		$noodle  = '<svg viewBox="0 0 30 30" fill="none" aria-hidden="true" focusable="false"><path d="M5 19 C5 11, 12 8, 15 13 C17 16, 12 20, 11 16 C10 12, 17 9, 21 13 C24 16, 23 21, 26 19" stroke-width="3" stroke-linecap="round"/></svg>';
 		?>
 		<div class="wrap"><div class="nood-admin" data-nood-theme="<?php echo esc_attr( $theme ); ?>">
-			<h1 class="screen-reader-text"><?php echo esc_html( $brand ); ?> dashboard</h1>
+			<h1 class="screen-reader-text"><?php
+				/* translators: %s is the app/brand name */
+				echo esc_html( sprintf( __( '%s dashboard', 'noodled' ), $brand ) );
+			?></h1>
 			<div class="nood-bar">
 				<div class="nood-brand"><?php echo $noodle; // phpcs:ignore ?>
-					<span style="display:flex;flex-direction:column;line-height:1.05"><b><?php echo esc_html( $brand ); ?></b><span>control room</span></span>
+					<span style="display:flex;flex-direction:column;line-height:1.05"><b><?php echo esc_html( $brand ); ?></b><span><?php esc_html_e( 'control room', 'noodled' ); ?></span></span>
 				</div>
 				<div class="nood-spacer"></div>
-				<a class="nood-toggle" href="<?php echo esc_url( add_query_arg( [ 'tab' => $tab, 'nood_theme' => $other ] ) ); ?>"><?php echo $theme === 'dark' ? '&#9728;&#65038; Light' : '&#9789; Dark'; ?></a>
-				<a class="nood-link" href="<?php echo esc_url( admin_url() ); ?>">WP&nbsp;Admin &#8599;</a>
+				<a class="nood-toggle" href="<?php echo esc_url( add_query_arg( [ 'tab' => $tab, 'nood_theme' => $other ] ) ); ?>"><?php echo $theme === 'dark' ? '&#9728;&#65038; ' . esc_html__( 'Light', 'noodled' ) : '&#9789; ' . esc_html__( 'Dark', 'noodled' ); ?></a>
+				<a class="nood-link" href="<?php echo esc_url( admin_url() ); ?>"><?php echo esc_html__( 'WP', 'noodled' ); ?>&nbsp;<?php echo esc_html__( 'Admin', 'noodled' ); ?> &#8599;</a>
 			</div>
 			<div class="nood-wrap">
-				<nav class="nood-tabs" aria-label="Noodled sections">
+				<nav class="nood-tabs" aria-label="<?php esc_attr_e( 'Noodled sections', 'noodled' ); ?>">
 					<?php foreach ( $tabs as $k => $label ) :
 						$url = admin_url( 'admin.php?page=noodled&tab=' . $k );
 						?>
@@ -249,19 +254,19 @@ class Noodled_Settings {
 		$peak = max( 1, max( $days ) );
 
 		$cards = [
-			[ 'v' => $note_count,                       'l' => 'Notes' ],
-			[ 'v' => count( $notebooks ),               'l' => 'Notebooks' ],
-			[ 'v' => count( $users ),                   'l' => 'Users' ],
-			[ 'v' => $pending,                          'l' => 'Pending',      'hot' => $pending > 0 ],
-			[ 'v' => $att_count,                        'l' => 'Attachments' ],
-			[ 'v' => size_format( $att_bytes ) ?: '0 B','l' => 'Storage' ],
-			[ 'v' => $trash_count,                      'l' => 'In Trash' ],
-			[ 'v' => $drop_count,                       'l' => 'Drop folders' ],
-			[ 'v' => $last_sync ? esc_html( $last_sync ) : 'Never', 'l' => 'Last sync', 'small' => true ],
-			[ 'v' => 'v' . NOODLED_VERSION,             'l' => 'Version' ],
+			[ 'v' => $note_count,                       'l' => __( 'Notes', 'noodled' ) ],
+			[ 'v' => count( $notebooks ),               'l' => __( 'Notebooks', 'noodled' ) ],
+			[ 'v' => count( $users ),                   'l' => __( 'Users', 'noodled' ) ],
+			[ 'v' => $pending,                          'l' => __( 'Pending', 'noodled' ),      'hot' => $pending > 0 ],
+			[ 'v' => $att_count,                        'l' => __( 'Attachments', 'noodled' ) ],
+			[ 'v' => size_format( $att_bytes ) ?: '0 B','l' => __( 'Storage', 'noodled' ) ],
+			[ 'v' => $trash_count,                      'l' => __( 'In Trash', 'noodled' ) ],
+			[ 'v' => $drop_count,                       'l' => __( 'Drop folders', 'noodled' ) ],
+			[ 'v' => $last_sync ? esc_html( $last_sync ) : esc_html__( 'Never', 'noodled' ), 'l' => __( 'Last sync', 'noodled' ), 'small' => true ],
+			[ 'v' => 'v' . NOODLED_VERSION,             'l' => __( 'Version', 'noodled' ) ],
 		];
 		?>
-		<h2 class="screen-reader-text">At a glance</h2>
+		<h2 class="screen-reader-text"><?php esc_html_e( 'At a glance', 'noodled' ); ?></h2>
 			<div class="nood-cards">
 			<?php foreach ( $cards as $c ) : ?>
 			<div class="noodled-card<?php echo ! empty( $c['hot'] ) ? ' noodled-card--hot' : ''; ?>">
@@ -272,13 +277,15 @@ class Noodled_Settings {
 		</div>
 
 		<div class="nood-panel">
-			<h2>Notes created</h2>
-			<div class="nood-panel-sub">Last 14 days</div>
+			<h2><?php esc_html_e( 'Notes created', 'noodled' ); ?></h2>
+			<div class="nood-panel-sub"><?php esc_html_e( 'Last 14 days', 'noodled' ); ?></div>
 			<div class="nood-chart">
 				<?php foreach ( $days as $date => $count ) :
 					$h = $count ? max( 6, (int) round( $count / $peak * 80 ) ) : 3;
+					/* translators: 1: date, 2: number of notes created that day */
+					$bar_title = sprintf( _n( '%1$s · %2$d note', '%1$s · %2$d notes', $count, 'noodled' ), $date, $count );
 					?>
-					<div class="bar" title="<?php echo esc_attr( $date . ' · ' . $count . ' notes' ); ?>">
+					<div class="bar" title="<?php echo esc_attr( $bar_title ); ?>">
 						<b><?php echo $count ?: ''; ?></b>
 						<i style="height:<?php echo (int) $h; ?>%"></i>
 						<span><?php echo esc_html( gmdate( 'j', strtotime( $date ) ) ); ?></span>
@@ -287,14 +294,17 @@ class Noodled_Settings {
 			</div>
 		</div>
 
-		<h2>Quick links</h2>
-		<p><a href="<?php echo esc_url( $app_url ); ?>" target="_blank" class="button button-primary">Open App</a>
+		<h2><?php esc_html_e( 'Quick links', 'noodled' ); ?></h2>
+		<p><a href="<?php echo esc_url( $app_url ); ?>" target="_blank" class="button button-primary"><?php esc_html_e( 'Open App', 'noodled' ); ?></a>
 		<?php if ( self::is_homepage_mode() ) : ?>
-			<a href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" class="button">Open Homepage</a>
+			<a href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" class="button"><?php esc_html_e( 'Open Homepage', 'noodled' ); ?></a>
 		<?php endif; ?>
-			<a href="<?php echo esc_url( $preview_url ); ?>" target="_blank" class="button">Preview Landing Page</a>
+			<a href="<?php echo esc_url( $preview_url ); ?>" target="_blank" class="button"><?php esc_html_e( 'Preview Landing Page', 'noodled' ); ?></a>
 		</p>
-		<p class="description">The landing page only shows to logged-out visitors, so use <strong>Preview Landing Page</strong> to see it while signed in.</p>
+		<p class="description"><?php
+			/* translators: %s is the bolded "Preview Landing Page" button label */
+			printf( esc_html__( 'The landing page only shows to logged-out visitors, so use %s to see it while signed in.', 'noodled' ), '<strong>' . esc_html__( 'Preview Landing Page', 'noodled' ) . '</strong>' );
+		?></p>
 		<?php
 	}
 
@@ -309,40 +319,49 @@ class Noodled_Settings {
 				<input type="hidden" name="<?php echo self::$option_key; ?>[_tab]" value="general">
 				<table class="form-table">
 					<tr>
-						<th><label for="noodled-app-path">App URL Path</label></th>
+						<th><label for="noodled-app-path"><?php esc_html_e( 'App URL Path', 'noodled' ); ?></label></th>
 						<td>
 							<input type="text" id="noodled-app-path" name="<?php echo self::$option_key; ?>[app_path]" value="<?php echo esc_attr( $opts['app_path'] ?? 'noodled' ); ?>" class="regular-text">
 							<p class="description"><?php echo esc_html( home_url( '/' ) ); ?><strong><?php echo esc_html( $opts['app_path'] ?? 'noodled' ); ?></strong>/</p>
 						</td>
 					</tr>
 					<tr>
-						<th>Homepage Mode</th>
-						<td><label><input type="checkbox" name="<?php echo self::$option_key; ?>[takeover_homepage]" value="1" <?php checked( ! empty( $opts['takeover_homepage'] ) ); ?>> Use as the site homepage</label></td>
+						<th><?php esc_html_e( 'Homepage Mode', 'noodled' ); ?></th>
+						<td><label><input type="checkbox" name="<?php echo self::$option_key; ?>[takeover_homepage]" value="1" <?php checked( ! empty( $opts['takeover_homepage'] ) ); ?>> <?php esc_html_e( 'Use as the site homepage', 'noodled' ); ?></label></td>
 					</tr>
 					<tr>
-						<th>Registration</th>
+						<th><?php esc_html_e( 'Registration', 'noodled' ); ?></th>
 						<td>
-							<label><input type="checkbox" name="<?php echo self::$option_key; ?>[allow_registration]" value="1" <?php checked( ! empty( $opts['allow_registration'] ) ); ?>> Allow open registration</label><br>
-							<label><input type="checkbox" name="<?php echo self::$option_key; ?>[require_approval]" value="1" <?php checked( ! empty( $opts['require_approval'] ) ); ?>> Require admin approval</label>
-							<p class="description">The landing page's <strong>Get a noodle</strong> button always queues requests for your approval, regardless of these options.</p>
+							<label><input type="checkbox" name="<?php echo self::$option_key; ?>[allow_registration]" value="1" <?php checked( ! empty( $opts['allow_registration'] ) ); ?>> <?php esc_html_e( 'Allow open registration', 'noodled' ); ?></label><br>
+							<label><input type="checkbox" name="<?php echo self::$option_key; ?>[require_approval]" value="1" <?php checked( ! empty( $opts['require_approval'] ) ); ?>> <?php esc_html_e( 'Require admin approval', 'noodled' ); ?></label>
+							<p class="description"><?php
+								/* translators: %s is the bolded "Get a noodle" button label */
+								printf( esc_html__( 'The landing page\'s %s button always queues requests for your approval, regardless of these options.', 'noodled' ), '<strong>' . esc_html__( 'Get a noodle', 'noodled' ) . '</strong>' );
+							?></p>
 						</td>
 					</tr>
 					<tr>
-						<th><label for="noodled-notify-email">Request Notifications</label></th>
+						<th><label for="noodled-notify-email"><?php esc_html_e( 'Request Notifications', 'noodled' ); ?></label></th>
 						<td>
 							<input type="email" id="noodled-notify-email" name="<?php echo self::$option_key; ?>[notify_email]" value="<?php echo esc_attr( $opts['notify_email'] ?? '' ); ?>" class="regular-text" placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
-							<p class="description">Where to email new noodle requests. Defaults to the site admin email.</p>
+							<p class="description"><?php esc_html_e( 'Where to email new noodle requests. Defaults to the site admin email.', 'noodled' ); ?></p>
 						</td>
 					</tr>
 					<tr>
-						<th><label for="noodled-trash-retention">Auto-empty Trash</label></th>
+						<th><label for="noodled-trash-retention"><?php esc_html_e( 'Auto-empty Trash', 'noodled' ); ?></label></th>
 						<td>
-							<input type="number" id="noodled-trash-retention" min="0" max="3650" name="<?php echo self::$option_key; ?>[trash_retention]" value="<?php echo esc_attr( (int) ( $opts['trash_retention'] ?? 0 ) ); ?>" class="small-text"> days
-							<p class="description">Permanently delete trashed notes (and their attachments) older than this many days. <strong>0 = keep forever</strong>. Runs once a day.</p>
+							<input type="number" id="noodled-trash-retention" min="0" max="3650" name="<?php echo self::$option_key; ?>[trash_retention]" value="<?php echo esc_attr( (int) ( $opts['trash_retention'] ?? 0 ) ); ?>" class="small-text"> <?php esc_html_e( 'days', 'noodled' ); ?>
+							<p class="description"><?php
+								/* translators: %s is the bolded "0 = keep forever" note */
+								printf( esc_html__( 'Permanently delete trashed notes (and their attachments) older than this many days. %s. Runs once a day.', 'noodled' ), '<strong>' . esc_html__( '0 = keep forever', 'noodled' ) . '</strong>' );
+							?></p>
 						</td>
 					</tr>
 				</table>
-				<p class="description" style="max-width:700px">Each new member gets their own private <strong>My Notes</strong> notebook. Notes are private by default; users share their own notebooks/notes from inside the app. Admins do not have a god-view of members' notes.</p>
+				<p class="description" style="max-width:700px"><?php
+					/* translators: %s is the bolded "My Notes" notebook name */
+					printf( esc_html__( 'Each new member gets their own private %s notebook. Notes are private by default; users share their own notebooks/notes from inside the app. Admins do not have a god-view of members\' notes.', 'noodled' ), '<strong>' . esc_html__( 'My Notes', 'noodled' ) . '</strong>' );
+				?></p>
 				<?php submit_button(); ?>
 			</form>
 		<?php
@@ -360,32 +379,35 @@ class Noodled_Settings {
 				<?php settings_fields( 'noodled_branding' ); ?>
 				<table class="form-table">
 					<tr>
-						<th><label for="noodled-brand-name">App Name</label></th>
+						<th><label for="noodled-brand-name"><?php esc_html_e( 'App Name', 'noodled' ); ?></label></th>
 						<td><input type="text" id="noodled-brand-name" name="<?php echo self::$option_key; ?>[brand_name]" value="<?php echo esc_attr( $opts['brand_name'] ?? 'noodled' ); ?>" class="regular-text"></td>
 					</tr>
 					<tr>
-						<th><label for="noodled-brand-tagline">Tagline</label></th>
-						<td><input type="text" id="noodled-brand-tagline" name="<?php echo self::$option_key; ?>[brand_tagline]" value="<?php echo esc_attr( $opts['brand_tagline'] ?? 'Your notes, everywhere' ); ?>" class="regular-text"></td>
+						<th><label for="noodled-brand-tagline"><?php esc_html_e( 'Tagline', 'noodled' ); ?></label></th>
+						<td><input type="text" id="noodled-brand-tagline" name="<?php echo self::$option_key; ?>[brand_tagline]" value="<?php echo esc_attr( $opts['brand_tagline'] ?? __( 'Your notes, everywhere', 'noodled' ) ); ?>" class="regular-text"></td>
 					</tr>
 					<tr>
-						<th><label for="noodled-accent-color">Accent Color</label></th>
+						<th><label for="noodled-accent-color"><?php esc_html_e( 'Accent Color', 'noodled' ); ?></label></th>
 						<td>
 							<input type="color" id="noodled-accent-color" name="<?php echo self::$option_key; ?>[accent_color]" value="<?php echo esc_attr( $opts['accent_color'] ?? '#0078d4' ); ?>" style="width:60px;height:34px;padding:2px;cursor:pointer">
-							<span style="color:#666;margin-left:8px">Default: #0078d4</span>
+							<span style="color:#666;margin-left:8px"><?php
+								/* translators: %s is the default accent color hex code */
+								printf( esc_html__( 'Default: %s', 'noodled' ), '#0078d4' );
+							?></span>
 						</td>
 					</tr>
 					<tr>
-						<th>Landing Page</th>
+						<th><?php esc_html_e( 'Landing Page', 'noodled' ); ?></th>
 						<td>
 							<?php if ( $has_landing ) : ?>
-								<p style="color:green;margin-bottom:8px">&#10003; Landing page is set.
-								<button type="button" class="button-link" style="color:#b32d2e" onclick="if(confirm('Remove landing page?')){fetch('<?php echo esc_url( rest_url( 'noodled/v1/admin/landing' ) ); ?>',{method:'DELETE',headers:{'X-WP-Nonce':'<?php echo wp_create_nonce( 'wp_rest' ); ?>'},credentials:'same-origin'}).then(()=>location.reload())}">Remove</button></p>
+								<p style="color:green;margin-bottom:8px">&#10003; <?php esc_html_e( 'Landing page is set.', 'noodled' ); ?>
+								<button type="button" class="button-link" style="color:#b32d2e" onclick="if(confirm('<?php echo esc_js( __( 'Remove landing page?', 'noodled' ) ); ?>')){fetch('<?php echo esc_url( rest_url( 'noodled/v1/admin/landing' ) ); ?>',{method:'DELETE',headers:{'X-WP-Nonce':'<?php echo wp_create_nonce( 'wp_rest' ); ?>'},credentials:'same-origin'}).then(()=>location.reload())}"><?php esc_html_e( 'Remove', 'noodled' ); ?></button></p>
 							<?php else : ?>
-								<p style="margin-bottom:8px">Upload an HTML file to show as a landing page for visitors.</p>
+								<p style="margin-bottom:8px"><?php esc_html_e( 'Upload an HTML file to show as a landing page for visitors.', 'noodled' ); ?></p>
 							<?php endif; ?>
-							<input type="file" name="landing_html" accept=".html,.htm" aria-label="Upload landing page HTML file">
+							<input type="file" name="landing_html" accept=".html,.htm" aria-label="<?php esc_attr_e( 'Upload landing page HTML file', 'noodled' ); ?>">
 							<?php wp_nonce_field( 'noodled_landing_upload', 'noodled_landing_nonce' ); ?>
-							<p class="description">A login modal is automatically injected.</p>
+							<p class="description"><?php esc_html_e( 'A login modal is automatically injected.', 'noodled' ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -404,9 +426,9 @@ class Noodled_Settings {
 		$members = array_values( array_filter( $users, function( $u ) { return $u['role'] !== 'pending'; } ) );
 		?>
 		<?php if ( $pending ) : ?>
-		<h2>Pending requests <span class="awaiting-mod"><span class="pending-count"><?php echo count( $pending ); ?></span></span></h2>
+		<h2><?php esc_html_e( 'Pending requests', 'noodled' ); ?> <span class="awaiting-mod"><span class="pending-count"><?php echo count( $pending ); ?></span></span></h2>
 		<table class="widefat striped" style="max-width:860px;margin-bottom:24px">
-			<thead><tr><th>Email</th><th>Name</th><th>Requested</th><th>Actions</th></tr></thead>
+			<thead><tr><th><?php esc_html_e( 'Email', 'noodled' ); ?></th><th><?php esc_html_e( 'Name', 'noodled' ); ?></th><th><?php esc_html_e( 'Requested', 'noodled' ); ?></th><th><?php esc_html_e( 'Actions', 'noodled' ); ?></th></tr></thead>
 			<tbody>
 			<?php foreach ( $pending as $u ) : ?>
 				<tr>
@@ -414,8 +436,8 @@ class Noodled_Settings {
 					<td><?php echo esc_html( $u['display_name'] ); ?></td>
 					<td><?php echo $u['created_at'] ? esc_html( $u['created_at'] ) : '&mdash;'; ?></td>
 					<td>
-						<button class="button button-primary button-small" onclick="noodledApprove(<?php echo (int) $u['id']; ?>)">Approve</button>
-						<button class="button button-small" onclick="noodledDeny(<?php echo (int) $u['id']; ?>)">Deny</button>
+						<button class="button button-primary button-small" onclick="noodledApprove(<?php echo (int) $u['id']; ?>)"><?php esc_html_e( 'Approve', 'noodled' ); ?></button>
+						<button class="button button-small" onclick="noodledDeny(<?php echo (int) $u['id']; ?>)"><?php esc_html_e( 'Deny', 'noodled' ); ?></button>
 					</td>
 				</tr>
 			<?php endforeach; ?>
@@ -423,9 +445,9 @@ class Noodled_Settings {
 		</table>
 		<?php endif; ?>
 
-		<h2>Members</h2>
+		<h2><?php esc_html_e( 'Members', 'noodled' ); ?></h2>
 		<table class="widefat striped" style="max-width:860px;margin-bottom:16px">
-			<thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Last Login</th><th title="When on, this member gets a folder whose contents are shared with you, shown under their name">Drop folder</th><th>Actions</th></tr></thead>
+			<thead><tr><th><?php esc_html_e( 'Email', 'noodled' ); ?></th><th><?php esc_html_e( 'Name', 'noodled' ); ?></th><th><?php esc_html_e( 'Role', 'noodled' ); ?></th><th><?php esc_html_e( 'Last Login', 'noodled' ); ?></th><th title="<?php esc_attr_e( 'When on, this member gets a folder whose contents are shared with you, shown under their name', 'noodled' ); ?>"><?php esc_html_e( 'Drop folder', 'noodled' ); ?></th><th><?php esc_html_e( 'Actions', 'noodled' ); ?></th></tr></thead>
 			<tbody>
 			<?php foreach ( $members as $u ) :
 				$is_member = $u['role'] === 'member';
@@ -435,35 +457,38 @@ class Noodled_Settings {
 					<td><?php echo esc_html( $u['email'] ); ?></td>
 					<td><?php echo esc_html( $u['display_name'] ); ?></td>
 					<td><?php echo esc_html( $u['role'] ); ?></td>
-					<td><?php echo $u['last_login'] ? esc_html( $u['last_login'] ) : '<em>Never</em>'; ?></td>
+					<td><?php echo $u['last_login'] ? esc_html( $u['last_login'] ) : '<em>' . esc_html__( 'Never', 'noodled' ) . '</em>'; ?></td>
 					<td>
 						<?php if ( $is_member ) : ?>
-							<label><input type="checkbox" <?php checked( (bool) $has_drop ); ?> onchange="noodledToggleDrop(<?php echo (int) $u['id']; ?>, this.checked, this)"> Share</label>
+							<label><input type="checkbox" <?php checked( (bool) $has_drop ); ?> onchange="noodledToggleDrop(<?php echo (int) $u['id']; ?>, this.checked, this)"> <?php esc_html_e( 'Share', 'noodled' ); ?></label>
 						<?php else : ?>
 							&mdash;
 						<?php endif; ?>
 					</td>
 					<td>
-						<button class="button button-small" onclick="noodledSendPin(<?php echo (int) $u['id']; ?>)">Send PIN</button>
+						<button class="button button-small" onclick="noodledSendPin(<?php echo (int) $u['id']; ?>)"><?php esc_html_e( 'Send PIN', 'noodled' ); ?></button>
 						<span class="noodled-pin" id="pin-<?php echo (int) $u['id']; ?>" role="status" aria-live="polite" style="margin:0 6px;font-size:12px"></span>
-						<button class="button button-small" onclick="noodledDeleteUser(<?php echo (int) $u['id']; ?>)">Remove</button>
+						<button class="button button-small" onclick="noodledDeleteUser(<?php echo (int) $u['id']; ?>)"><?php esc_html_e( 'Remove', 'noodled' ); ?></button>
 					</td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>
 		</table>
 
-		<h3>Invite</h3>
+		<h3><?php esc_html_e( 'Invite', 'noodled' ); ?></h3>
 		<div style="display:flex;gap:8px;align-items:center;max-width:860px;margin-bottom:8px;flex-wrap:wrap">
-			<input type="email" id="invite-email" placeholder="Email" aria-label="Invite email" class="regular-text" style="flex:1;min-width:160px">
-			<input type="text" id="invite-name" placeholder="Name (optional)" aria-label="Invite name (optional)" class="regular-text" style="flex:1;min-width:140px">
-			<select id="invite-role" aria-label="Invite role"><option value="member">Member</option><option value="admin">Admin</option></select>
-			<label style="white-space:nowrap"><input type="checkbox" id="invite-drop"> Drop folder</label>
-			<button type="button" class="button button-primary" onclick="noodledInvite()">Invite</button>
+			<input type="email" id="invite-email" placeholder="<?php esc_attr_e( 'Email', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Invite email', 'noodled' ); ?>" class="regular-text" style="flex:1;min-width:160px">
+			<input type="text" id="invite-name" placeholder="<?php esc_attr_e( 'Name (optional)', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Invite name (optional)', 'noodled' ); ?>" class="regular-text" style="flex:1;min-width:140px">
+			<select id="invite-role" aria-label="<?php esc_attr_e( 'Invite role', 'noodled' ); ?>"><option value="member"><?php esc_html_e( 'Member', 'noodled' ); ?></option><option value="admin"><?php esc_html_e( 'Admin', 'noodled' ); ?></option></select>
+			<label style="white-space:nowrap"><input type="checkbox" id="invite-drop"> <?php esc_html_e( 'Drop folder', 'noodled' ); ?></label>
+			<button type="button" class="button button-primary" onclick="noodledInvite()"><?php esc_html_e( 'Invite', 'noodled' ); ?></button>
 		</div>
 		<span id="invite-status" role="status" aria-live="polite"></span>
 
-		<p class="description" style="max-width:860px;margin-top:24px">Notes are private per user. Members share their own notebooks and notes from inside the app. <strong>Drop folder</strong> is the one exception: enabling it gives the member a folder whose contents are shared read/write with you, shown in your account under their name.</p>
+		<p class="description" style="max-width:860px;margin-top:24px"><?php
+			/* translators: %s is the bolded "Drop folder" label */
+			printf( esc_html__( 'Notes are private per user. Members share their own notebooks and notes from inside the app. %s is the one exception: enabling it gives the member a folder whose contents are shared read/write with you, shown in your account under their name.', 'noodled' ), '<strong>' . esc_html__( 'Drop folder', 'noodled' ) . '</strong>' );
+		?></p>
 
 		<script>
 		const _nonce = '<?php echo wp_create_nonce( 'wp_rest' ); ?>';
@@ -554,14 +579,17 @@ class Noodled_Settings {
 		settings_errors( 'noodled_import' );
 		?>
 			<div class="noodled-import-card">
-				<h2>From Evernote (admin)</h2>
-				<p>Export your notes from Evernote desktop as an <code>.enex</code> file, then upload it here. Members can also import their own from inside the app (toolbar &rarr; Import).</p>
+				<h2><?php esc_html_e( 'From Evernote (admin)', 'noodled' ); ?></h2>
+				<p><?php
+					/* translators: %s is the .enex file extension shown in a code tag */
+					printf( esc_html__( 'Export your notes from Evernote desktop as an %s file, then upload it here. Members can also import their own from inside the app (toolbar → Import).', 'noodled' ), '<code>.enex</code>' );
+				?></p>
 				<form method="post" enctype="multipart/form-data">
 					<?php wp_nonce_field( 'noodled_evernote_import' ); ?>
-					<input type="file" name="enex_file" accept=".enex" aria-label="Choose Evernote .enex file to import" style="margin-right:8px">
-					<button type="submit" class="button button-primary">Import</button>
+					<input type="file" name="enex_file" accept=".enex" aria-label="<?php esc_attr_e( 'Choose Evernote .enex file to import', 'noodled' ); ?>" style="margin-right:8px">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Import', 'noodled' ); ?></button>
 				</form>
-				<p class="description" style="margin-top:8px">Notes are created in an "Evernote Import" notebook (or grouped by first tag). Attachments, checklists, and tables are converted. Duplicates are skipped.</p>
+				<p class="description" style="margin-top:8px"><?php esc_html_e( 'Notes are created in an "Evernote Import" notebook (or grouped by first tag). Attachments, checklists, and tables are converted. Duplicates are skipped.', 'noodled' ); ?></p>
 			</div>
 
 			<?php
@@ -569,9 +597,9 @@ class Noodled_Settings {
 			if ( ! empty( $opts['github_owner'] ) && ! empty( $opts['github_token'] ) ) :
 			?>
 			<div class="noodled-import-card" style="margin-top:20px">
-				<h2>From GitHub</h2>
-				<p>Pull all notes from your connected GitHub repository.</p>
-				<button type="button" class="button button-primary" id="noodled-import-btn" onclick="noodledGitImport()">Import from GitHub</button>
+				<h2><?php esc_html_e( 'From GitHub', 'noodled' ); ?></h2>
+				<p><?php esc_html_e( 'Pull all notes from your connected GitHub repository.', 'noodled' ); ?></p>
+				<button type="button" class="button button-primary" id="noodled-import-btn" onclick="noodledGitImport()"><?php esc_html_e( 'Import from GitHub', 'noodled' ); ?></button>
 				<span id="noodled-import-status" role="status" aria-live="polite"></span>
 				<script>
 				async function noodledGitImport() {
@@ -611,26 +639,29 @@ class Noodled_Settings {
 		$opts = get_option( self::$option_key, [] );
 		$webhook_url = rest_url( 'noodled/v1/webhook/github' );
 		?>
-			<h2>GitHub</h2>
+			<h2><?php esc_html_e( 'GitHub', 'noodled' ); ?></h2>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'noodled_sync' ); ?>
 				<table class="form-table">
-					<tr><th><label for="noodled-gh-owner">Repository Owner</label></th><td><input type="text" id="noodled-gh-owner" name="<?php echo self::$option_key; ?>[github_owner]" value="<?php echo esc_attr( $opts['github_owner'] ?? '' ); ?>" class="regular-text"></td></tr>
-					<tr><th><label for="noodled-gh-repo">Repository Name</label></th><td><input type="text" id="noodled-gh-repo" name="<?php echo self::$option_key; ?>[github_repo]" value="<?php echo esc_attr( $opts['github_repo'] ?? 'noodled-notes' ); ?>" class="regular-text"></td></tr>
-					<tr><th><label for="noodled-gh-token">Personal Access Token</label></th><td><input type="password" id="noodled-gh-token" name="<?php echo self::$option_key; ?>[github_token]" value="<?php echo esc_attr( $opts['github_token'] ?? '' ); ?>" class="regular-text"></td></tr>
-					<tr><th><label for="noodled-gh-branch">Branch</label></th><td><input type="text" id="noodled-gh-branch" name="<?php echo self::$option_key; ?>[github_branch]" value="<?php echo esc_attr( $opts['github_branch'] ?? 'main' ); ?>" class="regular-text"></td></tr>
-					<tr><th><label for="noodled-webhook-secret">Webhook Secret</label></th><td><input type="password" id="noodled-webhook-secret" name="<?php echo self::$option_key; ?>[webhook_secret]" value="<?php echo esc_attr( $opts['webhook_secret'] ?? '' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-owner"><?php esc_html_e( 'Repository Owner', 'noodled' ); ?></label></th><td><input type="text" id="noodled-gh-owner" name="<?php echo self::$option_key; ?>[github_owner]" value="<?php echo esc_attr( $opts['github_owner'] ?? '' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-repo"><?php esc_html_e( 'Repository Name', 'noodled' ); ?></label></th><td><input type="text" id="noodled-gh-repo" name="<?php echo self::$option_key; ?>[github_repo]" value="<?php echo esc_attr( $opts['github_repo'] ?? 'noodled-notes' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-token"><?php esc_html_e( 'Personal Access Token', 'noodled' ); ?></label></th><td><input type="password" id="noodled-gh-token" name="<?php echo self::$option_key; ?>[github_token]" value="<?php echo esc_attr( $opts['github_token'] ?? '' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-gh-branch"><?php esc_html_e( 'Branch', 'noodled' ); ?></label></th><td><input type="text" id="noodled-gh-branch" name="<?php echo self::$option_key; ?>[github_branch]" value="<?php echo esc_attr( $opts['github_branch'] ?? 'main' ); ?>" class="regular-text"></td></tr>
+					<tr><th><label for="noodled-webhook-secret"><?php esc_html_e( 'Webhook Secret', 'noodled' ); ?></label></th><td><input type="password" id="noodled-webhook-secret" name="<?php echo self::$option_key; ?>[webhook_secret]" value="<?php echo esc_attr( $opts['webhook_secret'] ?? '' ); ?>" class="regular-text"></td></tr>
 				</table>
-				<?php submit_button( 'Save Sync Settings' ); ?>
+				<?php submit_button( __( 'Save Sync Settings', 'noodled' ) ); ?>
 			</form>
 
-			<h3>Webhook URL</h3>
-			<p>Add this as a push webhook in your GitHub repo settings:</p>
+			<h3><?php esc_html_e( 'Webhook URL', 'noodled' ); ?></h3>
+			<p><?php esc_html_e( 'Add this as a push webhook in your GitHub repo settings:', 'noodled' ); ?></p>
 			<code style="display:inline-block;padding:8px 14px;background:#f5f5f5;border-radius:4px"><?php echo esc_html( $webhook_url ); ?></code>
 
 			<?php if ( Noodled_Plaud::is_configured() ) : ?>
-			<h2 style="margin-top:30px">Plaud</h2>
-			<p style="color:green">&#10003; Plaud token detected from <code>.env</code> file. Voice recordings will sync via the app toolbar.</p>
+			<h2 style="margin-top:30px"><?php esc_html_e( 'Plaud', 'noodled' ); ?></h2>
+			<p style="color:green">&#10003; <?php
+				/* translators: %s is the .env filename shown in a code tag */
+				printf( esc_html__( 'Plaud token detected from %s file. Voice recordings will sync via the app toolbar.', 'noodled' ), '<code>.env</code>' );
+			?></p>
 			<?php endif; ?>
 		<?php
 	}
@@ -752,45 +783,45 @@ class Noodled_Settings {
 		</style>
 		<div class="setup-wrap">
 			<div class="setup-header">
-				<h1>Welcome to Noodled</h1>
-				<p>Let's get your note-taking app set up.</p>
+				<h1><?php esc_html_e( 'Welcome to Noodled', 'noodled' ); ?></h1>
+				<p><?php esc_html_e( 'Let\'s get your note-taking app set up.', 'noodled' ); ?></p>
 			</div>
 			<form method="post">
 				<?php wp_nonce_field( 'noodled_setup' ); ?>
 				<input type="hidden" name="noodled_setup_submit" value="1">
 
 				<div class="setup-card">
-					<div class="setup-step">Step 1 — Branding</div>
-					<h2>Make it yours</h2>
-					<p>Customize the name and look. Change anytime in Noodled > Branding.</p>
-					<div class="setup-field"><label for="setup-brand-name">App Name</label><input id="setup-brand-name" type="text" name="brand_name" value="noodled"></div>
-					<div class="setup-field"><label for="setup-brand-tagline">Tagline</label><input id="setup-brand-tagline" type="text" name="brand_tagline" value="Your notes, everywhere"></div>
-					<div class="setup-field"><label for="setup-accent-color">Accent Color</label><input id="setup-accent-color" type="color" name="accent_color" value="#0078d4"></div>
+					<div class="setup-step"><?php esc_html_e( 'Step 1 — Branding', 'noodled' ); ?></div>
+					<h2><?php esc_html_e( 'Make it yours', 'noodled' ); ?></h2>
+					<p><?php esc_html_e( 'Customize the name and look. Change anytime in Noodled > Branding.', 'noodled' ); ?></p>
+					<div class="setup-field"><label for="setup-brand-name"><?php esc_html_e( 'App Name', 'noodled' ); ?></label><input id="setup-brand-name" type="text" name="brand_name" value="noodled"></div>
+					<div class="setup-field"><label for="setup-brand-tagline"><?php esc_html_e( 'Tagline', 'noodled' ); ?></label><input id="setup-brand-tagline" type="text" name="brand_tagline" value="<?php esc_attr_e( 'Your notes, everywhere', 'noodled' ); ?>"></div>
+					<div class="setup-field"><label for="setup-accent-color"><?php esc_html_e( 'Accent Color', 'noodled' ); ?></label><input id="setup-accent-color" type="color" name="accent_color" value="#0078d4"></div>
 				</div>
 
 				<div class="setup-card">
-					<div class="setup-step">Step 2 — Access</div>
-					<h2>Where and who</h2>
-					<p>Pick the URL and decide who can sign up.</p>
-					<div class="setup-field"><label for="setup-app-path">App URL Path</label><input id="setup-app-path" type="text" name="app_path" value="noodled"><span style="font-size:12px;color:#595959"><?php echo esc_html( home_url( '/' ) ); ?>noodled/</span></div>
-					<div class="setup-check"><label><input type="checkbox" name="takeover_homepage"> Also use as site homepage</label></div>
-					<div class="setup-check"><label><input type="checkbox" name="allow_registration"> Allow open registration</label></div>
-					<div class="setup-check"><label><input type="checkbox" name="require_approval"> Require admin approval</label></div>
+					<div class="setup-step"><?php esc_html_e( 'Step 2 — Access', 'noodled' ); ?></div>
+					<h2><?php esc_html_e( 'Where and who', 'noodled' ); ?></h2>
+					<p><?php esc_html_e( 'Pick the URL and decide who can sign up.', 'noodled' ); ?></p>
+					<div class="setup-field"><label for="setup-app-path"><?php esc_html_e( 'App URL Path', 'noodled' ); ?></label><input id="setup-app-path" type="text" name="app_path" value="noodled"><span style="font-size:12px;color:#595959"><?php echo esc_html( home_url( '/' ) ); ?>noodled/</span></div>
+					<div class="setup-check"><label><input type="checkbox" name="takeover_homepage"> <?php esc_html_e( 'Also use as site homepage', 'noodled' ); ?></label></div>
+					<div class="setup-check"><label><input type="checkbox" name="allow_registration"> <?php esc_html_e( 'Allow open registration', 'noodled' ); ?></label></div>
+					<div class="setup-check"><label><input type="checkbox" name="require_approval"> <?php esc_html_e( 'Require admin approval', 'noodled' ); ?></label></div>
 				</div>
 
 				<div class="setup-card">
-					<div class="setup-step">Step 3 — GitHub Sync (optional)</div>
-					<h2>Connect to desktop</h2>
-					<p>Sync notes with a GitHub repo. Skip this and set it up later in Noodled > Sync.</p>
-					<div class="setup-field"><label for="setup-gh-owner">Repository Owner</label><input id="setup-gh-owner" type="text" name="github_owner" placeholder="your-username"></div>
-					<div class="setup-field"><label for="setup-gh-repo">Repository Name</label><input id="setup-gh-repo" type="text" name="github_repo" value="noodled-notes"></div>
-					<div class="setup-field"><label for="setup-gh-token">Access Token</label><input id="setup-gh-token" type="password" name="github_token" placeholder="ghp_..."></div>
-					<div class="setup-field"><label for="setup-gh-branch">Branch</label><input id="setup-gh-branch" type="text" name="github_branch" value="main"></div>
+					<div class="setup-step"><?php esc_html_e( 'Step 3 — GitHub Sync (optional)', 'noodled' ); ?></div>
+					<h2><?php esc_html_e( 'Connect to desktop', 'noodled' ); ?></h2>
+					<p><?php esc_html_e( 'Sync notes with a GitHub repo. Skip this and set it up later in Noodled > Sync.', 'noodled' ); ?></p>
+					<div class="setup-field"><label for="setup-gh-owner"><?php esc_html_e( 'Repository Owner', 'noodled' ); ?></label><input id="setup-gh-owner" type="text" name="github_owner" placeholder="your-username"></div>
+					<div class="setup-field"><label for="setup-gh-repo"><?php esc_html_e( 'Repository Name', 'noodled' ); ?></label><input id="setup-gh-repo" type="text" name="github_repo" value="noodled-notes"></div>
+					<div class="setup-field"><label for="setup-gh-token"><?php esc_html_e( 'Access Token', 'noodled' ); ?></label><input id="setup-gh-token" type="password" name="github_token" placeholder="ghp_..."></div>
+					<div class="setup-field"><label for="setup-gh-branch"><?php esc_html_e( 'Branch', 'noodled' ); ?></label><input id="setup-gh-branch" type="text" name="github_branch" value="main"></div>
 				</div>
 
 				<div style="text-align:center">
-					<button type="submit" class="setup-btn">Finish Setup</button>
-					<p style="margin-top:12px"><a href="<?php echo esc_url( admin_url( 'admin.php?page=noodled' ) ); ?>" style="color:#595959;font-size:12px">Skip</a></p>
+					<button type="submit" class="setup-btn"><?php esc_html_e( 'Finish Setup', 'noodled' ); ?></button>
+					<p style="margin-top:12px"><a href="<?php echo esc_url( admin_url( 'admin.php?page=noodled' ) ); ?>" style="color:#595959;font-size:12px"><?php esc_html_e( 'Skip', 'noodled' ); ?></a></p>
 				</div>
 			</form>
 		</div>

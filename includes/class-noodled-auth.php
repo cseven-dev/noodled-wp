@@ -94,7 +94,8 @@ class Noodled_Auth {
 			. $cta_html
 			. '</td></tr>'
 			. '<tr><td style="padding:16px 32px;background:#faf6f0;border-top:1px solid #ecebe6">'
-			. '<div style="font-size:12px;color:#9a978f">Sent by ' . esc_html( $brand ) . ' &middot; <a href="' . esc_url( $app ) . '" style="color:' . esc_attr( $accent ) . ';text-decoration:none">Open ' . esc_html( $brand ) . '</a></div>'
+			/* translators: %s is the brand name. */
+			. '<div style="font-size:12px;color:#9a978f">' . sprintf( esc_html__( 'Sent by %s', 'noodled' ), esc_html( $brand ) ) . ' &middot; <a href="' . esc_url( $app ) . '" style="color:' . esc_attr( $accent ) . ';text-decoration:none">' . sprintf( esc_html__( 'Open %s', 'noodled' ), esc_html( $brand ) ) . '</a></div>'
 			. '</td></tr>'
 			. '</table></td></tr></table></body></html>';
 
@@ -113,15 +114,15 @@ class Noodled_Auth {
 		), ARRAY_A );
 
 		if ( ! $user ) {
-			return [ 'error' => 'Email not found. Ask the admin to invite you.' ];
+			return [ 'error' => __( 'Email not found. Ask the admin to invite you.', 'noodled' ) ];
 		}
 
 		$r = self::generate_and_email_pin( $user );
 		if ( ! $r['sent'] ) {
-			return [ 'error' => 'Failed to send email. Check your mail settings.' ];
+			return [ 'error' => __( 'Failed to send email. Check your mail settings.', 'noodled' ) ];
 		}
 
-		return [ 'success' => true, 'message' => 'Check your email for a login PIN.' ];
+		return [ 'success' => true, 'message' => __( 'Check your email for a login PIN.', 'noodled' ) ];
 	}
 
 	/**
@@ -153,16 +154,23 @@ class Noodled_Auth {
 			. '<div style="display:inline-block;padding:14px 24px;background:#faf6f0;border:1px dashed ' . esc_attr( $accent )
 			. ';border-radius:12px;font-size:30px;font-weight:700;letter-spacing:8px;color:#1a1a1f;font-family:\'Courier New\',monospace">'
 			. esc_html( $pin ) . '</div></div>';
-		$body = self::email_p( 'Tap the button to sign in instantly, or enter this PIN on the login screen:' )
+		$body = self::email_p( esc_html__( 'Tap the button to sign in instantly, or enter this PIN on the login screen:', 'noodled' ) )
 			. $pin_box
-			. self::email_p( '<span style="color:#9a978f;font-size:13px">This PIN expires in 15 minutes. If you didn\'t request it, you can ignore this email.</span>' );
+			. self::email_p( '<span style="color:#9a978f;font-size:13px">' . esc_html__( "This PIN expires in 15 minutes. If you didn't request it, you can ignore this email.", 'noodled' ) . '</span>' );
+
+		/* translators: %s is the brand name. */
+		$subject = sprintf( __( 'Your %s login PIN', 'noodled' ), $brand );
+		/* translators: %s is the user's display name. */
+		$greeting = sprintf( __( 'Hi %s,', 'noodled' ), $user['display_name'] );
+		/* translators: %s is the brand name. */
+		$cta_label = sprintf( __( 'Sign in to %s', 'noodled' ), $brand );
 
 		$sent = self::send_branded(
 			$user['email'],
-			"Your {$brand} login PIN",
-			'Hi ' . $user['display_name'] . ',',
+			$subject,
+			$greeting,
 			$body,
-			[ 'label' => "Sign in to {$brand}", 'url' => $magic ]
+			[ 'label' => $cta_label, 'url' => $magic ]
 		);
 
 		return [ 'pin' => $pin, 'sent' => (bool) $sent ];
@@ -177,8 +185,8 @@ class Noodled_Auth {
 		$user = $wpdb->get_row( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}noodled_users WHERE id = %d", $id
 		), ARRAY_A );
-		if ( ! $user ) return [ 'error' => 'User not found' ];
-		if ( $user['role'] === 'pending' ) return [ 'error' => 'Approve this user before sending a PIN.' ];
+		if ( ! $user ) return [ 'error' => __( 'User not found', 'noodled' ) ];
+		if ( $user['role'] === 'pending' ) return [ 'error' => __( 'Approve this user before sending a PIN.', 'noodled' ) ];
 
 		$r = self::generate_and_email_pin( $user );
 		return [
@@ -326,7 +334,7 @@ class Noodled_Auth {
 		$email = sanitize_email( $email );
 		$name  = sanitize_text_field( $name );
 
-		if ( ! is_email( $email ) ) return [ 'error' => 'Please enter a valid email address.' ];
+		if ( ! is_email( $email ) ) return [ 'error' => __( 'Please enter a valid email address.', 'noodled' ) ];
 
 		$existing = $wpdb->get_row( $wpdb->prepare(
 			"SELECT id, role FROM {$table} WHERE email = %s", $email
@@ -334,9 +342,9 @@ class Noodled_Auth {
 
 		if ( $existing ) {
 			if ( $existing['role'] === 'pending' ) {
-				return [ 'success' => true, 'message' => "You're already on the list — we'll be in touch soon." ];
+				return [ 'success' => true, 'message' => __( "You're already on the list — we'll be in touch soon.", 'noodled' ) ];
 			}
-			return [ 'success' => true, 'message' => 'You already have access. Just sign in!' ];
+			return [ 'success' => true, 'message' => __( 'You already have access. Just sign in!', 'noodled' ) ];
 		}
 
 		$wpdb->insert( $table, [
@@ -348,7 +356,7 @@ class Noodled_Auth {
 
 		self::notify_admin_of_request( $name ?: $email, $email );
 
-		return [ 'success' => true, 'message' => "Request received! We'll email you once you're approved." ];
+		return [ 'success' => true, 'message' => __( "Request received! We'll email you once you're approved.", 'noodled' ) ];
 	}
 
 	/** Email a user that a notebook or note has been shared with them. */
@@ -361,11 +369,24 @@ class Noodled_Auth {
 
 		$brand   = Noodled_Settings::get_brand_name();
 		$app     = self::get_app_url();
-		$by      = $sharer ? ' by <strong>' . esc_html( $sharer ) . '</strong>' : '';
-		$subject = "A {$kind} was shared with you on {$brand}";
-		$body    = self::email_p( 'The ' . esc_html( $kind ) . ' <strong>' . esc_html( $title ) . '</strong>' . $by . ' is now shared with you.' )
-			. self::email_p( "Open {$brand} to take a look." );
-		self::send_branded( $u['email'], $subject, 'Hi ' . $u['display_name'] . ',', $body, [ 'label' => "Open {$brand}", 'url' => $app ] );
+		$kind_label = ( $kind === 'notebook' ) ? __( 'notebook', 'noodled' ) : __( 'note', 'noodled' );
+		/* translators: 1: item type (note or notebook), 2: brand name. */
+		$subject = sprintf( __( 'A %1$s was shared with you on %2$s', 'noodled' ), $kind_label, $brand );
+		if ( $sharer ) {
+			/* translators: 1: item type (note or notebook), 2: item title, 3: name of the person who shared it. */
+			$intro = sprintf( __( 'The %1$s %2$s by %3$s is now shared with you.', 'noodled' ), esc_html( $kind_label ), '<strong>' . esc_html( $title ) . '</strong>', '<strong>' . esc_html( $sharer ) . '</strong>' );
+		} else {
+			/* translators: 1: item type (note or notebook), 2: item title. */
+			$intro = sprintf( __( 'The %1$s %2$s is now shared with you.', 'noodled' ), esc_html( $kind_label ), '<strong>' . esc_html( $title ) . '</strong>' );
+		}
+		/* translators: %s is the brand name. */
+		$body    = self::email_p( $intro )
+			. self::email_p( sprintf( esc_html__( 'Open %s to take a look.', 'noodled' ), esc_html( $brand ) ) );
+		/* translators: %s is the user's display name. */
+		$greeting = sprintf( __( 'Hi %s,', 'noodled' ), $u['display_name'] );
+		/* translators: %s is the brand name. */
+		$cta_label = sprintf( __( 'Open %s', 'noodled' ), $brand );
+		self::send_branded( $u['email'], $subject, $greeting, $body, [ 'label' => $cta_label, 'url' => $app ] );
 	}
 
 	/** Email the site admin that someone has requested access. */
@@ -373,8 +394,10 @@ class Noodled_Auth {
 		$brand     = Noodled_Settings::get_brand_name();
 		$to        = Noodled_Settings::get_notify_email();
 		$users_url = admin_url( 'admin.php?page=noodled&tab=users' );
-		$subject   = "[{$brand}] New noodle request from {$name}";
-		$body      = "{$name} ({$email}) has requested a noodle.\n\nApprove or deny here:\n{$users_url}";
+		/* translators: 1: brand name, 2: requester name. */
+		$subject   = sprintf( __( '[%1$s] New noodle request from %2$s', 'noodled' ), $brand, $name );
+		/* translators: 1: requester name, 2: requester email, 3: URL to approve or deny. */
+		$body      = sprintf( __( "%1\$s (%2\$s) has requested a noodle.\n\nApprove or deny here:\n%3\$s", 'noodled' ), $name, $email, $users_url );
 		wp_mail( $to, $subject, $body );
 	}
 
@@ -394,7 +417,8 @@ class Noodled_Auth {
 		if ( $owns > 0 ) return;
 
 		$brand = Noodled_Settings::get_brand_name();
-		$body  = "# Welcome to {$brand}! \u{1F35C}\n\n"
+		/* translators: %s is the brand name. This is the body of the markdown welcome note shown to new users. */
+		$body  = sprintf( __( "# Welcome to %s! \u{1F35C}\n\n"
 			. "This is **your** private notebook — only you can see what's here unless you choose to share it. Here's the quick tour.\n\n"
 			. "## What you can do\n\n"
 			. "- **Write notes** in plain language — they save automatically as you type.\n"
@@ -408,11 +432,12 @@ class Noodled_Auth {
 			. "2. **Tag a thought** with `#idea` or `#todo` anywhere in a note, then search the tag later to pull them all up.\n\n"
 			. "## Your privacy\n\n"
 			. "Everything you write is private to your account. Sharing is always opt-in — nothing leaves your noodle unless you decide it should.\n\n"
-			. "Happy noodling \u{2014} delete this note whenever you're ready.\n";
+			. "Happy noodling \u{2014} delete this note whenever you're ready.\n", 'noodled' ), $brand );
 
 		// Noodled_Notes::create() ensures the 'My Notes' notebook exists owned by
 		// this user, then creates the welcome note inside it.
-		Noodled_Notes::create( 'My Notes', "Welcome to {$brand}", $body, $user_id );
+		/* translators: %s is the brand name; title of the welcome note. */
+		Noodled_Notes::create( 'My Notes', sprintf( __( 'Welcome to %s', 'noodled' ), $brand ), $body, $user_id );
 	}
 
 	/** Approve a pending user: promote to member, grant default notebook, email a login PIN. */
@@ -420,7 +445,7 @@ class Noodled_Auth {
 		global $wpdb;
 		$table = $wpdb->prefix . 'noodled_users';
 		$user  = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), ARRAY_A );
-		if ( ! $user ) return [ 'error' => 'User not found' ];
+		if ( ! $user ) return [ 'error' => __( 'User not found', 'noodled' ) ];
 
 		$wpdb->update( $table, [ 'role' => 'member' ], [ 'id' => $id ] );
 		self::seed_new_user( $id );
@@ -434,12 +459,12 @@ class Noodled_Auth {
 		$table = $wpdb->prefix . 'noodled_users';
 		$email = sanitize_email( $email );
 
-		if ( ! is_email( $email ) ) return [ 'error' => 'Invalid email' ];
+		if ( ! is_email( $email ) ) return [ 'error' => __( 'Invalid email', 'noodled' ) ];
 
 		$existing = $wpdb->get_var( $wpdb->prepare(
 			"SELECT id FROM {$table} WHERE email = %s", $email
 		) );
-		if ( $existing ) return [ 'error' => 'User already exists' ];
+		if ( $existing ) return [ 'error' => __( 'User already exists', 'noodled' ) ];
 
 		$wpdb->insert( $table, [
 			'email'        => $email,
@@ -483,29 +508,29 @@ class Noodled_Auth {
 
 	public static function handle_login( \WP_REST_Request $req ): \WP_REST_Response {
 		$email = $req->get_param( 'email' );
-		if ( ! $email ) return new \WP_REST_Response( [ 'error' => 'Email required' ], 400 );
+		if ( ! $email ) return new \WP_REST_Response( [ 'error' => __( 'Email required', 'noodled' ) ], 400 );
 		return new \WP_REST_Response( self::send_magic_link( $email ) );
 	}
 
 	public static function handle_verify( \WP_REST_Request $req ): \WP_REST_Response {
 		$token = trim( (string) $req->get_param( 'token' ) );
-		if ( ! $token ) return new \WP_REST_Response( [ 'error' => 'PIN required' ], 400 );
+		if ( ! $token ) return new \WP_REST_Response( [ 'error' => __( 'PIN required', 'noodled' ) ], 400 );
 
 		// Token-only sign-in has no email to scope it, so it's brute-forceable —
 		// rate-limit by IP (the magic link and manual "Already have a PIN" both use this).
 		$rate_key = 'noodled_verify_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
 		$attempts = (int) get_transient( $rate_key );
 		if ( $attempts >= 10 ) {
-			return new \WP_REST_Response( [ 'error' => 'Too many attempts. Try again in a few minutes.' ], 429 );
+			return new \WP_REST_Response( [ 'error' => __( 'Too many attempts. Try again in a few minutes.', 'noodled' ) ], 429 );
 		}
 		set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
 
 		$user = self::verify_token( $token );
 		if ( ! $user ) {
-			return new \WP_REST_Response( [ 'error' => 'Invalid or expired PIN' ], 401 );
+			return new \WP_REST_Response( [ 'error' => __( 'Invalid or expired PIN', 'noodled' ) ], 401 );
 		}
 		if ( ( $user['role'] ?? '' ) === 'pending' ) {
-			return new \WP_REST_Response( [ 'error' => 'Your account is still awaiting approval.' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Your account is still awaiting approval.', 'noodled' ) ], 403 );
 		}
 
 		delete_transient( $rate_key );
@@ -527,13 +552,13 @@ class Noodled_Auth {
 	public static function login_with_pin( string $email, string $pin ): array {
 		$email = sanitize_email( $email );
 		$pin   = sanitize_text_field( $pin );
-		if ( ! $email || ! $pin ) return [ 'error' => 'Email and PIN required', 'status' => 400 ];
+		if ( ! $email || ! $pin ) return [ 'error' => __( 'Email and PIN required', 'noodled' ), 'status' => 400 ];
 
 		// Rate limiting: max 5 attempts per email per 15 minutes
 		$rate_key = 'noodled_pin_' . md5( $email );
 		$attempts = (int) get_transient( $rate_key );
 		if ( $attempts >= 5 ) {
-			return [ 'error' => 'Too many attempts. Try again in a few minutes.', 'status' => 429 ];
+			return [ 'error' => __( 'Too many attempts. Try again in a few minutes.', 'noodled' ), 'status' => 429 ];
 		}
 		set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
 
@@ -543,8 +568,8 @@ class Noodled_Auth {
 			$email, $pin, gmdate( 'Y-m-d H:i:s' )
 		), ARRAY_A );
 
-		if ( ! $user ) return [ 'error' => 'Invalid or expired PIN', 'status' => 401 ];
-		if ( $user['role'] === 'pending' ) return [ 'error' => 'Your account is still awaiting approval.', 'status' => 403 ];
+		if ( ! $user ) return [ 'error' => __( 'Invalid or expired PIN', 'noodled' ), 'status' => 401 ];
+		if ( $user['role'] === 'pending' ) return [ 'error' => __( 'Your account is still awaiting approval.', 'noodled' ), 'status' => 403 ];
 
 		// Clear rate limit on success
 		delete_transient( $rate_key );
@@ -576,19 +601,19 @@ class Noodled_Auth {
 
 	public static function handle_register( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! Noodled_Settings::allow_registration() ) {
-			return new \WP_REST_Response( [ 'error' => 'Registration is not enabled' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Registration is not enabled', 'noodled' ) ], 403 );
 		}
 
 		$email = sanitize_email( $req->get_param( 'email' ) );
 		$name  = sanitize_text_field( $req->get_param( 'name' ) ) ?: '';
 
-		if ( ! is_email( $email ) ) return new \WP_REST_Response( [ 'error' => 'Invalid email' ], 400 );
+		if ( ! is_email( $email ) ) return new \WP_REST_Response( [ 'error' => __( 'Invalid email', 'noodled' ) ], 400 );
 
 		global $wpdb;
 		$existing = $wpdb->get_var( $wpdb->prepare(
 			"SELECT id FROM {$wpdb->prefix}noodled_users WHERE email = %s", $email
 		) );
-		if ( $existing ) return new \WP_REST_Response( [ 'error' => 'Account already exists. Try signing in.' ], 400 );
+		if ( $existing ) return new \WP_REST_Response( [ 'error' => __( 'Account already exists. Try signing in.', 'noodled' ) ], 400 );
 
 		$role = Noodled_Settings::require_approval() ? 'pending' : 'member';
 
@@ -613,7 +638,7 @@ class Noodled_Auth {
 	public static function handle_request( \WP_REST_Request $req ): \WP_REST_Response {
 		$email = $req->get_param( 'email' );
 		$name  = $req->get_param( 'name' ) ?: '';
-		if ( ! $email ) return new \WP_REST_Response( [ 'error' => 'Email required' ], 400 );
+		if ( ! $email ) return new \WP_REST_Response( [ 'error' => __( 'Email required', 'noodled' ) ], 400 );
 
 		$result = self::request_access( $email, $name );
 		$status = isset( $result['error'] ) ? 400 : 200;
@@ -622,7 +647,7 @@ class Noodled_Auth {
 
 	public static function handle_me( \WP_REST_Request $req ): \WP_REST_Response {
 		$user = self::get_current_user();
-		if ( ! $user ) return new \WP_REST_Response( [ 'error' => 'Not authenticated' ], 401 );
+		if ( ! $user ) return new \WP_REST_Response( [ 'error' => __( 'Not authenticated', 'noodled' ) ], 401 );
 		return new \WP_REST_Response( $user );
 	}
 }

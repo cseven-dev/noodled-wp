@@ -64,7 +64,7 @@ class Noodled_Notes {
 	public static function create( string $notebook_name, string $title, string $body = '', int $owner_id = 0 ): array {
 		global $wpdb;
 		$notebook_id = Noodled_Notebooks::ensure( $notebook_name, $owner_id );
-		if ( ! $notebook_id ) return [ 'error' => 'Could not create notebook' ];
+		if ( ! $notebook_id ) return [ 'error' => __( 'Could not create notebook', 'noodled' ) ];
 
 		$slug = self::slug( $title );
 		$now  = current_time( 'mysql', true );
@@ -87,7 +87,7 @@ class Noodled_Notes {
 			'modified_at' => $now,
 		] );
 
-		return self::get_one( (int) $wpdb->insert_id ) ?? [ 'error' => 'Failed to create note' ];
+		return self::get_one( (int) $wpdb->insert_id ) ?? [ 'error' => __( 'Failed to create note', 'noodled' ) ];
 	}
 
 	public static function update( int $id, array $data ): array {
@@ -113,7 +113,7 @@ class Noodled_Notes {
 		}
 
 		$wpdb->update( self::table(), $update, [ 'id' => $id ] );
-		return self::get_one( $id ) ?? [ 'error' => 'Note not found' ];
+		return self::get_one( $id ) ?? [ 'error' => __( 'Note not found', 'noodled' ) ];
 	}
 
 	public static function soft_delete( int $id ): bool {
@@ -151,7 +151,7 @@ class Noodled_Notes {
 	public static function restore( int $id, int $owner_id = 0 ): array {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . self::table() . " WHERE id = %d", $id ), ARRAY_A );
-		if ( ! $row ) return [ 'error' => 'Note not found in trash' ];
+		if ( ! $row ) return [ 'error' => __( 'Note not found in trash', 'noodled' ) ];
 
 		$target_id = $row['deleted_from'] ?: null;
 		if ( $target_id ) {
@@ -168,7 +168,7 @@ class Noodled_Notes {
 			'modified_at'  => current_time( 'mysql', true ),
 		], [ 'id' => $id ] );
 
-		return self::get_one( $id ) ?? [ 'error' => 'Failed to restore' ];
+		return self::get_one( $id ) ?? [ 'error' => __( 'Failed to restore', 'noodled' ) ];
 	}
 
 	public static function permanent_delete( int $id ): bool {
@@ -203,19 +203,19 @@ class Noodled_Notes {
 			'modified_at' => current_time( 'mysql', true ),
 		], [ 'id' => $id ] );
 
-		return self::get_one( $id ) ?? [ 'error' => 'Note not found' ];
+		return self::get_one( $id ) ?? [ 'error' => __( 'Note not found', 'noodled' ) ];
 	}
 
 	public static function toggle_pin( int $id ): array {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT pinned FROM " . self::table() . " WHERE id = %d", $id ), ARRAY_A );
-		if ( ! $row ) return [ 'error' => 'Note not found' ];
+		if ( ! $row ) return [ 'error' => __( 'Note not found', 'noodled' ) ];
 
 		$wpdb->update( self::table(), [
 			'pinned' => $row['pinned'] ? 0 : 1,
 		], [ 'id' => $id ] );
 
-		return self::get_one( $id ) ?? [ 'error' => 'Note not found' ];
+		return self::get_one( $id ) ?? [ 'error' => __( 'Note not found', 'noodled' ) ];
 	}
 
 	public static function search( string $query, array $notebook_ids = [], array $extra_note_ids = [] ): array {

@@ -97,7 +97,7 @@ class Noodled_Notebooks {
 
 	/** A notebook name unique across all owners (suffixes " (2)", " (3)"…). */
 	private static function unique_notebook_name( string $base ): string {
-		$base = sanitize_text_field( $base ) ?: 'Shared';
+		$base = sanitize_text_field( $base ) ?: __( 'Shared', 'noodled' );
 		$name = $base;
 		$i    = 2;
 		while ( self::get_by_name( $name ) ) {
@@ -110,7 +110,8 @@ class Noodled_Notebooks {
 	/** Friendly possessive label for a drop folder, e.g. "Simon's noodle". */
 	private static function drop_label( ?string $admin_name ): string {
 		$first = self::first_name( $admin_name );
-		return $first ? $first . "'s noodle" : 'Shared noodle';
+		/* translators: %s is the admin's first name. */
+		return $first ? sprintf( __( "%s's noodle", 'noodled' ), $first ) : __( 'Shared noodle', 'noodled' );
 	}
 
 	/** Clean first name from a display name or email ("simon@c7.ca" → "Simon"). */
@@ -131,7 +132,7 @@ class Noodled_Notebooks {
 	 */
 	public static function set_drop_folder( int $member_id, int $admin_id, bool $on ): array {
 		global $wpdb;
-		if ( $member_id <= 0 || $admin_id <= 0 ) return [ 'error' => 'Invalid user' ];
+		if ( $member_id <= 0 || $admin_id <= 0 ) return [ 'error' => __( 'Invalid user', 'noodled' ) ];
 
 		$existing = self::member_drop_folder( $member_id );
 
@@ -162,7 +163,7 @@ class Noodled_Notebooks {
 		$member = $wpdb->get_row( $wpdb->prepare(
 			"SELECT display_name, email FROM {$wpdb->prefix}noodled_users WHERE id = %d", $member_id
 		), ARRAY_A );
-		if ( ! $member ) return [ 'error' => 'Member not found' ];
+		if ( ! $member ) return [ 'error' => __( 'Member not found', 'noodled' ) ];
 
 		$base = $member['display_name'] ?: explode( '@', $member['email'] )[0];
 		$name = self::unique_notebook_name( $base );
@@ -183,11 +184,18 @@ class Noodled_Notebooks {
 			"SELECT display_name FROM {$wpdb->prefix}noodled_users WHERE id = %d", $admin_id
 		) );
 		$first = self::first_name( $admin_name );
+		$share_with = $first ?: __( 'the admin', 'noodled' );
+		$drop_for   = $first ?: __( 'them', 'noodled' );
+		/* translators: 1: recipient name (admin or "the admin"), 2: recipient name (admin or "them"). */
+		$about_body = sprintf(
+			__( "\u{1F4E5} Anything you add to **this folder** is automatically shared with %1\$s.\n\nDrop notes here that you'd like %2\$s to see. Your other notebooks stay private.\n", 'noodled' ),
+			$share_with,
+			$drop_for
+		);
 		Noodled_Notes::create(
 			$name,
-			'About this folder',
-			"\u{1F4E5} Anything you add to **this folder** is automatically shared with " . ( $first ?: 'the admin' ) . ".\n\n"
-			. "Drop notes here that you'd like " . ( $first ?: 'them' ) . " to see. Your other notebooks stay private.\n",
+			__( 'About this folder', 'noodled' ),
+			$about_body,
 			$member_id
 		);
 
@@ -248,7 +256,7 @@ class Noodled_Notebooks {
 		$name = sanitize_text_field( $name );
 
 		if ( self::get_by_name( $name, $owner_id ) ) {
-			return [ 'error' => 'Notebook already exists' ];
+			return [ 'error' => __( 'Notebook already exists', 'noodled' ) ];
 		}
 
 		$wpdb->insert( self::table(), [
@@ -266,8 +274,8 @@ class Noodled_Notebooks {
 		$new_name = sanitize_text_field( $new_name );
 		$nb = self::get_by_name( $old_name, $owner_id );
 
-		if ( ! $nb ) return [ 'error' => 'Notebook not found' ];
-		if ( self::get_by_name( $new_name, $owner_id ) ) return [ 'error' => 'Name already taken' ];
+		if ( ! $nb ) return [ 'error' => __( 'Notebook not found', 'noodled' ) ];
+		if ( self::get_by_name( $new_name, $owner_id ) ) return [ 'error' => __( 'Name already taken', 'noodled' ) ];
 
 		$wpdb->update( self::table(), [
 			'name'        => $new_name,

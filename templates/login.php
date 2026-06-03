@@ -226,29 +226,29 @@ body::before {
 
   <div class="login-card">
     <div id="stepEmail">
-      <div class="card-title">Sign in</div>
-      <div class="card-sub">We'll send a PIN to your email</div>
+      <div class="card-title"><?php esc_html_e( 'Sign in', 'noodled' ); ?></div>
+      <div class="card-sub"><?php esc_html_e( "We'll send a PIN to your email", 'noodled' ); ?></div>
       <form onsubmit="handleLogin(event)">
-        <input class="login-input" type="email" id="emailInput" placeholder="you@example.com" aria-label="Email address" required autofocus>
-        <button class="login-btn" type="submit" id="loginBtn">Continue</button>
+        <input class="login-input" type="email" id="emailInput" placeholder="<?php esc_attr_e( 'you@example.com', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Email address', 'noodled' ); ?>" required autofocus>
+        <button class="login-btn" type="submit" id="loginBtn"><?php esc_html_e( 'Continue', 'noodled' ); ?></button>
       </form>
     </div>
 
     <?php if ( Noodled_Settings::allow_registration() ) : ?>
     <div style="margin-top:12px;text-align:center" id="regLink">
-      <button type="button" class="login-link-btn" onclick="showStep('stepRegister')">Don't have an account? Create one</button>
+      <button type="button" class="login-link-btn" onclick="showStep('stepRegister')"><?php esc_html_e( "Don't have an account? Create one", 'noodled' ); ?></button>
     </div>
     <?php endif; ?>
 
     <div id="stepPin" style="display:none">
-      <div class="card-title">Enter PIN</div>
-      <div class="card-sub">Check your email for a 6-digit code</div>
+      <div class="card-title"><?php esc_html_e( 'Enter PIN', 'noodled' ); ?></div>
+      <div class="card-sub"><?php esc_html_e( 'Check your email for a 6-digit code', 'noodled' ); ?></div>
       <form onsubmit="handlePin(event)">
-        <input class="login-input" type="text" id="pinInput" placeholder="000000" aria-label="6-digit PIN" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus style="text-align:center;font-size:24px;letter-spacing:8px">
-        <button class="login-btn" type="submit" id="pinBtn">Sign in</button>
+        <input class="login-input" type="text" id="pinInput" placeholder="000000" aria-label="<?php esc_attr_e( '6-digit PIN', 'noodled' ); ?>" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus style="text-align:center;font-size:24px;letter-spacing:8px">
+        <button class="login-btn" type="submit" id="pinBtn"><?php esc_html_e( 'Sign in', 'noodled' ); ?></button>
       </form>
       <div style="margin-top:12px;text-align:center">
-        <button type="button" class="login-link-btn" onclick="backToEmail()">Use a different email</button>
+        <button type="button" class="login-link-btn" onclick="backToEmail()"><?php esc_html_e( 'Use a different email', 'noodled' ); ?></button>
       </div>
     </div>
 
@@ -260,15 +260,15 @@ body::before {
 
     <?php if ( Noodled_Settings::allow_registration() ) : ?>
     <div id="stepRegister" style="display:none">
-      <div class="card-title">Create account</div>
-      <div class="card-sub">Enter your details to get started</div>
+      <div class="card-title"><?php esc_html_e( 'Create account', 'noodled' ); ?></div>
+      <div class="card-sub"><?php esc_html_e( 'Enter your details to get started', 'noodled' ); ?></div>
       <form onsubmit="handleRegister(event)">
-        <input class="login-input" type="text" id="regName" placeholder="Your name" aria-label="Your name" required>
-        <input class="login-input" type="email" id="regEmail" placeholder="Email address" aria-label="Email address" required>
-        <button class="login-btn" type="submit" id="regBtn">Create account</button>
+        <input class="login-input" type="text" id="regName" placeholder="<?php esc_attr_e( 'Your name', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Your name', 'noodled' ); ?>" required>
+        <input class="login-input" type="email" id="regEmail" placeholder="<?php esc_attr_e( 'Email address', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Email address', 'noodled' ); ?>" required>
+        <button class="login-btn" type="submit" id="regBtn"><?php esc_html_e( 'Create account', 'noodled' ); ?></button>
       </form>
       <div style="margin-top:12px;text-align:center">
-        <button type="button" class="login-link-btn" onclick="showStep('stepEmail')">Already have an account? Sign in</button>
+        <button type="button" class="login-link-btn" onclick="showStep('stepEmail')"><?php esc_html_e( 'Already have an account? Sign in', 'noodled' ); ?></button>
       </div>
     </div>
     <?php endif; ?>
@@ -277,15 +277,15 @@ body::before {
   <div class="features">
     <div class="feature">
       <div class="feature-icon">&#128221;</div>
-      <div class="feature-text">Markdown notes with rich editing</div>
+      <div class="feature-text"><?php esc_html_e( 'Markdown notes with rich editing', 'noodled' ); ?></div>
     </div>
     <div class="feature">
       <div class="feature-icon">&#128274;</div>
-      <div class="feature-text">Private notebooks with sharing</div>
+      <div class="feature-text"><?php esc_html_e( 'Private notebooks with sharing', 'noodled' ); ?></div>
     </div>
     <div class="feature">
       <div class="feature-icon">&#128260;</div>
-      <div class="feature-text">Syncs with desktop app</div>
+      <div class="feature-text"><?php esc_html_e( 'Syncs with desktop app', 'noodled' ); ?></div>
     </div>
   </div>
 </div>

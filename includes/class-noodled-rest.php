@@ -271,27 +271,27 @@ class Noodled_REST {
 	public static function notebook_share( \WP_REST_Request $req ): \WP_REST_Response {
 		$nb_id = (int) $req['id'];
 		if ( ! self::owns_notebook( $nb_id ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Only the owner can share this notebook' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Only the owner can share this notebook', 'noodled' ) ], 403 );
 		}
 		$target = self::resolve_user_id( $req->get_param( 'email' ) );
 		if ( ! $target ) {
-			return new \WP_REST_Response( [ 'error' => 'No noodled user with that email — they need an account first.' ], 404 );
+			return new \WP_REST_Response( [ 'error' => __( 'No noodled user with that email — they need an account first.', 'noodled' ) ], 404 );
 		}
 		if ( $target === self::current_user_id() ) {
-			return new \WP_REST_Response( [ 'error' => "That's your own account." ], 400 );
+			return new \WP_REST_Response( [ 'error' => __( "That's your own account.", 'noodled' ) ], 400 );
 		}
 		$can_write = $req->get_param( 'access' ) === 'write';
 		Noodled_Permissions::set( $target, $nb_id, true, $can_write );
 		$nb = Noodled_Notebooks::get_by_id( $nb_id );
 		$me = Noodled_Auth::get_current_user();
-		Noodled_Auth::notify_share( $target, 'notebook', $nb['name'] ?? 'notebook', $me['name'] ?? '' );
+		Noodled_Auth::notify_share( $target, 'notebook', $nb['name'] ?? __( 'notebook', 'noodled' ), $me['name'] ?? '' );
 		return new \WP_REST_Response( [ 'success' => true ] );
 	}
 
 	public static function notebook_unshare( \WP_REST_Request $req ): \WP_REST_Response {
 		$nb_id = (int) $req['id'];
 		if ( ! self::owns_notebook( $nb_id ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Only the owner can manage sharing' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Only the owner can manage sharing', 'noodled' ) ], 403 );
 		}
 		$target = self::resolve_user_id( $req->get_param( 'email' ) );
 		if ( $target ) {
@@ -310,27 +310,27 @@ class Noodled_REST {
 	public static function note_share_user( \WP_REST_Request $req ): \WP_REST_Response {
 		$note_id = (int) $req['id'];
 		if ( ! self::owns_note( $note_id ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Only the owner can share this note' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Only the owner can share this note', 'noodled' ) ], 403 );
 		}
 		$target = self::resolve_user_id( $req->get_param( 'email' ) );
 		if ( ! $target ) {
-			return new \WP_REST_Response( [ 'error' => 'No noodled user with that email — they need an account first.' ], 404 );
+			return new \WP_REST_Response( [ 'error' => __( 'No noodled user with that email — they need an account first.', 'noodled' ) ], 404 );
 		}
 		if ( $target === self::current_user_id() ) {
-			return new \WP_REST_Response( [ 'error' => "That's your own account." ], 400 );
+			return new \WP_REST_Response( [ 'error' => __( "That's your own account.", 'noodled' ) ], 400 );
 		}
 		$can_write = $req->get_param( 'access' ) === 'write';
 		Noodled_Permissions::share_note( $note_id, $target, $can_write );
 		$note = Noodled_Notes::get_one( $note_id );
 		$me   = Noodled_Auth::get_current_user();
-		Noodled_Auth::notify_share( $target, 'note', $note['title'] ?? 'note', $me['name'] ?? '' );
+		Noodled_Auth::notify_share( $target, 'note', $note['title'] ?? __( 'note', 'noodled' ), $me['name'] ?? '' );
 		return new \WP_REST_Response( [ 'success' => true ] );
 	}
 
 	public static function note_unshare_user( \WP_REST_Request $req ): \WP_REST_Response {
 		$note_id = (int) $req['id'];
 		if ( ! self::owns_note( $note_id ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Only the owner can manage sharing' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Only the owner can manage sharing', 'noodled' ) ], 403 );
 		}
 		$target = self::resolve_user_id( $req->get_param( 'email' ) );
 		if ( $target ) Noodled_Permissions::unshare_note( $note_id, $target );
@@ -378,20 +378,20 @@ class Noodled_REST {
 
 	public static function create_notebook( \WP_REST_Request $req ): \WP_REST_Response {
 		$name = $req->get_param( 'name' );
-		if ( empty( $name ) ) return new \WP_REST_Response( [ 'error' => 'Name required' ], 400 );
+		if ( empty( $name ) ) return new \WP_REST_Response( [ 'error' => __( 'Name required', 'noodled' ) ], 400 );
 		return new \WP_REST_Response( Noodled_Notebooks::create( $name, self::current_user_id() ) );
 	}
 
 	public static function rename_notebook( \WP_REST_Request $req ): \WP_REST_Response {
 		$old = $req->get_param( 'old_name' );
 		$new = $req->get_param( 'new_name' );
-		if ( ! $old || ! $new ) return new \WP_REST_Response( [ 'error' => 'Names required' ], 400 );
+		if ( ! $old || ! $new ) return new \WP_REST_Response( [ 'error' => __( 'Names required', 'noodled' ) ], 400 );
 		return new \WP_REST_Response( Noodled_Notebooks::rename( $old, $new, self::current_user_id() ) );
 	}
 
 	public static function delete_notebook( \WP_REST_Request $req ): \WP_REST_Response {
 		$name = $req->get_param( 'name' );
-		if ( ! $name ) return new \WP_REST_Response( [ 'error' => 'Name required' ], 400 );
+		if ( ! $name ) return new \WP_REST_Response( [ 'error' => __( 'Name required', 'noodled' ) ], 400 );
 		Noodled_Notebooks::delete( $name, self::current_user_id() );
 		return new \WP_REST_Response( true );
 	}
@@ -439,7 +439,7 @@ class Noodled_REST {
 
 	public static function get_note( \WP_REST_Request $req ): \WP_REST_Response {
 		$note = self::verify_note_access( (int) $req['id'] );
-		if ( ! $note ) return new \WP_REST_Response( [ 'error' => 'Note not found' ], 404 );
+		if ( ! $note ) return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
 		$note['attachments'] = Noodled_Attachments::get_for_note( (int) $req['id'] );
 		return new \WP_REST_Response( $note );
 	}
@@ -449,10 +449,10 @@ class Noodled_REST {
 		$files = $req->get_file_params();
 		$f = $files['file'] ?? null;
 		if ( ! $f || empty( $f['tmp_name'] ) || ( $f['error'] ?? 1 ) !== UPLOAD_ERR_OK ) {
-			return new \WP_REST_Response( [ 'error' => 'No file uploaded' ], 400 );
+			return new \WP_REST_Response( [ 'error' => __( 'No file uploaded', 'noodled' ) ], 400 );
 		}
 		if ( strtolower( pathinfo( $f['name'] ?? '', PATHINFO_EXTENSION ) ) !== 'enex' ) {
-			return new \WP_REST_Response( [ 'error' => 'Please choose an Evernote .enex export file.' ], 400 );
+			return new \WP_REST_Response( [ 'error' => __( 'Please choose an Evernote .enex export file.', 'noodled' ) ], 400 );
 		}
 		return new \WP_REST_Response( Noodled_Evernote::import( $f['tmp_name'], self::current_user_id() ) );
 	}
@@ -462,13 +462,13 @@ class Noodled_REST {
 	 * plus each note's attachments under {slug}_files/, matching the desktop layout.
 	 */
 	public static function export_backup() {
-		if ( ! class_exists( 'ZipArchive' ) ) { status_header( 500 ); echo 'Zip support unavailable on this server.'; exit; }
+		if ( ! class_exists( 'ZipArchive' ) ) { status_header( 500 ); esc_html_e( 'Zip support unavailable on this server.', 'noodled' ); exit; }
 		$uid = self::current_user_id();
 		if ( ! $uid ) { status_header( 403 ); exit; }
 
 		$tmp = wp_tempnam( 'noodled-export' );
 		$zip = new \ZipArchive();
-		if ( $zip->open( $tmp, \ZipArchive::OVERWRITE ) !== true ) { status_header( 500 ); echo 'Could not build archive.'; exit; }
+		if ( $zip->open( $tmp, \ZipArchive::OVERWRITE ) !== true ) { status_header( 500 ); esc_html_e( 'Could not build archive.', 'noodled' ); exit; }
 
 		$used = [];
 		foreach ( Noodled_Notebooks::get_for_user( $uid ) as $nb ) {
@@ -504,15 +504,15 @@ class Noodled_REST {
 
 	/** Restore notes from a backup/zip of .md files (folder name → notebook). */
 	public static function import_zip( \WP_REST_Request $req ): \WP_REST_Response {
-		if ( ! class_exists( 'ZipArchive' ) ) return new \WP_REST_Response( [ 'error' => 'Zip support unavailable' ], 500 );
+		if ( ! class_exists( 'ZipArchive' ) ) return new \WP_REST_Response( [ 'error' => __( 'Zip support unavailable', 'noodled' ) ], 500 );
 		$files = $req->get_file_params();
 		$f = $files['file'] ?? null;
 		if ( ! $f || empty( $f['tmp_name'] ) || ( $f['error'] ?? 1 ) !== UPLOAD_ERR_OK ) {
-			return new \WP_REST_Response( [ 'error' => 'No file uploaded' ], 400 );
+			return new \WP_REST_Response( [ 'error' => __( 'No file uploaded', 'noodled' ) ], 400 );
 		}
 		$uid = self::current_user_id();
 		$zip = new \ZipArchive();
-		if ( $zip->open( $f['tmp_name'] ) !== true ) return new \WP_REST_Response( [ 'error' => 'Not a valid zip' ], 400 );
+		if ( $zip->open( $f['tmp_name'] ) !== true ) return new \WP_REST_Response( [ 'error' => __( 'Not a valid zip', 'noodled' ) ], 400 );
 
 		$imported = 0;
 		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
@@ -574,7 +574,7 @@ class Noodled_REST {
 	public static function create_note( \WP_REST_Request $req ): \WP_REST_Response {
 		$uid      = self::current_user_id();
 		$notebook = $req->get_param( 'notebook' ) ?: 'General';
-		$title    = $req->get_param( 'title' ) ?: 'Untitled Note';
+		$title    = $req->get_param( 'title' ) ?: __( 'Untitled Note', 'noodled' );
 		$body     = $req->get_param( 'body' ) ?: '';
 		$result   = Noodled_Notes::create( $notebook, $title, $body, $uid );
 		// GitHub sync is an admin-only desktop<->web pipeline; regular users'
@@ -587,7 +587,7 @@ class Noodled_REST {
 
 	public static function update_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_write( (int) $req['id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		// Optimistic-concurrency guard: if the caller tells us which version it
 		// last saw and the stored note has moved on (another device/tab saved),
@@ -613,7 +613,7 @@ class Noodled_REST {
 
 	public static function delete_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		// Get note info before deleting for GitHub sync
 		if ( Noodled_GitHub::is_configured() ) {
@@ -634,16 +634,16 @@ class Noodled_REST {
 
 	public static function move_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		$to = $req->get_param( 'notebook' );
-		if ( ! $to ) return new \WP_REST_Response( [ 'error' => 'Target notebook required' ], 400 );
+		if ( ! $to ) return new \WP_REST_Response( [ 'error' => __( 'Target notebook required', 'noodled' ) ], 400 );
 		return new \WP_REST_Response( Noodled_Notes::move( (int) $req['id'], $to, self::current_user_id() ) );
 	}
 
 	public static function pin_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		return new \WP_REST_Response( Noodled_Notes::toggle_pin( (int) $req['id'] ) );
 	}
@@ -668,14 +668,14 @@ class Noodled_REST {
 
 	public static function restore_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		return new \WP_REST_Response( Noodled_Notes::restore( (int) $req['id'], self::current_user_id() ) );
 	}
 
 	public static function permanent_delete( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		Noodled_Notes::permanent_delete( (int) $req['id'] );
 		return new \WP_REST_Response( true );
@@ -704,10 +704,10 @@ class Noodled_REST {
 		$filename = $req->get_param( 'filename' );
 		$data     = $req->get_param( 'data' );
 		if ( ! $note_id || ! $filename || ! $data ) {
-			return new \WP_REST_Response( [ 'error' => 'Missing parameters' ], 400 );
+			return new \WP_REST_Response( [ 'error' => __( 'Missing parameters', 'noodled' ) ], 400 );
 		}
 		if ( ! self::verify_note_write( $note_id ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		return new \WP_REST_Response( Noodled_Attachments::save( $note_id, $filename, $data ) );
 	}
@@ -719,7 +719,7 @@ class Noodled_REST {
 			"SELECT note_id FROM {$wpdb->prefix}noodled_attachments WHERE id = %d", (int) $req['id']
 		), ARRAY_A );
 		if ( ! $att || ! self::verify_note_write( (int) $att['note_id'] ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Access denied' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		Noodled_Attachments::delete( (int) $req['id'] );
 		return new \WP_REST_Response( true );
@@ -762,7 +762,7 @@ class Noodled_REST {
 
 	public static function sync_push(): \WP_REST_Response {
 		if ( ! Noodled_GitHub::is_configured() ) {
-			return new \WP_REST_Response( [ 'error' => 'GitHub not configured' ] );
+			return new \WP_REST_Response( [ 'error' => __( 'GitHub not configured', 'noodled' ) ] );
 		}
 
 		global $wpdb;
@@ -797,7 +797,7 @@ class Noodled_REST {
 
 	public static function sync_import(): \WP_REST_Response {
 		if ( ! Noodled_GitHub::is_configured() ) {
-			return new \WP_REST_Response( [ 'error' => 'GitHub not configured' ] );
+			return new \WP_REST_Response( [ 'error' => __( 'GitHub not configured', 'noodled' ) ] );
 		}
 		$result = Noodled_Sync::full_import();
 		return new \WP_REST_Response( $result );
@@ -809,10 +809,10 @@ class Noodled_REST {
 		$note_id = (int) $req['id'];
 		// Only the owner may mint a public link for a note.
 		if ( ! self::owns_note( $note_id ) ) {
-			return new \WP_REST_Response( [ 'error' => 'Only the owner can create a public link' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'Only the owner can create a public link', 'noodled' ) ], 403 );
 		}
 		$note = Noodled_Notes::get_one( $note_id );
-		if ( ! $note ) return new \WP_REST_Response( [ 'error' => 'Note not found' ], 404 );
+		if ( ! $note ) return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
 
 		// Generate or retrieve share token
 		global $wpdb;
@@ -840,7 +840,7 @@ class Noodled_REST {
 			'%"share_token":"' . $wpdb->esc_like( $token ) . '"%'
 		), ARRAY_A );
 
-		if ( ! $row ) return new \WP_REST_Response( [ 'error' => 'Note not found or link expired' ], 404 );
+		if ( ! $row ) return new \WP_REST_Response( [ 'error' => __( 'Note not found or link expired', 'noodled' ) ], 404 );
 
 		return new \WP_REST_Response( [
 			'title' => $row['title'],
@@ -874,7 +874,7 @@ class Noodled_REST {
 		// Verify ownership
 		$nb = Noodled_Notebooks::get_by_id( $notebook_id );
 		if ( ! $nb || (int) $nb['owner_id'] !== $uid ) {
-			return new \WP_REST_Response( [ 'error' => 'You can only share notebooks you own' ], 403 );
+			return new \WP_REST_Response( [ 'error' => __( 'You can only share notebooks you own', 'noodled' ) ], 403 );
 		}
 
 		// Find target user

@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateTrashCount();
   } catch (e) {
     console.error('Noodled: load failed', e.message);
-    setStatus('Failed to load — try refreshing');
+    setStatus(__( 'Failed to load — try refreshing', 'noodled' ));
   }
 
   document.getElementById('splash')?.classList.add('hidden');
@@ -155,8 +155,10 @@ function applyTheme(mode) {
   document.documentElement.setAttribute('data-theme', effectiveTheme(mode));
   const btn = document.getElementById('themeBtn');
   if (btn) {
-    btn.title = 'Theme: ' + mode + ' (click to change)';
-    btn.setAttribute('aria-label', 'Theme: ' + mode + '. Click to change.');
+    /* translators: %s is the current theme mode (dark, light, or auto) */
+    btn.title = sprintf( __( 'Theme: %s (click to change)', 'noodled' ), mode );
+    /* translators: %s is the current theme mode (dark, light, or auto) */
+    btn.setAttribute('aria-label', sprintf( __( 'Theme: %s. Click to change.', 'noodled' ), mode ));
     const glyph = mode === 'auto' ? '&#9681;' : (mode === 'light' ? '&#9728;' : '&#9680;');
     btn.innerHTML = '<span aria-hidden="true">' + glyph + '</span>';
   }
@@ -167,7 +169,8 @@ if (_systemDark) { try { _systemDark.addEventListener('change', () => { if (conf
 async function toggleTheme() {
   const next = config.theme === 'dark' ? 'light' : (config.theme === 'light' ? 'auto' : 'dark');
   applyTheme(next);
-  showToast('Theme: ' + next);
+  /* translators: %s is the current theme mode (dark, light, or auto) */
+  showToast(sprintf( __( 'Theme: %s', 'noodled' ), next ));
   try { await api.set_config('theme', next); } catch (e) {}
 }
 
@@ -200,9 +203,11 @@ function renderNotebooks() {
     const label = nb.label || nb.name;
     const active = activeNotebook === name ? ' active' : '';
     const color = nbColors[i % nbColors.length];
-    const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="Shared with you" aria-hidden="true">&#128279;</span><span class="sr-only">(shared with you)</span>' : '';
-    const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="Read only" aria-hidden="true">&#128274;</span><span class="sr-only">(read only)</span>' : '';
-    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="Notebook ${esc(label)}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
+    const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">&#128279;</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
+    const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
+    /* translators: %s is the notebook name */
+    const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
+    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
@@ -222,7 +227,7 @@ async function selectNotebook(name) {
 }
 
 async function createNotebook() {
-  const name = await showPrompt('New Notebook', 'Notebook name:');
+  const name = await showPrompt(__( 'New Notebook', 'noodled' ), __( 'Notebook name:', 'noodled' ));
   if (!name) return;
   await api.create_notebook(name);
   await loadNotebooks();
@@ -232,14 +237,14 @@ async function createNotebook() {
 function showNbContext(event, name) {
   const nb = notebooks.find(n => n.name === name);
   const items = [
-    { label: 'Rename', action: () => renameNotebook(name) },
-    { label: 'Set cover image', action: () => setNotebookCover(name) },
+    { label: __( 'Rename', 'noodled' ), action: () => renameNotebook(name) },
+    { label: __( 'Set cover image', 'noodled' ), action: () => setNotebookCover(name) },
   ];
   if (nb && nb.access === 'owner') {
-    items.push({ label: 'Share...', action: () => showShareDialog(nb) });
+    items.push({ label: __( 'Share...', 'noodled' ), action: () => showShareDialog(nb) });
   }
   items.push({ sep: true });
-  items.push({ label: 'Delete', danger: true, action: () => deleteNotebook(name) });
+  items.push({ label: __( 'Delete', 'noodled' ), danger: true, action: () => deleteNotebook(name) });
   showContextMenu(event, items);
 }
 
@@ -248,15 +253,15 @@ async function showShareDialog(nb) {
   el.innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
       <div class="modal" style="min-width:380px">
-        <h3>Share "${esc(nb.name)}"</h3>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Enter their email to grant access</p>
-        <input id="shareEmail" placeholder="Email address" aria-label="Email address to share with" autofocus>
+        <h3>${esc(sprintf( /* translators: %s is the notebook name */ __( 'Share "%s"', 'noodled' ), nb.name ))}</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${esc(__( 'Enter their email to grant access', 'noodled' ))}</p>
+        <input id="shareEmail" placeholder="${escAttr(__( 'Email address', 'noodled' ))}" aria-label="${escAttr(__( 'Email address to share with', 'noodled' ))}" autofocus>
         <div style="display:flex;gap:8px;margin-bottom:16px">
-          <label style="font-size:12px;color:var(--text)"><input type="checkbox" id="shareWrite"> Can edit</label>
+          <label style="font-size:12px;color:var(--text)"><input type="checkbox" id="shareWrite"> ${esc(__( 'Can edit', 'noodled' ))}</label>
         </div>
         <div class="modal-buttons">
-          <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
-          <button class="btn btn-sm btn-accent" onclick="doShare(${nb.id})">Share</button>
+          <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
+          <button class="btn btn-sm btn-accent" onclick="doShare(${nb.id})">${esc(__( 'Share', 'noodled' ))}</button>
         </div>
         <div id="shareMsg" style="margin-top:8px;font-size:12px"></div>
         <div id="nbShareList" style="margin-top:14px"></div>
@@ -271,7 +276,7 @@ async function doShare(notebookId) {
   const email = document.getElementById('shareEmail').value;
   const canWrite = document.getElementById('shareWrite').checked;
   const msg = document.getElementById('shareMsg');
-  if (!email) { msg.textContent = 'Email required'; msg.style.color = 'var(--red)'; return; }
+  if (!email) { msg.textContent = __( 'Email required', 'noodled' ); msg.style.color = 'var(--red)'; return; }
 
   try {
     const r = await api._fetch('/share', {
@@ -279,9 +284,10 @@ async function doShare(notebookId) {
       body: JSON.stringify({ notebook_id: notebookId, email, can_write: canWrite })
     });
     if (r.error) { msg.textContent = r.error; msg.style.color = 'var(--red)'; }
-    else { msg.textContent = 'Shared!'; msg.style.color = 'var(--green)'; renderNotebookShareList(notebookId); }
+    else { msg.textContent = __( 'Shared!', 'noodled' ); msg.style.color = 'var(--green)'; renderNotebookShareList(notebookId); }
   } catch (e) {
-    msg.textContent = 'Failed: ' + e.message; msg.style.color = 'var(--red)';
+    /* translators: %s is the error message */
+    msg.textContent = sprintf( __( 'Failed: %s', 'noodled' ), e.message ); msg.style.color = 'var(--red)';
   }
 }
 
@@ -289,11 +295,11 @@ async function renderNotebookShareList(notebookId) {
   const list = document.getElementById('nbShareList');
   if (!list) return;
   const shares = await api.notebook_shares(notebookId);
-  if (!Array.isArray(shares) || !shares.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Not shared with anyone yet.</div>'; return; }
-  list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Shared with</div>' + shares.map(s =>
+  if (!Array.isArray(shares) || !shares.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">' + esc(__( 'Not shared with anyone yet.', 'noodled' )) + '</div>'; return; }
+  list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">' + esc(__( 'Shared with', 'noodled' )) + '</div>' + shares.map(s =>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px">
-       <span>${esc(s.display_name || s.email)} <span style="color:var(--text-muted)">(${s.can_write == 1 ? 'edit' : 'read'})</span></span>
-       <button class="btn btn-sm" onclick="removeNotebookShare(${notebookId}, '${esc(s.email)}')">Remove</button>
+       <span>${esc(s.display_name || s.email)} <span style="color:var(--text-muted)">(${s.can_write == 1 ? esc(__( 'edit', 'noodled' )) : esc(__( 'read', 'noodled' ))})</span></span>
+       <button class="btn btn-sm" onclick="removeNotebookShare(${notebookId}, '${esc(s.email)}')">${esc(__( 'Remove', 'noodled' ))}</button>
      </div>`).join('');
 }
 
@@ -305,22 +311,22 @@ async function removeNotebookShare(notebookId, email) {
 // ── Note-level user sharing ──
 function showNoteShareDialog(noteId) {
   const note = filteredNotes.find(n => n.id === noteId) || activeNote;
-  const title = note ? note.title : 'note';
+  const title = note ? note.title : __( 'note', 'noodled' );
   const el = document.getElementById('modalContainer');
   el.innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
       <div class="modal" style="min-width:400px">
-        <h3>Share "${esc(title)}"</h3>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Give another noodled user access to just this note.</p>
+        <h3>${esc(sprintf( /* translators: %s is the note title */ __( 'Share "%s"', 'noodled' ), title ))}</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${esc(__( 'Give another noodled user access to just this note.', 'noodled' ))}</p>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="nShareEmail" placeholder="Email address" aria-label="Email address to share with" style="flex:1" autofocus>
-          <label style="font-size:12px;white-space:nowrap"><input type="checkbox" id="nShareWrite"> Can edit</label>
-          <button class="btn btn-sm btn-accent" onclick="doNoteShare(${noteId})">Share</button>
+          <input id="nShareEmail" placeholder="${escAttr(__( 'Email address', 'noodled' ))}" aria-label="${escAttr(__( 'Email address to share with', 'noodled' ))}" style="flex:1" autofocus>
+          <label style="font-size:12px;white-space:nowrap"><input type="checkbox" id="nShareWrite"> ${esc(__( 'Can edit', 'noodled' ))}</label>
+          <button class="btn btn-sm btn-accent" onclick="doNoteShare(${noteId})">${esc(__( 'Share', 'noodled' ))}</button>
         </div>
         <div id="nShareMsg" style="margin-top:8px;font-size:12px"></div>
         <div id="nShareList" style="margin-top:14px"></div>
         <div class="modal-buttons" style="margin-top:14px">
-          <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+          <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
         </div>
       </div>
     </div>`;
@@ -332,11 +338,11 @@ async function renderNoteShareList(noteId) {
   const list = document.getElementById('nShareList');
   if (!list) return;
   const shares = await api.note_shares(noteId);
-  if (!Array.isArray(shares) || !shares.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Not shared with anyone yet.</div>'; return; }
-  list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Shared with</div>' + shares.map(s =>
+  if (!Array.isArray(shares) || !shares.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">' + esc(__( 'Not shared with anyone yet.', 'noodled' )) + '</div>'; return; }
+  list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">' + esc(__( 'Shared with', 'noodled' )) + '</div>' + shares.map(s =>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px">
-       <span>${esc(s.display_name || s.email)} <span style="color:var(--text-muted)">(${s.can_write == 1 ? 'edit' : 'read'})</span></span>
-       <button class="btn btn-sm" onclick="removeNoteShare(${noteId}, '${esc(s.email)}')">Remove</button>
+       <span>${esc(s.display_name || s.email)} <span style="color:var(--text-muted)">(${s.can_write == 1 ? esc(__( 'edit', 'noodled' )) : esc(__( 'read', 'noodled' ))})</span></span>
+       <button class="btn btn-sm" onclick="removeNoteShare(${noteId}, '${esc(s.email)}')">${esc(__( 'Remove', 'noodled' ))}</button>
      </div>`).join('');
 }
 
@@ -344,14 +350,14 @@ async function doNoteShare(noteId) {
   const email = document.getElementById('nShareEmail').value.trim();
   const canWrite = document.getElementById('nShareWrite').checked;
   const msg = document.getElementById('nShareMsg');
-  if (!email) { msg.textContent = 'Email required'; msg.style.color = 'var(--red)'; return; }
+  if (!email) { msg.textContent = __( 'Email required', 'noodled' ); msg.style.color = 'var(--red)'; return; }
   try {
     const r = await api.note_share(noteId, email, canWrite);
     if (r.error) { msg.textContent = r.error; msg.style.color = 'var(--red)'; return; }
-    msg.textContent = 'Shared!'; msg.style.color = 'var(--green)';
+    msg.textContent = __( 'Shared!', 'noodled' ); msg.style.color = 'var(--green)';
     document.getElementById('nShareEmail').value = '';
     renderNoteShareList(noteId);
-  } catch (e) { msg.textContent = 'Failed: ' + e.message; msg.style.color = 'var(--red)'; }
+  } catch (e) { /* translators: %s is the error message */ msg.textContent = sprintf( __( 'Failed: %s', 'noodled' ), e.message ); msg.style.color = 'var(--red)'; }
 }
 
 async function removeNoteShare(noteId, email) {
@@ -360,7 +366,7 @@ async function removeNoteShare(noteId, email) {
 }
 
 async function renameNotebook(name) {
-  const newName = await showPrompt('Rename Notebook', 'New name:', name);
+  const newName = await showPrompt(__( 'Rename Notebook', 'noodled' ), __( 'New name:', 'noodled' ), name);
   if (!newName || newName === name) return;
   await api.rename_notebook(name, newName);
   if (activeNotebook === name) activeNotebook = newName;
@@ -369,7 +375,8 @@ async function renameNotebook(name) {
 }
 
 async function deleteNotebook(name) {
-  if (!confirm(`Delete notebook "${name}" and all its notes?`)) return;
+  /* translators: %s is the notebook name */
+  if (!confirm(sprintf( __( 'Delete notebook "%s" and all its notes?', 'noodled' ), name ))) return;
   await api.delete_notebook(name);
   if (activeNotebook === name) activeNotebook = null;
   activeNote = null;
@@ -388,7 +395,7 @@ async function loadNotes() {
     // Offline / fetch failed → fall back to the last cached copy so notes stay readable.
     try {
       const c = JSON.parse(localStorage.getItem('noodled_notes_cache') || 'null');
-      if (c && c.nb === activeNotebook && Array.isArray(c.notes)) { notes = c.notes; showToast('Offline — showing cached notes'); }
+      if (c && c.nb === activeNotebook && Array.isArray(c.notes)) { notes = c.notes; showToast(__( 'Offline — showing cached notes', 'noodled' )); }
       else throw e;
     } catch (_) { throw e; }
   }
@@ -423,7 +430,7 @@ function onSearch() { filterNotes(); }
 
 function cycleSort() {
   const modes = ['modified', 'created', 'alpha'];
-  const labels = { modified: 'Modified', created: 'Created', alpha: 'A-Z' };
+  const labels = { modified: __( 'Modified', 'noodled' ), created: __( 'Created', 'noodled' ), alpha: __( 'A-Z', 'noodled' ) };
   sortMode = modes[(modes.indexOf(sortMode) + 1) % modes.length];
   document.getElementById('sortBtn').textContent = labels[sortMode];
   filterNotes();
@@ -438,18 +445,18 @@ function highlightMatch(text, query) {
 
 // Bucket a note's date into a list section label.
 function dateGroup(dateStr) {
-  if (!dateStr) return 'Earlier';
+  if (!dateStr) return __( 'Earlier', 'noodled' );
   const d = new Date(dateStr.replace(' ', 'T') + (dateStr.length <= 16 ? 'Z' : ''));
-  if (isNaN(d)) return 'Earlier';
+  if (isNaN(d)) return __( 'Earlier', 'noodled' );
   const now = new Date();
   const day = 86400000;
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const t = d.getTime();
-  if (t >= startToday) return 'Today';
-  if (t >= startToday - day) return 'Yesterday';
-  if (t >= startToday - 7 * day) return 'This week';
-  if (t >= startToday - 30 * day) return 'This month';
-  return 'Earlier';
+  if (t >= startToday) return __( 'Today', 'noodled' );
+  if (t >= startToday - day) return __( 'Yesterday', 'noodled' );
+  if (t >= startToday - 7 * day) return __( 'This week', 'noodled' );
+  if (t >= startToday - 30 * day) return __( 'This month', 'noodled' );
+  return __( 'Earlier', 'noodled' );
 }
 
 function renderNoteList() {
@@ -462,13 +469,13 @@ function renderNoteList() {
   const out = [];
   filteredNotes.forEach(n => {
     if (grouped) {
-      const g = n.pinned ? 'Pinned' : dateGroup(n.modified || n.created);
-      if (g !== lastGroup) { lastGroup = g; out.push(`<div class="note-group">${g}</div>`); }
+      const g = n.pinned ? __( 'Pinned', 'noodled' ) : dateGroup(n.modified || n.created);
+      if (g !== lastGroup) { lastGroup = g; out.push(`<div class="note-group">${esc(g)}</div>`); }
     }
     out.push(renderNoteItem(n));
   });
   el.innerHTML = coverHtml + out.join('');
-  document.getElementById('noteCount').textContent = `${filteredNotes.length} note${filteredNotes.length !== 1 ? 's' : ''}`;
+  document.getElementById('noteCount').textContent = sprintf( _n( '%d note', '%d notes', filteredNotes.length, 'noodled' ), filteredNotes.length );
 }
 
 function renderNoteItem(n) {
@@ -489,20 +496,24 @@ function renderNoteItem(n) {
       .trim().substring(0, 120);
     const isActive = activeNote && activeNote.id === n.id;
     const badge = n.source === 'plaud' ? '<span class="source-badge">plaud</span>' : '';
-    const pin = n.pinned ? '<span style="margin-right:4px;font-size:11px" title="Pinned">&#128204;</span>' : '';
-    const star = isStarred(n.id) ? '<span style="margin-right:4px;font-size:11px;color:#f59e0b" title="Starred">&#9733;</span>' : '';
-    const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="Shared with you">&#128279;</span>' : '';
-    const attBadge = (n.att > 0) ? `<span class="att-badge" title="${n.att} attachment${n.att !== 1 ? 's' : ''}">&#128206; ${n.att}</span>` : '';
+    const pin = n.pinned ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Pinned', 'noodled' )) + '">&#128204;</span>' : '';
+    const star = isStarred(n.id) ? '<span style="margin-right:4px;font-size:11px;color:#f59e0b" title="' + escAttr(__( 'Starred', 'noodled' )) + '">&#9733;</span>' : '';
+    const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '">&#128279;</span>' : '';
+    /* translators: %d is the number of attachments */
+    const attBadge = (n.att > 0) ? `<span class="att-badge" title="${escAttr(sprintf( _n( '%d attachment', '%d attachments', n.att, 'noodled' ), n.att ))}">&#128206; ${n.att}</span>` : '';
     const tasks = checklistProgress(n.body);
-    const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${tasks.done} of ${tasks.total} tasks done">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
+    /* translators: %1$d is completed tasks, %2$d is total tasks */
+    const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${escAttr(sprintf( __( '%1$d of %2$d tasks done', 'noodled' ), tasks.done, tasks.total ))}">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
     const time = relativeTime(n.modified || n.created);
     const fullDate = n.modified || n.created || '';
-    const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" aria-label="Select note: ${escAttr(n.title || 'Untitled')}" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
+    /* translators: %s is the note title */
+    const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" aria-label="${escAttr(sprintf( __( 'Select note: %s', 'noodled' ), n.title || __( 'Untitled', 'noodled' ) ))}" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
     const noteColor = getNoteColor(n.id);
     const colorStyle = noteColor ? `border-left:3px solid ${noteColor}` : '';
     // In bulk mode the row contains a real checkbox, so it must NOT be a role=button
     // (a button can't contain interactive descendants); the checkbox is the control.
-    const rowRole = bulkMode ? '' : `role="button" tabindex="0" aria-label="Open note: ${escAttr(n.title || 'Untitled')}"`;
+    /* translators: %s is the note title */
+    const rowRole = bulkMode ? '' : `role="button" tabindex="0" aria-label="${escAttr(sprintf( __( 'Open note: %s', 'noodled' ), n.title || __( 'Untitled', 'noodled' ) ))}"`;
     return `
       <div class="note-item ${isActive ? 'active' : ''}" data-note-id="${n.id}" style="${colorStyle}"
            ${rowRole}
@@ -533,7 +544,7 @@ async function selectNote(noteId) {
   } catch (e) {
     // Offline → read from the cached list copy (body only, no attachments).
     const c = notes.find(n => n.id === noteId);
-    if (c) { activeNote = { ...c }; showToast('Offline — showing cached note'); }
+    if (c) { activeNote = { ...c }; showToast(__( 'Offline — showing cached note', 'noodled' )); }
     else throw e;
   }
   trackRecentNote(noteId);
@@ -552,7 +563,7 @@ function trackRecentNote(id) {
 async function createNote() {
   await doSave();
   const nb = activeNotebook || 'General';
-  const note = await api.create_note(nb, 'Untitled Note', '');
+  const note = await api.create_note(nb, __( 'Untitled Note', 'noodled' ), '');
   await loadNotebooks();
   await loadNotes();
   activeNote = note;
@@ -569,37 +580,38 @@ async function createNote() {
 function showNoteContext(event, noteId) {
   if (viewingTrash) {
     showContextMenu(event, [
-      { label: 'Restore', action: () => restoreNote(noteId) },
+      { label: __( 'Restore', 'noodled' ), action: () => restoreNote(noteId) },
       { sep: true },
-      { label: 'Delete permanently', danger: true, action: () => permanentDelete(noteId) },
+      { label: __( 'Delete permanently', 'noodled' ), danger: true, action: () => permanentDelete(noteId) },
     ]);
     return;
   }
 
   const note = filteredNotes.find(n => n.id === noteId);
-  const pinLabel = note && note.pinned ? 'Unpin' : 'Pin to top';
+  const pinLabel = note && note.pinned ? __( 'Unpin', 'noodled' ) : __( 'Pin to top', 'noodled' );
 
   const moveItems = notebooks
     .filter(nb => !note || nb.name !== note.notebook)
     .map(nb => ({
-      label: `Move to ${nb.name}`,
+      /* translators: %s is the notebook name */
+      label: sprintf( __( 'Move to %s', 'noodled' ), nb.name ),
       action: () => moveNote(noteId, nb.name)
     }));
 
-  const starLabel = isStarred(noteId) ? 'Unstar' : 'Star';
+  const starLabel = isStarred(noteId) ? __( 'Unstar', 'noodled' ) : __( 'Star', 'noodled' );
   showContextMenu(event, [
     { label: pinLabel, action: () => togglePin(noteId) },
     { label: starLabel, action: () => toggleStar(noteId) },
-    { label: 'Color', action: () => showColorPicker(noteId) },
-    { label: 'Duplicate', action: () => duplicateNote(noteId) },
-    { label: 'Open in split', action: () => openInSplit(noteId) },
-    { label: 'Copy text', action: () => copyNoteText(noteId) },
-    { label: 'Share with people…', action: () => showNoteShareDialog(noteId) },
-    { label: 'Public link', action: () => shareNoteLink(noteId) },
+    { label: __( 'Color', 'noodled' ), action: () => showColorPicker(noteId) },
+    { label: __( 'Duplicate', 'noodled' ), action: () => duplicateNote(noteId) },
+    { label: __( 'Open in split', 'noodled' ), action: () => openInSplit(noteId) },
+    { label: __( 'Copy text', 'noodled' ), action: () => copyNoteText(noteId) },
+    { label: __( 'Share with people…', 'noodled' ), action: () => showNoteShareDialog(noteId) },
+    { label: __( 'Public link', 'noodled' ), action: () => shareNoteLink(noteId) },
     { sep: true },
     ...moveItems,
     { sep: true },
-    { label: 'Delete', danger: true, action: () => deleteNote(noteId) },
+    { label: __( 'Delete', 'noodled' ), danger: true, action: () => deleteNote(noteId) },
   ]);
 }
 
@@ -614,7 +626,7 @@ async function copyNoteText(noteId) {
   const note = await api.get_note(null, noteId);
   if (note.body) {
     await navigator.clipboard.writeText(note.body);
-    showToast('Copied to clipboard');
+    showToast(__( 'Copied to clipboard', 'noodled' ));
   }
 }
 
@@ -629,7 +641,7 @@ async function deleteNote(noteId) {
   await loadNotebooks();
   await loadNotes();
   updateTrashCount();
-  showUndoToast('Note moved to trash', () => undoDelete(noteId));
+  showUndoToast(__( 'Note moved to trash', 'noodled' ), () => undoDelete(noteId));
 }
 
 async function moveNote(noteId, toNotebook) {
@@ -638,7 +650,8 @@ async function moveNote(noteId, toNotebook) {
   await api.move_note(note.notebook, noteId, toNotebook);
   await loadNotebooks();
   await loadNotes();
-  showToast(`Moved to ${toNotebook}`);
+  /* translators: %s is the destination notebook name */
+  showToast(sprintf( __( 'Moved to %s', 'noodled' ), toNotebook ));
 }
 
 async function selectTrash() {
@@ -660,11 +673,11 @@ async function restoreNote(noteId) {
   filterNotes();
   await updateTrashCount();
   await loadNotebooks();
-  showToast('Restored');
+  showToast(__( 'Restored', 'noodled' ));
 }
 
 async function permanentDelete(noteId) {
-  if (!confirm('Permanently delete this note? This cannot be undone.')) return;
+  if (!confirm(__( 'Permanently delete this note? This cannot be undone.', 'noodled' ))) return;
   await api.permanent_delete(noteId);
   if (activeNote && activeNote.id === noteId) { activeNote = null; renderContent(); }
   notes = await api.get_trash();
@@ -683,7 +696,7 @@ async function updateTrashCount() {
 function renderContent() {
   const el = document.getElementById('colContent');
   if (!activeNote) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#127837;</div><div>Select a note or create a new one</div></div>';
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#127837;</div><div>' + esc(__( 'Select a note or create a new one', 'noodled' )) + '</div></div>';
     return;
   }
 
@@ -691,37 +704,37 @@ function renderContent() {
   el.innerHTML = `
     <div class="content-toolbar">
       <input class="content-title-input" id="titleInput" value="${escAttr(n.title)}"
-             placeholder="Note title" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();document.getElementById(showRawMarkdown?'noteBodyRaw':'noteBody')?.focus();}">
+             placeholder="${escAttr(__( 'Note title', 'noodled' ))}" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();document.getElementById(showRawMarkdown?'noteBodyRaw':'noteBody')?.focus();}">
       <span class="save-indicator" id="saveIndicator"></span>
       <div class="editor-actions">
-        <button class="btn btn-sm" onclick="insertBullet()" title="Bullet list" aria-label="Bullet list"><span aria-hidden="true">&#9679;</span></button>
-        <button class="btn btn-sm" onclick="insertChecklistItem()" title="Checklist" aria-label="Checklist"><span aria-hidden="true">&#9744;</span></button>
-        <button class="btn btn-sm" onclick="insertHeading()" title="Heading" aria-label="Heading">H</button>
+        <button class="btn btn-sm" onclick="insertBullet()" title="${escAttr(__( 'Bullet list', 'noodled' ))}" aria-label="${escAttr(__( 'Bullet list', 'noodled' ))}"><span aria-hidden="true">&#9679;</span></button>
+        <button class="btn btn-sm" onclick="insertChecklistItem()" title="${escAttr(__( 'Checklist', 'noodled' ))}" aria-label="${escAttr(__( 'Checklist', 'noodled' ))}"><span aria-hidden="true">&#9744;</span></button>
+        <button class="btn btn-sm" onclick="insertHeading()" title="${escAttr(__( 'Heading', 'noodled' ))}" aria-label="${escAttr(__( 'Heading', 'noodled' ))}">H</button>
         <span class="toolbar-divider" aria-hidden="true"></span>
-        <button class="btn btn-sm" onclick="copyBody()" title="Copy" aria-label="Copy note"><span aria-hidden="true">&#128203;</span></button>
-        <button class="btn btn-sm" onclick="uploadFiles()" title="Add files" aria-label="Add files"><span aria-hidden="true">&#128206;</span></button>
-        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="Dictate" aria-label="Dictate"><span aria-hidden="true">&#127908;</span></button>
+        <button class="btn btn-sm" onclick="copyBody()" title="${escAttr(__( 'Copy', 'noodled' ))}" aria-label="${escAttr(__( 'Copy note', 'noodled' ))}"><span aria-hidden="true">&#128203;</span></button>
+        <button class="btn btn-sm" onclick="uploadFiles()" title="${escAttr(__( 'Add files', 'noodled' ))}" aria-label="${escAttr(__( 'Add files', 'noodled' ))}"><span aria-hidden="true">&#128206;</span></button>
+        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="${escAttr(__( 'Dictate', 'noodled' ))}" aria-label="${escAttr(__( 'Dictate', 'noodled' ))}"><span aria-hidden="true">&#127908;</span></button>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <div class="toolbar-menu-wrap">
-          <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="More tools" aria-label="More tools" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
+          <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="${escAttr(__( 'More tools', 'noodled' ))}" aria-label="${escAttr(__( 'More tools', 'noodled' ))}" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
           <div class="toolbar-dropdown" id="editorMenu" role="menu" aria-labelledby="editorMenuBtn">
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? 'Preview mode' : 'Source mode'}</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleFindReplace()">Find & replace</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTOC()">Table of contents</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportNote()">Export as HTML</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="downloadNoteMd()">Download as Markdown</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="printNote()">Print / Save as PDF</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? esc(__( 'Preview mode', 'noodled' )) : esc(__( 'Source mode', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleFindReplace()">${esc(__( 'Find & replace', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTOC()">${esc(__( 'Table of contents', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportNote()">${esc(__( 'Export as HTML', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="downloadNoteMd()">${esc(__( 'Download as Markdown', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="printNote()">${esc(__( 'Print / Save as PDF', 'noodled' ))}</div>
             <div class="dropdown-sep"></div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleReadingMode()">Reading mode</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTypewriter()">Typewriter mode</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleZenMode()">Zen mode</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleReadingMode()">${esc(__( 'Reading mode', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTypewriter()">${esc(__( 'Typewriter mode', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleZenMode()">${esc(__( 'Zen mode', 'noodled' ))}</div>
             <div class="dropdown-sep"></div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showHistory()">Version history</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="setWordGoal()">Word count goal</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="saveAsTemplate()">Save as template</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showReadingPrefs()">Reading preferences</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showHistory()">${esc(__( 'Version history', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="setWordGoal()">${esc(__( 'Word count goal', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="saveAsTemplate()">${esc(__( 'Save as template', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showReadingPrefs()">${esc(__( 'Reading preferences', 'noodled' ))}</div>
             <div class="dropdown-sep"></div>
-            <div class="dropdown-item dropdown-danger" onclick="deleteCurrentNote()">Delete note</div>
+            <div class="dropdown-item dropdown-danger" onclick="deleteCurrentNote()">${esc(__( 'Delete note', 'noodled' ))}</div>
           </div>
         </div>
       </div>
@@ -730,7 +743,7 @@ function renderContent() {
       ${showRawMarkdown
         ? `<textarea id="noteBodyRaw" class="raw-markdown" oninput="schedSave(); updateWordCount()">${escAttr(n.body || '')}</textarea>`
         : `<div class="rendered-content" id="noteBody" contenteditable="true"
-               role="textbox" aria-multiline="true" aria-label="Note body"
+               role="textbox" aria-multiline="true" aria-label="${escAttr(__( 'Note body', 'noodled' ))}"
                oninput="schedSave(); updateWordCount()" onkeydown="handleContentKey(event)"
                >${renderMarkdown(n.body)}</div>`
       }
@@ -785,7 +798,8 @@ function updateWordCount() {
   let goalText = '';
   if (goal) {
     const pct = Math.min(100, Math.round(wordCount / goal * 100));
-    goalText = ` \u00b7 ${pct}% of ${goal} goal`;
+    /* translators: %1$d is the percentage complete, %2$d is the word-count goal */
+    goalText = ' \u00b7 ' + sprintf( __( '%1$d%% of %2$d goal', 'noodled' ), pct, goal );
   }
   // Checklist progress \u2014 read checkboxes straight from the DOM when rendered
   // (cheap on every keystroke), else fall back to parsing the markdown.
@@ -797,7 +811,8 @@ function updateWordCount() {
   } else {
     prog = checklistProgress(activeNote.body || '');
   }
-  el.innerHTML = `${wordCount} words \u00b7 ${charCount} chars \u00b7 ${readTime} min read${goalText ? esc(goalText) : ''}`;
+  /* translators: %1$d is the word count, %2$d is the character count, %3$d is the estimated read time in minutes */
+  el.innerHTML = esc(sprintf( __( '%1$d words \u00b7 %2$d chars \u00b7 %3$d min read', 'noodled' ), wordCount, charCount, readTime )) + (goalText ? esc(goalText) : '');
   if (prog) {
     el.innerHTML += ` <span class="footer-tasks">\u00b7 \u2713 ${prog.done}/${prog.total}<span class="ftbar"><span style="width:${Math.round(prog.done / prog.total * 100)}%"></span></span></span>`;
   }
@@ -893,7 +908,7 @@ function insertBullet() {
   const el = document.getElementById('noteBody');
   if (!el) return;
   const li = document.createElement('li');
-  li.textContent = 'item';
+  li.textContent = __( 'item', 'noodled' );
   const sel = window.getSelection();
   let ul = document.createElement('ul');
   ul.appendChild(li);
@@ -1002,7 +1017,8 @@ function toggleEditorMenu() {
 async function deleteCurrentNote() {
   if (!activeNote) return;
   if (typeof dictating !== 'undefined' && dictating) stopDictation();
-  if (!confirm(`Delete "${activeNote.title}"?`)) return;
+  /* translators: %s is the note title */
+  if (!confirm(sprintf( __( 'Delete "%s"?', 'noodled' ), activeNote.title ))) return;
   const deletedId = activeNote.id;
   await api.delete_note(activeNote.notebook, activeNote.id);
   activeNote = null;
@@ -1013,7 +1029,7 @@ async function deleteCurrentNote() {
   updateTrashCount();
   // Push to GitHub so delete syncs across devices
   try { await api.git_push(); } catch (e) {}
-  showUndoToast('Note moved to trash', () => undoDelete(deletedId));
+  showUndoToast(__( 'Note moved to trash', 'noodled' ), () => undoDelete(deletedId));
 }
 
 function toggleMarkdownView() {
@@ -1183,17 +1199,18 @@ async function attachFile(file) {
     if (result && result.filename) {
       if (i >= 0) note.attachments[i] = result; else note.attachments.push(result);
       if (activeNote === note) { renderAttachmentGallery(); syncAttBadge(); }
-      showToast(`Attached: ${result.filename}`);
+      /* translators: %s is the attached file name */
+      showToast(sprintf( __( 'Attached: %s', 'noodled' ), result.filename ));
     } else {
       if (i >= 0) note.attachments.splice(i, 1);
       if (activeNote === note) renderAttachmentGallery();
-      showToast((result && result.error) || 'Upload failed');
+      showToast((result && result.error) || __( 'Upload failed', 'noodled' ));
     }
   } catch (e) {
     const i = note.attachments.indexOf(placeholder);
     if (i >= 0) note.attachments.splice(i, 1);
     if (activeNote === note) renderAttachmentGallery();
-    showToast('Upload failed');
+    showToast(__( 'Upload failed', 'noodled' ));
   }
 }
 
@@ -1216,17 +1233,19 @@ async function handleFiles(input) {
   if (activeNote) {
     let ok = 0;
     for (const f of files) { await attachFile(f); ok++; }
-    showToast(`${ok} file${ok !== 1 ? 's' : ''} added`);
+    /* translators: %d is the number of files added */
+    showToast(sprintf( _n( '%d file added', '%d files added', ok, 'noodled' ), ok ));
     return;
   }
 
   await doSave();
   const nb = activeNotebook || 'General';
   const allImages = files.every(f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(f.name));
-  const title = (allImages ? 'Image Upload ' : 'Files ') + new Date().toLocaleString();
-  showToast(`Uploading ${files.length} file${files.length !== 1 ? 's' : ''}…`);
+  const title = (allImages ? __( 'Image Upload', 'noodled' ) + ' ' : __( 'Files', 'noodled' ) + ' ') + new Date().toLocaleString();
+  /* translators: %d is the number of files being uploaded */
+  showToast(sprintf( _n( 'Uploading %d file…', 'Uploading %d files…', files.length, 'noodled' ), files.length ));
   const note = await api.create_note(nb, title, '');
-  if (!note || note.error) { showToast('Could not create note'); return; }
+  if (!note || note.error) { showToast(__( 'Could not create note', 'noodled' )); return; }
   let ok = 0;
   for (const f of files) {
     try { const cf = await compressImage(f); const b64 = await fileToB64(cf); const r = await api.save_attachment(note.notebook, note.id, cf.name, b64); if (r && r.filename) ok++; } catch (e) {}
@@ -1238,18 +1257,19 @@ async function handleFiles(input) {
   renderContent();
   document.querySelector('.col-content')?.classList.add('open');
   closeSidebar();
-  showToast(`${ok} file${ok !== 1 ? 's' : ''} added`);
+  /* translators: %d is the number of files added */
+  showToast(sprintf( _n( '%d file added', '%d files added', ok, 'noodled' ), ok ));
 }
 
 // Delete an attachment (from a gallery × or the lightbox trash button).
 async function deleteAttachment(id) {
-  if (!confirm('Delete this attachment?')) return;
+  if (!confirm(__( 'Delete this attachment?', 'noodled' ))) return;
   try { await api.delete_attachment(id); }
-  catch (e) { showToast('Delete failed'); return; }
+  catch (e) { showToast(__( 'Delete failed', 'noodled' )); return; }
   if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(a => a.id !== id);
   renderAttachmentGallery();
   syncAttBadge();
-  showToast('Deleted');
+  showToast(__( 'Deleted', 'noodled' ));
 }
 
 // Keep the note-list paperclip count in sync after an attach/delete on the open
@@ -1274,17 +1294,22 @@ function importEvernote() {
 async function handleEvernoteImport(input) {
   const file = input.files && input.files[0];
   if (!file) return;
-  showToast('Importing from Evernote…');
+  showToast(__( 'Importing from Evernote…', 'noodled' ));
   const fd = new FormData();
   fd.append('file', file);
   try {
     const res = await api.import_evernote(fd);
-    if (res && res.error) { showToast('Import failed: ' + res.error); return; }
+    /* translators: %s is the error message */
+    if (res && res.error) { showToast(sprintf( __( 'Import failed: %s', 'noodled' ), res.error )); return; }
     await loadNotebooks();
     await loadNotes();
     const n = res.imported || 0;
-    showToast(`Imported ${n} note${n !== 1 ? 's' : ''}` + (res.skipped ? `, ${res.skipped} skipped` : ''));
-  } catch (e) { showToast('Import failed'); }
+    /* translators: %d is the number of notes imported */
+    let m = sprintf( _n( 'Imported %d note', 'Imported %d notes', n, 'noodled' ), n );
+    /* translators: %d is the number of notes skipped during import */
+    if (res.skipped) m += ', ' + sprintf( _n( '%d skipped', '%d skipped', res.skipped, 'noodled' ), res.skipped );
+    showToast(m);
+  } catch (e) { showToast(__( 'Import failed', 'noodled' )); }
 }
 
 // ── Owner: manage people (mobile-friendly user management, owner-only) ──
@@ -1293,10 +1318,10 @@ function manageUsers() {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal" style="max-width:540px">
-      <h3>People</h3>
-      <div id="muBody" style="max-height:62vh;overflow:auto;margin-top:8px">Loading…</div>
+      <h3>${esc(__( 'People', 'noodled' ))}</h3>
+      <div id="muBody" style="max-height:62vh;overflow:auto;margin-top:8px">${esc(__( 'Loading…', 'noodled' ))}</div>
       <div class="modal-buttons" style="margin-top:12px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div></div>`;
   renderManageUsers();
@@ -1306,60 +1331,63 @@ async function renderManageUsers() {
   const body = document.getElementById('muBody');
   if (!body) return;
   let users;
-  try { users = await api.admin_users(); } catch (e) { body.textContent = 'Could not load people.'; return; }
+  try { users = await api.admin_users(); } catch (e) { body.textContent = __( 'Could not load people.', 'noodled' ); return; }
   if (users.error) { body.textContent = users.error; return; }
   const pending = users.filter(u => u.role === 'pending');
   const members = users.filter(u => u.role !== 'pending');
   let h = '';
   if (pending.length) {
-    h += '<div class="mu-head">Pending requests</div>';
+    h += '<div class="mu-head">' + esc(__( 'Pending requests', 'noodled' )) + '</div>';
     pending.forEach(u => {
       h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)}</span></div>
-        <div class="mu-actions"><button class="btn btn-sm btn-accent" onclick="muApprove(${u.id})">Approve</button><button class="btn btn-sm" onclick="muRemove(${u.id})">Deny</button></div></div>`;
+        <div class="mu-actions"><button class="btn btn-sm btn-accent" onclick="muApprove(${u.id})">${esc(__( 'Approve', 'noodled' ))}</button><button class="btn btn-sm" onclick="muRemove(${u.id})">${esc(__( 'Deny', 'noodled' ))}</button></div></div>`;
     });
   }
-  h += '<div class="mu-head">Members</div>';
+  h += '<div class="mu-head">' + esc(__( 'Members', 'noodled' )) + '</div>';
   members.forEach(u => {
     const drop = u.role === 'member'
-      ? `<label class="mu-drop"><input type="checkbox" ${u.drop ? 'checked' : ''} onchange="muDrop(${u.id}, this.checked)"> drop</label>` : '';
+      ? `<label class="mu-drop"><input type="checkbox" ${u.drop ? 'checked' : ''} onchange="muDrop(${u.id}, this.checked)"> ${esc(__( 'drop', 'noodled' ))}</label>` : '';
+    /* translators: %s is the member name or email */
+    const removeAria = escAttr(sprintf( __( 'Remove %s', 'noodled' ), u.display_name || u.email || __( 'member', 'noodled' ) ));
     h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)} · ${esc(u.role)}</span><span class="mu-pin" id="mu-pin-${u.id}"></span></div>
-      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">PIN</button><button class="btn btn-sm" aria-label="Remove ${escAttr(u.display_name || u.email || 'member')}" onclick="muRemove(${u.id})">&#10005;</button></div></div>`;
+      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">${esc(__( 'PIN', 'noodled' ))}</button><button class="btn btn-sm" aria-label="${removeAria}" onclick="muRemove(${u.id})">&#10005;</button></div></div>`;
   });
-  h += `<div class="mu-head">Invite someone</div>
+  h += `<div class="mu-head">${esc(__( 'Invite someone', 'noodled' ))}</div>
     <div class="mu-invite">
-      <input id="muEmail" type="email" inputmode="email" placeholder="email" aria-label="Member email" class="login-input" style="margin:0">
-      <input id="muName" type="text" placeholder="name (optional)" aria-label="Member name (optional)" class="login-input" style="margin:0">
+      <input id="muEmail" type="email" inputmode="email" placeholder="${escAttr(__( 'email', 'noodled' ))}" aria-label="${escAttr(__( 'Member email', 'noodled' ))}" class="login-input" style="margin:0">
+      <input id="muName" type="text" placeholder="${escAttr(__( 'name (optional)', 'noodled' ))}" aria-label="${escAttr(__( 'Member name (optional)', 'noodled' ))}" class="login-input" style="margin:0">
       <div class="mu-invite-row">
-        <label class="mu-drop"><input type="checkbox" id="muInviteDrop"> drop folder</label>
-        <button class="btn btn-sm btn-accent" onclick="muInvite()">Invite</button>
+        <label class="mu-drop"><input type="checkbox" id="muInviteDrop"> ${esc(__( 'drop folder', 'noodled' ))}</label>
+        <button class="btn btn-sm btn-accent" onclick="muInvite()">${esc(__( 'Invite', 'noodled' ))}</button>
         <span id="muInviteStatus" class="mu-status"></span>
       </div>
     </div>`;
   body.innerHTML = h;
 }
 
-async function muApprove(id) { try { await api.admin_approve(id); } catch (e) { showToast('Failed'); } renderManageUsers(); }
-async function muRemove(id) { if (!confirm('Remove this person? Their notes stay but they lose access.')) return; try { await api.admin_delete_user(id); } catch (e) { showToast('Failed'); } renderManageUsers(); }
-async function muDrop(id, on) { try { const r = await api.admin_set_drop(id, on); if (r && r.error) showToast(r.error); } catch (e) { showToast('Failed'); } }
+async function muApprove(id) { try { await api.admin_approve(id); } catch (e) { showToast(__( 'Failed', 'noodled' )); } renderManageUsers(); }
+async function muRemove(id) { if (!confirm(__( 'Remove this person? Their notes stay but they lose access.', 'noodled' ))) return; try { await api.admin_delete_user(id); } catch (e) { showToast(__( 'Failed', 'noodled' )); } renderManageUsers(); }
+async function muDrop(id, on) { try { const r = await api.admin_set_drop(id, on); if (r && r.error) showToast(r.error); } catch (e) { showToast(__( 'Failed', 'noodled' )); } }
 async function muPin(id) {
   const out = document.getElementById('mu-pin-' + id); if (out) out.textContent = '…';
-  try { const d = await api.admin_send_pin(id); if (out) out.innerHTML = d.error ? esc(d.error) : (' PIN <b>' + esc(d.pin) + '</b>' + (d.emailed ? ' ✓' : '')); }
-  catch (e) { if (out) out.textContent = 'failed'; }
+  /* translators: %s is the generated PIN code */
+  try { const d = await api.admin_send_pin(id); if (out) out.innerHTML = d.error ? esc(d.error) : (sprintf( __( ' PIN %s', 'noodled' ), '<b>' + esc(d.pin) + '</b>' ) + (d.emailed ? ' ✓' : '')); }
+  catch (e) { if (out) out.textContent = __( 'failed', 'noodled' ); }
 }
 async function muInvite() {
   const email = document.getElementById('muEmail').value.trim();
   const name = document.getElementById('muName').value.trim();
   const drop = document.getElementById('muInviteDrop').checked;
   const st = document.getElementById('muInviteStatus');
-  if (!email) { st.textContent = 'email?'; return; }
+  if (!email) { st.textContent = __( 'email?', 'noodled' ); return; }
   st.textContent = '…';
   let d;
-  try { d = await api.admin_invite(email, name, 'member', drop); } catch (e) { st.textContent = 'failed'; return; }
+  try { d = await api.admin_invite(email, name, 'member', drop); } catch (e) { st.textContent = __( 'failed', 'noodled' ); return; }
   if (d.error) { st.textContent = d.error; return; }
   document.getElementById('muEmail').value = '';
   document.getElementById('muName').value = '';
   document.getElementById('muInviteDrop').checked = false;
-  st.textContent = 'invited ✓';
+  st.textContent = __( 'invited ✓', 'noodled' );
   renderManageUsers();
 }
 
@@ -1390,8 +1418,8 @@ async function toggleCheck(checkIndex) {
 async function copyBody() {
   if (!activeNote) return;
   const text = activeNote.body || '';
-  try { await navigator.clipboard.writeText(text); showToast('Copied to clipboard'); }
-  catch { showToast('Copy failed'); }
+  try { await navigator.clipboard.writeText(text); showToast(__( 'Copied to clipboard', 'noodled' )); }
+  catch { showToast(__( 'Copy failed', 'noodled' )); }
 }
 
 // ── Global keyboard shortcuts ──
@@ -1399,7 +1427,7 @@ function handleGlobalKey(e) {
   const tag = e.target.tagName;
   const isEditable = e.target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA';
   if (e.ctrlKey && e.key === 'n') { e.preventDefault(); createNote(); return; }
-  if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); showToast('Saved'); return; }
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); showToast(__( 'Saved', 'noodled' )); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K') && !e.shiftKey) { e.preventDefault(); showCommandPalette(); return; }
   if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); document.getElementById('searchInput').focus(); return; }
   if (e.ctrlKey && e.key === 'p') { e.preventDefault(); showQuickOpen(); return; }
@@ -1415,7 +1443,7 @@ function handleGlobalKey(e) {
 function showQuickOpen() {
   const el = document.getElementById('modalContainer');
   const allNotes = notes;
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal" style="min-width:400px"><h3>Quick Open</h3><input id="qoInput" placeholder="Type to search notes..." aria-label="Search notes to open" autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal" style="min-width:400px"><h3>${esc(__( 'Quick Open', 'noodled' ))}</h3><input id="qoInput" placeholder="${escAttr(__( 'Type to search notes...', 'noodled' ))}" aria-label="${escAttr(__( 'Search notes to open', 'noodled' ))}" autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
   let qoHighlight = 0, qoResults = [];
   function qoFilter() {
     const q = document.getElementById('qoInput').value.toLowerCase();
@@ -1424,7 +1452,7 @@ function showQuickOpen() {
   }
   function qoRender() {
     const list = document.getElementById('qoList');
-    if (!qoResults.length) { list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:12px">No matches</div>'; return; }
+    if (!qoResults.length) { list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:12px">' + esc(__( 'No matches', 'noodled' )) + '</div>'; return; }
     list.innerHTML = qoResults.map((n, i) => `<div class="quick-open-item ${i === qoHighlight ? 'highlight' : ''}" onclick="selectNote(${n.id}); document.getElementById('modalContainer').innerHTML='';"><span>${esc(n.title)}</span><span class="qo-notebook">${esc(n.notebook)}</span></div>`).join('');
   }
   const inp = document.getElementById('qoInput');
@@ -1441,7 +1469,7 @@ function showQuickOpen() {
 // ── Shortcuts help ──
 function showShortcutsHelp() {
   const el = document.getElementById('modalContainer');
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>Keyboard Shortcuts</h3><div class="shortcuts-grid"><kbd>Ctrl+N</kbd> <span>New note</span><kbd>Ctrl+S</kbd> <span>Force save</span><kbd>Ctrl+P</kbd> <span>Quick open</span><kbd>Ctrl+Shift+F</kbd> <span>Focus search</span><kbd>Ctrl+B</kbd> <span>Bold</span><kbd>Ctrl+I</kbd> <span>Italic</span><kbd>?</kbd> <span>This help</span></div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button></div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Keyboard Shortcuts', 'noodled' ))}</h3><div class="shortcuts-grid"><kbd>Ctrl+N</kbd> <span>${esc(__( 'New note', 'noodled' ))}</span><kbd>Ctrl+S</kbd> <span>${esc(__( 'Force save', 'noodled' ))}</span><kbd>Ctrl+P</kbd> <span>${esc(__( 'Quick open', 'noodled' ))}</span><kbd>Ctrl+Shift+F</kbd> <span>${esc(__( 'Focus search', 'noodled' ))}</span><kbd>Ctrl+B</kbd> <span>${esc(__( 'Bold', 'noodled' ))}</span><kbd>Ctrl+I</kbd> <span>${esc(__( 'Italic', 'noodled' ))}</span><kbd>?</kbd> <span>${esc(__( 'This help', 'noodled' ))}</span></div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
 }
 
 // ── Markdown renderer ──
@@ -1470,15 +1498,16 @@ function renderMarkdown(text) {
         if (target) return `<a href="#" class="wikilink" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
         return `<a href="#" class="wikilink broken" onclick="event.preventDefault()">${esc(title)}</a>`;
       })
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="Opens in a new tab">${txt}</a>`)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${txt}</a>`)
       // Autolink bare URLs (not already inside a markdown link's href/text).
-      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="Opens in a new tab">${url}</a>`)
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${url}</a>`)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\[(\d+:\d+(?::\d+)?)\]\s*/g, '<span class="timestamp">[$1]</span> ')
-      .replace(/(^|\s)#([a-zA-Z][\w-]*)/g, '$1<span class="tag" role="button" tabindex="0" aria-label="Filter by tag $2" onclick="filterByTag(\'$2\')">#$2</span>');
+      /* translators: %s is the tag name */
+      .replace(/(^|\s)#([a-zA-Z][\w-]*)/g, (m, pre, tag) => `${pre}<span class="tag" role="button" tabindex="0" aria-label="${escAttr(sprintf( __( 'Filter by tag %s', 'noodled' ), tag ))}" onclick="filterByTag('${tag}')">#${tag}</span>`);
   }
 
   for (let i = 0; i < lines.length; i++) {
@@ -1558,11 +1587,14 @@ function relativeTime(dateStr) {
   const d = new Date(dateStr.replace(' ', 'T') + (dateStr.includes('Z') ? '' : 'Z'));
   const now = new Date();
   const diff = Math.floor((now - d) / 1000);
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  if (diff < 172800) return 'yesterday';
-  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+  if (diff < 60) return __( 'just now', 'noodled' );
+  /* translators: %d is the number of minutes ago */
+  if (diff < 3600) return sprintf( __( '%dm ago', 'noodled' ), Math.floor(diff / 60) );
+  /* translators: %d is the number of hours ago */
+  if (diff < 86400) return sprintf( __( '%dh ago', 'noodled' ), Math.floor(diff / 3600) );
+  if (diff < 172800) return __( 'yesterday', 'noodled' );
+  /* translators: %d is the number of days ago */
+  if (diff < 604800) return sprintf( __( '%dd ago', 'noodled' ), Math.floor(diff / 86400) );
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -1583,7 +1615,7 @@ function setStatus(msg) {
 function showPrompt(title, label, defaultVal = '') {
   return new Promise(resolve => {
     const el = document.getElementById('modalContainer');
-    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${title}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${label}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">Cancel</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">OK</button></div></div></div>`;
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${title}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${label}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">${esc(__( 'Cancel', 'noodled' ))}</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">${esc(__( 'OK', 'noodled' ))}</button></div></div></div>`;
     window.resolve_modal = (val) => { el.innerHTML = ''; resolve(val); };
     const inp = document.getElementById('modalInput');
     inp.focus();
@@ -1639,10 +1671,11 @@ function updateOfflineBanner() {
   if (!el) return;
   const n = saveQueue.length;
   if (!_isOnline) {
-    el.textContent = "You're offline — changes are saved on this device and will sync when you reconnect";
+    el.textContent = __( "You're offline — changes are saved on this device and will sync when you reconnect", 'noodled' );
     el.classList.add('show');
   } else if (n) {
-    el.textContent = n + ' change' + (n > 1 ? 's' : '') + ' waiting to sync…';
+    /* translators: %d is the number of changes waiting to sync */
+    el.textContent = sprintf( _n( '%d change waiting to sync…', '%d changes waiting to sync…', n, 'noodled' ), n );
     el.classList.add('show');
   } else {
     el.classList.remove('show');
@@ -1664,43 +1697,47 @@ function loadSaveQueue() {
 async function syncPull() {
   const btn = document.getElementById('syncPullBtn');
   btn.disabled = true;
-  btn.textContent = 'Syncing...';
+  btn.textContent = __( 'Syncing...', 'noodled' );
   try {
     const r = await api._fetch('/sync/pull', { method: 'POST' });
     if (r.error) {
-      showToast('Sync failed: ' + r.error);
+      /* translators: %s is the error message */
+      showToast(sprintf( __( 'Sync failed: %s', 'noodled' ), r.error ));
     } else {
-      showToast(`Synced: ${r.notes || 0} notes`);
+      /* translators: %d is the number of notes synced */
+      showToast(sprintf( _n( 'Synced: %d note', 'Synced: %d notes', r.notes || 0, 'noodled' ), r.notes || 0 ));
       await loadNotebooks();
       await loadNotes();
       updateTrashCount();
     }
   } catch (e) {
-    showToast('Sync failed');
+    showToast(__( 'Sync failed', 'noodled' ));
   }
   btn.disabled = false;
-  btn.textContent = 'Sync';
+  btn.textContent = __( 'Sync', 'noodled' );
 }
 
 // ── Plaud sync ──
 async function syncPlaud() {
   const btn = document.getElementById('plaudSyncBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Syncing Plaud...'; }
+  if (btn) { btn.disabled = true; btn.textContent = __( 'Syncing Plaud...', 'noodled' ); }
   try {
     const r = await api.sync_plaud();
     if (r.error) {
-      showToast('Plaud sync failed: ' + r.error);
+      /* translators: %s is the error message */
+      showToast(sprintf( __( 'Plaud sync failed: %s', 'noodled' ), r.error ));
     } else {
-      showToast(`Plaud: ${r.downloaded} new recording${r.downloaded !== 1 ? 's' : ''} imported`);
+      /* translators: %d is the number of new recordings imported */
+      showToast(sprintf( _n( 'Plaud: %d new recording imported', 'Plaud: %d new recordings imported', r.downloaded, 'noodled' ), r.downloaded ));
       if (r.downloaded > 0) {
         await loadNotebooks();
         await loadNotes();
       }
     }
   } catch (e) {
-    showToast('Plaud sync failed');
+    showToast(__( 'Plaud sync failed', 'noodled' ));
   }
-  if (btn) { btn.disabled = false; btn.textContent = 'Plaud'; }
+  if (btn) { btn.disabled = false; btn.textContent = __( 'Plaud', 'noodled' ); }
 }
 
 // ── Pull to refresh ──
@@ -1730,14 +1767,14 @@ async function syncPlaud() {
 
   document.addEventListener('touchend', async () => {
     if (pullEl && pullEl.classList.contains('show')) {
-      pullEl.textContent = 'Syncing...';
+      pullEl.textContent = __( 'Syncing...', 'noodled' );
       try {
         await loadNotebooks();
         await loadNotes();
-        showToast('Refreshed');
+        showToast(__( 'Refreshed', 'noodled' ));
       } catch (e) {}
       pullEl.classList.remove('show');
-      pullEl.textContent = '↓ Pull to refresh';
+      pullEl.textContent = __( '↓ Pull to refresh', 'noodled' );
     }
     pulling = false;
     pullEl = null;
@@ -1807,12 +1844,13 @@ async function showStarred() {
 async function duplicateNote(noteId) {
   const note = await api.get_note(null, noteId);
   if (!note) return;
-  const newNote = await api.create_note(note.notebook, note.title + ' (copy)', note.body);
+  /* translators: %s is the original note title */
+  const newNote = await api.create_note(note.notebook, sprintf( __( '%s (copy)', 'noodled' ), note.title ), note.body);
   await loadNotebooks();
   await loadNotes();
   if (newNote && !newNote.error) {
     selectNote(newNote.id);
-    showToast('Duplicated');
+    showToast(__( 'Duplicated', 'noodled' ));
   }
 }
 
@@ -1832,7 +1870,7 @@ img{max-width:100%}hr{border:none;border-top:1px solid #ddd;margin:2em 0}</style
   a.download = (activeNote.title || 'note') + '.html';
   a.click();
   URL.revokeObjectURL(a.href);
-  showToast('Exported');
+  showToast(__( 'Exported', 'noodled' ));
 }
 
 // ── Reading mode ──
@@ -1856,7 +1894,7 @@ document.addEventListener('paste', e => {
   if (/^https?:\/\/\S+$/.test(text.trim())) {
     e.preventDefault();
     const url = text.trim();
-    document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener noreferrer" title="Opens in a new tab">${url}</a>`);
+    document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${url}</a>`);
     schedSave();
     return;
   }
@@ -1889,11 +1927,11 @@ function saveHistory(note) {
 function showHistory() {
   if (!activeNote) return;
   const history = activeNote._history || [];
-  if (!history.length) { showToast('No history yet'); return; }
+  if (!history.length) { showToast(__( 'No history yet', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal" style="max-width:500px">
-      <h3>Note History</h3>
+      <h3>${esc(__( 'Note History', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
         ${history.map((h, i) => `<div class="history-item" role="button" tabindex="0" onclick="restoreHistory(${i})" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
           <div style="font-size:12px;color:var(--text-muted)">${relativeTime(h.time)} — ${h.title}</div>
@@ -1901,7 +1939,7 @@ function showHistory() {
         </div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:12px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -1916,7 +1954,7 @@ function restoreHistory(index) {
   document.getElementById('modalContainer').innerHTML = '';
   renderContent();
   doSave();
-  showToast('Restored from history');
+  showToast(__( 'Restored from history', 'noodled' ));
 }
 
 // ── Bulk select mode ──
@@ -1939,7 +1977,8 @@ function toggleBulkSelect(noteId, e) {
 
 async function bulkDelete() {
   if (!bulkSelected.size) return;
-  if (!confirm(`Delete ${bulkSelected.size} note(s)?`)) return;
+  /* translators: %d is the number of notes selected for deletion */
+  if (!confirm(sprintf( _n( 'Delete %d note?', 'Delete %d notes?', bulkSelected.size, 'noodled' ), bulkSelected.size ))) return;
   for (const id of bulkSelected) {
     const note = notes.find(n => n.id === id);
     if (note) await api.delete_note(note.notebook, id);
@@ -1949,12 +1988,12 @@ async function bulkDelete() {
   await loadNotebooks();
   await loadNotes();
   updateTrashCount();
-  showToast('Deleted');
+  showToast(__( 'Deleted', 'noodled' ));
 }
 
 async function bulkMove() {
   if (!bulkSelected.size) return;
-  const target = await showPrompt('Move Notes', 'Move to notebook:');
+  const target = await showPrompt(__( 'Move Notes', 'noodled' ), __( 'Move to notebook:', 'noodled' ));
   if (!target) return;
   for (const id of bulkSelected) {
     const note = notes.find(n => n.id === id);
@@ -1964,7 +2003,8 @@ async function bulkMove() {
   toggleBulkMode();
   await loadNotebooks();
   await loadNotes();
-  showToast(`Moved to ${target}`);
+  /* translators: %s is the destination notebook name */
+  showToast(sprintf( __( 'Moved to %s', 'noodled' ), target ));
 }
 
 // ── Notebook drag reorder ──
@@ -2010,7 +2050,7 @@ async function setWordGoal() {
   if (!activeNote) return;
   const goals = config.word_goals || {};
   const current = goals[activeNote.id] || '';
-  const goal = await showPrompt('Word Count Goal', 'Target words:', current.toString());
+  const goal = await showPrompt(__( 'Word Count Goal', 'noodled' ), __( 'Target words:', 'noodled' ), current.toString());
   if (goal === null) return;
   activeNote.wordGoal = parseInt(goal) || 0;
   if (activeNote.wordGoal > 0) goals[activeNote.id] = activeNote.wordGoal;
@@ -2037,15 +2077,15 @@ function getAllTags() {
 
 function showTagCloud() {
   const tags = getAllTags();
-  if (!tags.length) { showToast('No tags found'); return; }
+  if (!tags.length) { showToast(__( 'No tags found', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>Tags</h3>
+    <div class="modal"><h3>${esc(__( 'Tags', 'noodled' ))}</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:300px;overflow-y:auto">
-        ${tags.map(t => `<span class="tag-chip" role="button" tabindex="0" aria-label="Filter by tag ${esc(t)}" onclick="document.getElementById('modalContainer').innerHTML=''; document.getElementById('searchInput').value='#${t}'; onSearch();">#${esc(t)}</span>`).join('')}
+        ${tags.map(t => `<span class="tag-chip" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the tag name */ __( 'Filter by tag %s', 'noodled' ), t ))}" onclick="document.getElementById('modalContainer').innerHTML=''; document.getElementById('searchInput').value='#${t}'; onSearch();">#${esc(t)}</span>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2053,22 +2093,22 @@ function showTagCloud() {
 
 // ── Note templates ──
 const defaultTemplates = [
-  { name: 'Meeting Notes', body: '## Meeting Notes\n\n**Date:** \n**Attendees:** \n\n### Agenda\n- \n\n### Action Items\n- [ ] \n\n### Notes\n' },
-  { name: 'Journal Entry', body: '## ' + new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '\n\n### Gratitude\n- \n\n### Today\n\n\n### Reflection\n' },
-  { name: 'Project Plan', body: '## Project: \n\n### Goal\n\n\n### Tasks\n- [ ] \n- [ ] \n- [ ] \n\n### Timeline\n\n| Phase | Start | End |\n|-------|-------|-----|\n| Planning | | |\n| Execution | | |\n| Review | | |\n\n### Notes\n' },
-  { name: 'Quick List', body: '## List\n\n- [ ] \n- [ ] \n- [ ] \n' },
+  { name: __( 'Meeting Notes', 'noodled' ), body: __( '## Meeting Notes\n\n**Date:** \n**Attendees:** \n\n### Agenda\n- \n\n### Action Items\n- [ ] \n\n### Notes\n', 'noodled' ) },
+  { name: __( 'Journal Entry', 'noodled' ), body: '## ' + new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + __( '\n\n### Gratitude\n- \n\n### Today\n\n\n### Reflection\n', 'noodled' ) },
+  { name: __( 'Project Plan', 'noodled' ), body: __( '## Project: \n\n### Goal\n\n\n### Tasks\n- [ ] \n- [ ] \n- [ ] \n\n### Timeline\n\n| Phase | Start | End |\n|-------|-------|-----|\n| Planning | | |\n| Execution | | |\n| Review | | |\n\n### Notes\n', 'noodled' ) },
+  { name: __( 'Quick List', 'noodled' ), body: __( '## List\n\n- [ ] \n- [ ] \n- [ ] \n', 'noodled' ) },
 ];
 
 function showTemplates() {
   const templates = config.templates || defaultTemplates;
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>New from Template</h3>
+    <div class="modal"><h3>${esc(__( 'New from Template', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
-        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" role="button" tabindex="0" aria-label="Create note from ${escAttr(t.name)} template" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="Delete template" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
+        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the template name */ __( 'Create note from %s template', 'noodled' ), t.name ))}" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="${escAttr(__( 'Delete template', 'noodled' ))}" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2102,7 +2142,7 @@ function startFocusTimer(minutes = 25) {
     if (focusRemaining <= 0) {
       clearInterval(focusInterval);
       focusInterval = null;
-      showToast('Focus session complete!');
+      showToast(__( 'Focus session complete!', 'noodled' ));
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       const el = document.getElementById('focusTimer');
       if (el) el.classList.remove('show');
@@ -2127,15 +2167,15 @@ function updateFocusDisplay() {
 function showFocusOptions() {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>Focus Timer</h3>
+    <div class="modal"><h3>${esc(__( 'Focus Timer', 'noodled' ))}</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(15)">15 min</button>
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(25)">25 min</button>
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(45)">45 min</button>
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(60)">60 min</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(15)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 15 ))}</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(25)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 25 ))}</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(45)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 45 ))}</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(60)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 60 ))}</button>
       </div>
       <div class="modal-buttons" style="margin-top:14px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2162,7 +2202,7 @@ async function submitQuickCapture() {
   toggleQuickCapture();
   await loadNotebooks();
   await loadNotes();
-  showToast('Captured!');
+  showToast(__( 'Captured!', 'noodled' ));
 }
 
 // ── Note linking graph ──
@@ -2180,18 +2220,18 @@ function showLinkGraph() {
 
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:500px"><h3>Note Links</h3>
+    <div class="modal" style="max-width:500px"><h3>${esc(__( 'Note Links', 'noodled' ))}</h3>
       <div style="max-height:350px;overflow-y:auto;font-size:13px">
         ${connected.length ? connected.map(([title, targets]) =>
           `<div style="margin-bottom:12px"><strong>${esc(title)}</strong><div style="padding-left:16px;color:var(--text-muted)">${targets.map(t => {
             const found = allNotes.find(n => n.title.toLowerCase() === t.toLowerCase());
             return found ? `<a href="#" style="color:var(--accent)" onclick="event.preventDefault();document.getElementById('modalContainer').innerHTML='';selectNote(${found.id})">${esc(t)}</a>` : `<span style="color:var(--red)">${esc(t)}</span>`;
           }).join(', ')}</div></div>`
-        ).join('') : '<div style="color:var(--text-muted)">No wiki-links found. Use [[Note Title]] to link notes.</div>'}
-        ${orphans.length ? `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px"><div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">${orphans.length} unlinked notes</div></div>` : ''}
+        ).join('') : '<div style="color:var(--text-muted)">' + esc(__( 'No wiki-links found. Use [[Note Title]] to link notes.', 'noodled' )) + '</div>'}
+        ${orphans.length ? `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px"><div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">${esc(sprintf( /* translators: %d is the number of unlinked notes */ _n( '%d unlinked note', '%d unlinked notes', orphans.length, 'noodled' ), orphans.length ))}</div></div>` : ''}
       </div>
       <div class="modal-buttons" style="margin-top:12px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2199,17 +2239,17 @@ function showLinkGraph() {
 
 // ── Color-coded notes ──
 const noteColors = ['', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-const noteColorNames = ['None', 'Blue', 'Green', 'Yellow', 'Red', 'Purple', 'Pink'];
+const noteColorNames = [__( 'None', 'noodled' ), __( 'Blue', 'noodled' ), __( 'Green', 'noodled' ), __( 'Yellow', 'noodled' ), __( 'Red', 'noodled' ), __( 'Purple', 'noodled' ), __( 'Pink', 'noodled' )];
 
 function showColorPicker(noteId) {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>Note Color</h3>
+    <div class="modal"><h3>${esc(__( 'Note Color', 'noodled' ))}</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${noteColors.map((c, i) => `<div role="button" tabindex="0" aria-label="${noteColorNames[i]}" onclick="setNoteColor(${noteId},'${c}');document.getElementById('modalContainer').innerHTML='';" style="width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid var(--border);${c ? 'background:' + c : 'background:var(--bg-input)'}" title="${noteColorNames[i]}"></div>`).join('')}
+        ${noteColors.map((c, i) => `<div role="button" tabindex="0" aria-label="${escAttr(noteColorNames[i])}" onclick="setNoteColor(${noteId},'${c}');document.getElementById('modalContainer').innerHTML='';" style="width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid var(--border);${c ? 'background:' + c : 'background:var(--bg-input)'}" title="${escAttr(noteColorNames[i])}"></div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:14px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Cancel</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2247,7 +2287,7 @@ function renderSplitView() {
     <div class="content-toolbar">
       <span class="content-title-input" style="border:none;background:none;font-weight:600">${esc(splitNote.title)}</span>
       <span class="spacer"></span>
-      <button class="btn btn-sm" onclick="closeSplitView()">Close</button>
+      <button class="btn btn-sm" onclick="closeSplitView()">${esc(__( 'Close', 'noodled' ))}</button>
     </div>
     <div class="content-body"><div class="rendered-content">${renderMarkdown(splitNote.body)}</div></div>
   `;
@@ -2274,7 +2314,7 @@ async function openDailyJournal() {
   }
 
   // Create new journal entry
-  const body = `## ${title}\n\n### Today\n\n\n### Notes\n\n`;
+  const body = `## ${title}` + __( '\n\n### Today\n\n\n### Notes\n\n', 'noodled' );
   const note = await api.create_note(nbName, title, body);
   await loadNotebooks();
   await loadNotes();
@@ -2288,7 +2328,7 @@ let dictating = false;
 function setDictateBtn(on) {
   const btn = document.getElementById('voiceBtn');
   if (!btn) return;
-  if (on) { btn.textContent = 'Stop'; btn.classList.add('recording'); }
+  if (on) { btn.textContent = __( 'Stop', 'noodled' ); btn.classList.add('recording'); }
   else { btn.innerHTML = '&#127908;'; btn.classList.remove('recording'); }
 }
 
@@ -2344,10 +2384,10 @@ function insertDictation(text) {
 
 function toggleVoiceMemo() {
   if (dictating) { stopDictation(); return; }
-  if (!activeNote) { showToast('Select a note first'); return; }
+  if (!activeNote) { showToast(__( 'Select a note first', 'noodled' )); return; }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { showToast('Dictation is not supported in this browser'); return; }
+  if (!SR) { showToast(__( 'Dictation is not supported in this browser', 'noodled' )); return; }
 
   recognition = new SR();
   recognition.lang = navigator.language || 'en-US';
@@ -2365,9 +2405,10 @@ function toggleVoiceMemo() {
   recognition.onerror = (e) => {
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
       dictating = false;
-      showToast('Microphone access denied');
+      showToast(__( 'Microphone access denied', 'noodled' ));
     } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
-      showToast('Dictation error: ' + e.error);
+      /* translators: %s is the dictation error code */
+      showToast(sprintf( __( 'Dictation error: %s', 'noodled' ), e.error ));
     }
   };
 
@@ -2382,10 +2423,10 @@ function toggleVoiceMemo() {
     recognition.start();
     dictating = true;
     setDictateBtn(true);
-    showToast('Listening…');
+    showToast(__( 'Listening…', 'noodled' ));
   } catch (e) {
     dictating = false;
-    showToast('Could not start dictation');
+    showToast(__( 'Could not start dictation', 'noodled' ));
   }
 }
 
@@ -2403,15 +2444,15 @@ function showTOC() {
       const m = line.trim().match(/^(#{1,3})\s+(.+)$/);
       return m ? { level: m[1].length, text: m[2], line: i } : null;
     }).filter(Boolean);
-  if (!headings.length) { showToast('No headings found'); return; }
+  if (!headings.length) { showToast(__( 'No headings found', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>Table of Contents</h3>
+    <div class="modal"><h3>${esc(__( 'Table of Contents', 'noodled' ))}</h3>
       <div style="max-height:350px;overflow-y:auto">
         ${headings.map(h => `<div class="toc-item" role="button" tabindex="0" style="padding-left:${(h.level - 1) * 16}px" onclick="jumpToHeading(${h.line});document.getElementById('modalContainer').innerHTML='';">${esc(h.text)}</div>`).join('')}
       </div>
       <div class="modal-buttons" style="margin-top:12px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2442,9 +2483,9 @@ async function shareNoteLink(noteId) {
     if (r.error) { showToast(r.error); return; }
     const url = r.url;
     await navigator.clipboard.writeText(url);
-    showToast('Public link copied!');
+    showToast(__( 'Public link copied!', 'noodled' ));
   } catch (e) {
-    showToast('Share failed');
+    showToast(__( 'Share failed', 'noodled' ));
   }
 }
 
@@ -2452,10 +2493,10 @@ async function shareNoteLink(noteId) {
 function embedMedia(url) {
   // YouTube
   let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-  if (m) return `<div class="embed-container"><iframe title="Embedded YouTube video" src="https://www.youtube.com/embed/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  if (m) return `<div class="embed-container"><iframe title="${escAttr(__( 'Embedded YouTube video', 'noodled' ))}" src="https://www.youtube.com/embed/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
   // Vimeo
   m = url.match(/vimeo\.com\/(\d+)/);
-  if (m) return `<div class="embed-container"><iframe title="Embedded Vimeo video" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  if (m) return `<div class="embed-container"><iframe title="${escAttr(__( 'Embedded Vimeo video', 'noodled' ))}" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
   return null;
 }
 
@@ -2465,7 +2506,7 @@ let typewriterMode = false;
 function toggleTypewriter() {
   typewriterMode = !typewriterMode;
   document.body.classList.toggle('typewriter-mode', typewriterMode);
-  showToast(typewriterMode ? 'Typewriter mode on' : 'Typewriter mode off');
+  showToast(typewriterMode ? __( 'Typewriter mode on', 'noodled' ) : __( 'Typewriter mode off', 'noodled' ));
 }
 
 // Keep cursor centered in typewriter mode
@@ -2514,24 +2555,26 @@ function showStats() {
   const heatmap = Object.entries(days).reverse().map(([date, count]) => {
     const pct = Math.round(count / maxActivity * 100);
     const label = date.slice(5);
-    return `<div title="${date}: ${count} notes" aria-label="${date}: ${count} notes" style="width:20px;height:20px;border-radius:3px;background:var(--accent);opacity:${Math.max(0.1, pct / 100)}"></div>`;
+    /* translators: %1$s is the date, %2$d is the number of notes on that date */
+    const hmLabel = escAttr(sprintf( _n( '%1$s: %2$d note', '%1$s: %2$d notes', count, 'noodled' ), date, count ));
+    return `<div title="${hmLabel}" aria-label="${hmLabel}" style="width:20px;height:20px;border-radius:3px;background:var(--accent);opacity:${Math.max(0.1, pct / 100)}"></div>`;
   }).join('');
 
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:450px"><h3>Statistics</h3>
+    <div class="modal" style="max-width:450px"><h3>${esc(__( 'Statistics', 'noodled' ))}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-        <div class="stat-card"><div class="stat-num">${totalNotes}</div><div class="stat-label">Notes</div></div>
-        <div class="stat-card"><div class="stat-num">${totalWords.toLocaleString()}</div><div class="stat-label">Words</div></div>
-        <div class="stat-card"><div class="stat-num">${notebooks.length}</div><div class="stat-label">Notebooks</div></div>
-        <div class="stat-card"><div class="stat-num">${tags.length}</div><div class="stat-label">Tags</div></div>
+        <div class="stat-card"><div class="stat-num">${totalNotes}</div><div class="stat-label">${esc(__( 'Notes', 'noodled' ))}</div></div>
+        <div class="stat-card"><div class="stat-num">${totalWords.toLocaleString()}</div><div class="stat-label">${esc(__( 'Words', 'noodled' ))}</div></div>
+        <div class="stat-card"><div class="stat-num">${notebooks.length}</div><div class="stat-label">${esc(__( 'Notebooks', 'noodled' ))}</div></div>
+        <div class="stat-card"><div class="stat-num">${tags.length}</div><div class="stat-label">${esc(__( 'Tags', 'noodled' ))}</div></div>
       </div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Notes per notebook</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${esc(__( 'Notes per notebook', 'noodled' ))}</div>
       ${Object.entries(nbCounts).map(([name, count]) => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>${esc(name)}</span><span style="color:var(--text-muted)">${count}</span></div>`).join('')}
-      <div style="font-size:12px;color:var(--text-muted);margin:12px 0 6px">Activity (14 days)</div>
+      <div style="font-size:12px;color:var(--text-muted);margin:12px 0 6px">${esc(__( 'Activity (14 days)', 'noodled' ))}</div>
       <div style="display:flex;gap:3px;flex-wrap:wrap">${heatmap}</div>
       <div class="modal-buttons" style="margin-top:14px">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
   </div>`;
@@ -2549,10 +2592,10 @@ function toggleFindReplace() {
   bar.id = 'findReplaceBar';
   bar.className = 'find-replace-bar';
   bar.innerHTML = `
-    <input id="frFind" placeholder="Find..." aria-label="Find text" oninput="highlightFindsInContent()">
-    <input id="frReplace" placeholder="Replace..." aria-label="Replace with">
-    <button class="btn btn-sm" onclick="doReplace(false)">Replace</button>
-    <button class="btn btn-sm" onclick="doReplace(true)">All</button>
+    <input id="frFind" placeholder="${escAttr(__( 'Find...', 'noodled' ))}" aria-label="${escAttr(__( 'Find text', 'noodled' ))}" oninput="highlightFindsInContent()">
+    <input id="frReplace" placeholder="${escAttr(__( 'Replace...', 'noodled' ))}" aria-label="${escAttr(__( 'Replace with', 'noodled' ))}">
+    <button class="btn btn-sm" onclick="doReplace(false)">${esc(__( 'Replace', 'noodled' ))}</button>
+    <button class="btn btn-sm" onclick="doReplace(true)">${esc(__( 'All', 'noodled' ))}</button>
     <button class="btn btn-sm" onclick="toggleFindReplace()">&#10005;</button>
   `;
   const toolbar = document.querySelector('.content-toolbar');
@@ -2574,7 +2617,7 @@ function doReplace(all) {
   }
   renderContent();
   doSave();
-  showToast('Replaced');
+  showToast(__( 'Replaced', 'noodled' ));
 }
 
 // ── Zen writing mode ──
@@ -2583,7 +2626,7 @@ let zenMode = false;
 function toggleZenMode() {
   zenMode = !zenMode;
   document.body.classList.toggle('zen-mode', zenMode);
-  showToast(zenMode ? 'Zen mode on' : 'Zen mode off');
+  showToast(zenMode ? __( 'Zen mode on', 'noodled' ) : __( 'Zen mode off', 'noodled' ));
 }
 
 // ── Auto-save indicator ──
@@ -2620,13 +2663,14 @@ function renderBacklinks() {
   if (!el) return;
   if (backlinks.length) {
     const links = backlinks.map(n => `<a href="#" class="backlink" onclick="event.preventDefault();selectNote(${n.id})">${esc(n.title)}</a>`).join(', ');
-    el.innerHTML += `<div class="backlinks-line">Linked from: ${links}</div>`;
+    /* translators: %s is a comma-separated list of note links */
+    el.innerHTML += `<div class="backlinks-line">${sprintf( __( 'Linked from: %s', 'noodled' ), links )}</div>`;
   }
 }
 
 // ── Notebook cover image ──
 async function setNotebookCover(nbName) {
-  const url = await showPrompt('Notebook Cover', 'Image URL:', (config.nb_covers || {})[nbName] || '');
+  const url = await showPrompt(__( 'Notebook Cover', 'noodled' ), __( 'Image URL:', 'noodled' ), (config.nb_covers || {})[nbName] || '');
   if (url === null) return;
   const covers = config.nb_covers || {};
   if (url) covers[nbName] = url;
@@ -2692,7 +2736,7 @@ function renderAttachmentGallery() {
     }
     // Intuitive delete: × on each item (always shown on touch, on hover on desktop).
     const del = document.createElement('button');
-    del.className = 'gal-del'; del.type = 'button'; del.title = 'Delete'; del.setAttribute('aria-label', 'Delete attachment'); del.innerHTML = '&#10005;';
+    del.className = 'gal-del'; del.type = 'button'; del.title = __( 'Delete', 'noodled' ); del.setAttribute('aria-label', __( 'Delete attachment', 'noodled' )); del.innerHTML = '&#10005;';
     del.onclick = (e) => { e.stopPropagation(); deleteAttachment(a.id); };
     item.appendChild(del);
     gallery.appendChild(item);
@@ -2711,11 +2755,11 @@ function openLightbox(images, index) {
     lb.id = 'noodledLightbox';
     lb.className = 'noodled-lightbox';
     lb.innerHTML = `
-      <button class="lb-close" onclick="closeLightbox()" aria-label="Close">&#10005;</button>
-      <button class="lb-del" onclick="deleteLightboxImage()" aria-label="Delete">&#128465;&#65039;</button>
-      <button class="lb-nav lb-prev" onclick="lightboxStep(-1)" aria-label="Previous">&#8249;</button>
+      <button class="lb-close" onclick="closeLightbox()" aria-label="${escAttr(__( 'Close', 'noodled' ))}">&#10005;</button>
+      <button class="lb-del" onclick="deleteLightboxImage()" aria-label="${escAttr(__( 'Delete', 'noodled' ))}">&#128465;&#65039;</button>
+      <button class="lb-nav lb-prev" onclick="lightboxStep(-1)" aria-label="${escAttr(__( 'Previous', 'noodled' ))}">&#8249;</button>
       <div class="lb-stage"><img id="lbImg" alt=""><div class="lb-caption" id="lbCaption"></div></div>
-      <button class="lb-nav lb-next" onclick="lightboxStep(1)" aria-label="Next">&#8250;</button>`;
+      <button class="lb-nav lb-next" onclick="lightboxStep(1)" aria-label="${escAttr(__( 'Next', 'noodled' ))}">&#8250;</button>`;
     lb.onclick = (e) => { if (e.target === lb) closeLightbox(); };
     document.body.appendChild(lb);
     document.addEventListener('keydown', lightboxKey);
@@ -2730,7 +2774,7 @@ function renderLightbox() {
   lbResetZoom();
   const lbImg = document.getElementById('lbImg');
   lbImg.src = a.url;
-  lbImg.alt = a.filename || a.name || 'Attachment image';
+  lbImg.alt = a.filename || a.name || __( 'Attachment image', 'noodled' );
   document.getElementById('lbCaption').innerHTML = lightboxCaption(a);
   const nav = _lbImages.length > 1;
   document.querySelectorAll('#noodledLightbox .lb-nav').forEach(b => b.style.display = nav ? '' : 'none');
@@ -2746,7 +2790,7 @@ function lightboxCaption(a) {
     if (e.ExposureTime) bits.push(esc(String(e.ExposureTime)) + 's');
     if (e.ISO) bits.push('ISO ' + esc(String(e.ISO)));
     if (e.FocalLength) bits.push(esc(String(evalFrac(e.FocalLength))) + 'mm');
-    if (e.GPSLatitude && e.GPSLongitude) bits.push('<a href="https://maps.google.com/?q=' + e.GPSLatitude + ',' + e.GPSLongitude + '" target="_blank" rel="noopener">📍 map</a>');
+    if (e.GPSLatitude && e.GPSLongitude) bits.push('<a href="https://maps.google.com/?q=' + e.GPSLatitude + ',' + e.GPSLongitude + '" target="_blank" rel="noopener">📍 ' + esc(__( 'map', 'noodled' )) + '</a>');
     if (bits.length) parts.push('<span class="lb-exif">' + bits.join(' &middot; ') + '</span>');
   }
   return parts.join('<br>');
@@ -2767,16 +2811,16 @@ function closeLightbox() {
 async function deleteLightboxImage() {
   const a = _lbImages[_lbIndex];
   if (!a) return;
-  if (!confirm('Delete this image?')) return;
+  if (!confirm(__( 'Delete this image?', 'noodled' ))) return;
   try { await api.delete_attachment(a.id); }
-  catch (e) { showToast('Delete failed'); return; }
+  catch (e) { showToast(__( 'Delete failed', 'noodled' )); return; }
   if (activeNote && activeNote.attachments) activeNote.attachments = activeNote.attachments.filter(x => x.id !== a.id);
   _lbImages.splice(_lbIndex, 1);
   renderAttachmentGallery();
-  if (!_lbImages.length) { closeLightbox(); showToast('Deleted'); return; }
+  if (!_lbImages.length) { closeLightbox(); showToast(__( 'Deleted', 'noodled' )); return; }
   _lbIndex = _lbIndex % _lbImages.length;
   renderLightbox();
-  showToast('Deleted');
+  showToast(__( 'Deleted', 'noodled' ));
 }
 function lightboxKey(e) {
   const lb = document.getElementById('noodledLightbox');
@@ -2862,7 +2906,7 @@ async function retrySaveQueue() {
     if (!saveQueue.length) {
       clearInterval(saveRetryTimer);
       saveRetryTimer = null;
-      showToast('Synced pending changes');
+      showToast(__( 'Synced pending changes', 'noodled' ));
     } else {
       retrySaveQueue();
     }
@@ -2897,7 +2941,8 @@ function highlightFindsInContent() {
     range.surroundContents(span);
     count++;
   });
-  showToast(`${matches.length} match${matches.length !== 1 ? 'es' : ''}`);
+  /* translators: %d is the number of matches found */
+  showToast(sprintf( _n( '%d match', '%d matches', matches.length, 'noodled' ), matches.length ));
   // Scroll to first match
   const first = el.querySelector('.find-highlight-active');
   if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3009,23 +3054,23 @@ function showCommandPalette() {
   const el = document.getElementById('modalContainer');
   const owner = !!(noodledConfig.user && noodledConfig.user.owner);
   const cmds = [
-    { icon: '📝', label: 'New note', run: () => createNote() },
-    { icon: '📄', label: 'New from template', run: () => showTemplates() },
-    { icon: '📎', label: 'Add files', run: () => uploadFiles() },
-    { icon: '🔍', label: 'Search notes', run: () => document.getElementById('searchInput').focus() },
-    { icon: '🗓️', label: 'Daily journal', run: () => openDailyJournal() },
-    { icon: '⚡', label: 'Quick capture', run: () => toggleQuickCapture() },
-    { icon: '⏱️', label: 'Focus timer', run: () => showFocusOptions() },
-    { icon: '🔄', label: 'Sync now', run: () => syncPull() },
-    { icon: '🌓', label: 'Toggle theme', run: () => toggleTheme() },
-    { icon: '⬇️', label: 'Export backup', run: () => exportBackup() },
-    { icon: '⬆️', label: 'Import backup', run: () => importBackup() },
-    { icon: '⌨️', label: 'Keyboard shortcuts', run: () => showShortcutsHelp() },
+    { icon: '📝', label: __( 'New note', 'noodled' ), run: () => createNote() },
+    { icon: '📄', label: __( 'New from template', 'noodled' ), run: () => showTemplates() },
+    { icon: '📎', label: __( 'Add files', 'noodled' ), run: () => uploadFiles() },
+    { icon: '🔍', label: __( 'Search notes', 'noodled' ), run: () => document.getElementById('searchInput').focus() },
+    { icon: '🗓️', label: __( 'Daily journal', 'noodled' ), run: () => openDailyJournal() },
+    { icon: '⚡', label: __( 'Quick capture', 'noodled' ), run: () => toggleQuickCapture() },
+    { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), run: () => showFocusOptions() },
+    { icon: '🔄', label: __( 'Sync now', 'noodled' ), run: () => syncPull() },
+    { icon: '🌓', label: __( 'Toggle theme', 'noodled' ), run: () => toggleTheme() },
+    { icon: '⬇️', label: __( 'Export backup', 'noodled' ), run: () => exportBackup() },
+    { icon: '⬆️', label: __( 'Import backup', 'noodled' ), run: () => importBackup() },
+    { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), run: () => showShortcutsHelp() },
   ];
-  if (owner) cmds.splice(3, 0, { icon: '👥', label: 'Manage people', run: () => manageUsers() });
+  if (owner) cmds.splice(3, 0, { icon: '👥', label: __( 'Manage people', 'noodled' ), run: () => manageUsers() });
 
   el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp">
-    <input id="cmdpInput" placeholder="Type a command or note…" autocomplete="off" aria-label="Command palette">
+    <input id="cmdpInput" placeholder="${escAttr(__( 'Type a command or note…', 'noodled' ))}" autocomplete="off" aria-label="${escAttr(__( 'Command palette', 'noodled' ))}">
     <div class="cmdp-list" id="cmdpList"></div></div></div>`;
   const input = el.querySelector('#cmdpInput');
   const list = el.querySelector('#cmdpList');
@@ -3046,7 +3091,7 @@ function showCommandPalette() {
       const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}` : `📄 ${esc(r.item.title)}`;
       const sub = r.type === 'note' ? `<span class="cmdp-sub">${esc(r.item.notebook || '')}</span>` : '';
       return `<div class="cmdp-i ${i === hi ? 'on' : ''}" data-i="${i}">${label}${sub}</div>`;
-    }).join('') : '<div class="cmdp-empty">No matches</div>';
+    }).join('') : '<div class="cmdp-empty">' + esc(__( 'No matches', 'noodled' )) + '</div>';
     const on = list.querySelector('.cmdp-i.on');
     if (on) on.scrollIntoView({ block: 'nearest' });
   }
@@ -3070,22 +3115,21 @@ function showConflict(server, mine) {
   _conflictOpen = true;
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:460px">
-    <h3>This note changed elsewhere</h3>
-    <p style="font-size:13px;color:var(--text-muted);line-height:1.5">Another device or tab saved
-    "<b>${esc(server.title || '')}</b>" after you opened it. Which version do you want to keep?</p>
+    <h3>${esc(__( 'This note changed elsewhere', 'noodled' ))}</h3>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.5">${sprintf( /* translators: %s is the note title */ __( 'Another device or tab saved "%s" after you opened it. Which version do you want to keep?', 'noodled' ), '<b>' + esc(server.title || '') + '</b>' )}</p>
     <div class="modal-buttons">
-      <button class="btn btn-sm" id="cfTheirs">Load theirs</button>
-      <button class="btn btn-sm btn-accent" id="cfMine">Keep mine</button>
+      <button class="btn btn-sm" id="cfTheirs">${esc(__( 'Load theirs', 'noodled' ))}</button>
+      <button class="btn btn-sm btn-accent" id="cfMine">${esc(__( 'Keep mine', 'noodled' ))}</button>
     </div></div></div>`;
   el.querySelector('#cfMine').onclick = async () => {
     el.innerHTML = ''; _conflictOpen = false;
     const r = await api.save_note(activeNote.notebook, activeNote.id, mine.title, mine.body, { force: true });
-    if (r && !r.error) { adoptSaved(r); await loadNotes(); renderContent(); showToast('Kept your version'); }
+    if (r && !r.error) { adoptSaved(r); await loadNotes(); renderContent(); showToast(__( 'Kept your version', 'noodled' )); }
   };
   el.querySelector('#cfTheirs').onclick = async () => {
     el.innerHTML = ''; _conflictOpen = false;
     try { activeNote = await api.get_note(null, server.id); } catch (e) {}
-    await loadNotes(); renderContent(); showToast('Loaded the other version');
+    await loadNotes(); renderContent(); showToast(__( 'Loaded the other version', 'noodled' ));
   };
 }
 
@@ -3126,15 +3170,15 @@ function setupNoteSwipe() {
 }
 async function swipeTrash(id) {
   const n = notes.find(x => x.id === id); if (!n) return;
-  try { await api.delete_note(n.notebook, id); } catch (e) { showToast('Delete failed'); return; }
+  try { await api.delete_note(n.notebook, id); } catch (e) { showToast(__( 'Delete failed', 'noodled' )); return; }
   if (activeNote && activeNote.id === id) { activeNote = null; renderContent(); document.querySelector('.col-content')?.classList.remove('open'); }
   await loadNotebooks(); await loadNotes(); updateTrashCount();
-  showUndoToast('Note moved to trash', () => undoDelete(id));
+  showUndoToast(__( 'Note moved to trash', 'noodled' ), () => undoDelete(id));
 }
 async function swipePin(id) {
   const n = notes.find(x => x.id === id); if (!n) return;
   try { await api.toggle_pin(n.notebook, id); } catch (e) { return; }
-  showToast(n.pinned ? 'Unpinned' : 'Pinned');
+  showToast(n.pinned ? __( 'Unpinned', 'noodled' ) : __( 'Pinned', 'noodled' ));
   await loadNotes();
 }
 
@@ -3236,7 +3280,7 @@ function setupSearchRecents() {
   function render() {
     const r = getRecentSearches();
     if (!r.length || inp.value) { dd.classList.remove('show'); return; }
-    dd.innerHTML = '<div class="sr-h">Recent searches</div>' + r.map(q => `<div class="sr-i" data-q="${escAttr(q)}">${esc(q)}</div>`).join('');
+    dd.innerHTML = '<div class="sr-h">' + esc(__( 'Recent searches', 'noodled' )) + '</div>' + r.map(q => `<div class="sr-i" data-q="${escAttr(q)}">${esc(q)}</div>`).join('');
     dd.classList.add('show');
   }
   inp.addEventListener('focus', render);
@@ -3255,7 +3299,7 @@ function exportBackup() {
   const a = document.createElement('a');
   a.href = url; a.rel = 'noopener';
   document.body.appendChild(a); a.click(); a.remove();
-  showToast('Preparing your backup…');
+  showToast(__( 'Preparing your backup…', 'noodled' ));
 }
 function importBackup() {
   let inp = document.getElementById('backupImportInput');
@@ -3270,15 +3314,17 @@ function importBackup() {
 async function handleBackupImport(input) {
   const f = input.files && input.files[0];
   if (!f) return;
-  showToast('Importing backup…');
+  showToast(__( 'Importing backup…', 'noodled' ));
   const fd = new FormData(); fd.append('file', f);
   try {
     const res = await fetch(api._base + '/import/zip', { method: 'POST', headers: { 'X-WP-Nonce': api._nonce }, credentials: 'same-origin', body: fd }).then(r => r.json());
-    if (res && res.error) { showToast('Import failed: ' + res.error); return; }
+    /* translators: %s is the error message */
+    if (res && res.error) { showToast(sprintf( __( 'Import failed: %s', 'noodled' ), res.error )); return; }
     await loadNotebooks(); await loadNotes();
     const n = (res && res.imported) || 0;
-    showToast(`Imported ${n} note${n !== 1 ? 's' : ''}`);
-  } catch (e) { showToast('Import failed'); }
+    /* translators: %d is the number of notes imported */
+    showToast(sprintf( _n( 'Imported %d note', 'Imported %d notes', n, 'noodled' ), n ));
+  } catch (e) { showToast(__( 'Import failed', 'noodled' )); }
 }
 
 // ── Wire up the polish features once the DOM is ready ────────
@@ -3323,7 +3369,7 @@ function codeBlockHtml(lines, lang) {
   const code = lines.join('\n');
   const label = lang ? `<span class="cb-lang">${esc(lang)}</span>` : '<span class="cb-lang"></span>';
   return `<div class="code-block"><div class="cb-head" contenteditable="false">${label}`
-    + `<button class="cb-copy" type="button" onclick="copyCodeBlock(this)">Copy</button></div>`
+    + `<button class="cb-copy" type="button" onclick="copyCodeBlock(this)">${esc(__( 'Copy', 'noodled' ))}</button></div>`
     + `<pre><code>${highlightCode(code)}</code></pre></div>`;
 }
 function highlightCode(code) {
@@ -3347,8 +3393,8 @@ function copyCodeBlock(btn) {
   const code = block && block.querySelector('code');
   if (!code) return;
   navigator.clipboard.writeText(code.innerText).then(() => {
-    btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1500);
-  }).catch(() => showToast('Copy failed'));
+    btn.textContent = __( 'Copied', 'noodled' ); setTimeout(() => btn.textContent = __( 'Copy', 'noodled' ), 1500);
+  }).catch(() => showToast(__( 'Copy failed', 'noodled' )));
 }
 
 // ── Note-list keyboard navigation (↑/↓ select, Enter open, Del trash) ──
@@ -3385,14 +3431,14 @@ function showReadingPrefs() {
   const p = (config.editor_prefs = config.editor_prefs || {});
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="min-width:320px"><h3>Reading preferences</h3>
-      <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">Font size</label>
-      <input type="range" id="rpSize" aria-label="Font size" min="13" max="22" step="1" value="${p.size || 16}" style="width:100%">
-      <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">Line height</label>
-      <input type="range" id="rpLh" aria-label="Line height" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
-      <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> Serif body font</label>
-      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpNarrow" ${p.narrow ? 'checked' : ''}> Narrow reading column</label>
-      <div class="modal-buttons" style="margin-top:16px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Done</button></div>
+    <div class="modal" style="min-width:320px"><h3>${esc(__( 'Reading preferences', 'noodled' ))}</h3>
+      <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">${esc(__( 'Font size', 'noodled' ))}</label>
+      <input type="range" id="rpSize" aria-label="${escAttr(__( 'Font size', 'noodled' ))}" min="13" max="22" step="1" value="${p.size || 16}" style="width:100%">
+      <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">${esc(__( 'Line height', 'noodled' ))}</label>
+      <input type="range" id="rpLh" aria-label="${escAttr(__( 'Line height', 'noodled' ))}" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
+      <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> ${esc(__( 'Serif body font', 'noodled' ))}</label>
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpNarrow" ${p.narrow ? 'checked' : ''}> ${esc(__( 'Narrow reading column', 'noodled' ))}</label>
+      <div class="modal-buttons" style="margin-top:16px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button></div>
     </div></div>`;
   const upd = () => {
     p.size = +document.getElementById('rpSize').value;
@@ -3414,22 +3460,23 @@ function manageTags() {
   notes.forEach(n => ((n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []).forEach(t => { const k = t.trim().slice(1); counts[k] = (counts[k] || 0) + 1; }));
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="min-width:360px"><h3>Manage tags</h3>
+    <div class="modal" style="min-width:360px"><h3>${esc(__( 'Manage tags', 'noodled' ))}</h3>
       <div style="max-height:50vh;overflow:auto">${tags.length ? tags.map(t => `
         <div class="mt-row" style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)">
           <span style="flex:1">#${esc(t)} <span style="color:var(--text-muted);font-size:11px">${counts[t] || 0}</span></span>
-          <button class="btn btn-sm" onclick="renameTag('${esc(t)}')">Rename</button>
-          <button class="btn btn-sm" style="color:var(--red)" onclick="deleteTag('${esc(t)}')">Delete</button>
-        </div>`).join('') : '<p style="color:var(--text-muted);font-size:13px">No tags yet.</p>'}</div>
-      <div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">Close</button></div>
+          <button class="btn btn-sm" onclick="renameTag('${esc(t)}')">${esc(__( 'Rename', 'noodled' ))}</button>
+          <button class="btn btn-sm" style="color:var(--red)" onclick="deleteTag('${esc(t)}')">${esc(__( 'Delete', 'noodled' ))}</button>
+        </div>`).join('') : '<p style="color:var(--text-muted);font-size:13px">' + esc(__( 'No tags yet.', 'noodled' )) + '</p>'}</div>
+      <div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>
     </div></div>`;
 }
 function _tagRe(tag) { return new RegExp('(^|\\s)#' + tag.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&') + '(?![\\w-])', 'g'); }
 async function _rewriteTag(tag, replacer, doneMsg) {
   const hits = notes.filter(n => _tagRe(tag).test(n.body || ''));
-  if (!hits.length) { showToast('No notes use that tag'); return; }
+  if (!hits.length) { showToast(__( 'No notes use that tag', 'noodled' )); return; }
   document.getElementById('modalContainer').innerHTML = '';
-  showToast(`Updating ${hits.length} note${hits.length !== 1 ? 's' : ''}…`);
+  /* translators: %d is the number of notes being updated */
+  showToast(sprintf( _n( 'Updating %d note…', 'Updating %d notes…', hits.length, 'noodled' ), hits.length ));
   for (const n of hits) {
     const body = (n.body || '').replace(_tagRe(tag), replacer);
     try { await api.save_note(n.notebook, n.id, n.title, body, { force: true }); } catch (e) {}
@@ -3439,26 +3486,30 @@ async function _rewriteTag(tag, replacer, doneMsg) {
   showToast(doneMsg);
 }
 async function renameTag(tag) {
-  const next = (await showPrompt('Rename tag', 'New name for #' + tag, tag) || '').trim().replace(/^#/, '');
+  /* translators: %s is the tag name */
+  const next = (await showPrompt(__( 'Rename tag', 'noodled' ), sprintf( __( 'New name for #%s', 'noodled' ), tag ), tag) || '').trim().replace(/^#/, '');
   if (!next || next === tag) return;
   const clean = next.replace(/[^\w-]/g, '');
-  await _rewriteTag(tag, (m, pre) => pre + '#' + clean, `Renamed #${tag} → #${clean}`);
+  /* translators: %1$s is the old tag name, %2$s is the new tag name */
+  await _rewriteTag(tag, (m, pre) => pre + '#' + clean, sprintf( __( 'Renamed #%1$s → #%2$s', 'noodled' ), tag, clean ));
 }
 async function deleteTag(tag) {
-  if (!confirm(`Remove #${tag} from all notes? (The notes stay; only the tag is removed.)`)) return;
-  await _rewriteTag(tag, (m, pre) => pre, `Removed #${tag}`);
+  /* translators: %s is the tag name */
+  if (!confirm(sprintf( __( 'Remove #%s from all notes? (The notes stay; only the tag is removed.)', 'noodled' ), tag ))) return;
+  /* translators: %s is the tag name */
+  await _rewriteTag(tag, (m, pre) => pre, sprintf( __( 'Removed #%s', 'noodled' ), tag ));
 }
 
 // ── Save the current note as a reusable template ─────────────
 async function saveAsTemplate() {
-  if (!activeNote) { showToast('Open a note first'); return; }
-  const name = (await showPrompt('Save as template', 'Template name:', activeNote.title || '') || '').trim();
+  if (!activeNote) { showToast(__( 'Open a note first', 'noodled' )); return; }
+  const name = (await showPrompt(__( 'Save as template', 'noodled' ), __( 'Template name:', 'noodled' ), activeNote.title || '') || '').trim();
   if (!name) return;
   const tpls = (config.templates && config.templates.length) ? config.templates.slice() : defaultTemplates.slice();
   tpls.push({ name, body: activeNote.body || '', custom: true });
   config.templates = tpls;
   api.set_config('templates', tpls).catch(() => {});
-  showToast('Template saved');
+  showToast(__( 'Template saved', 'noodled' ));
 }
 function deleteTemplate(i) {
   const tpls = (config.templates && config.templates.length) ? config.templates.slice() : defaultTemplates.slice();
@@ -3483,9 +3534,10 @@ function setupInstallPrompt() {
 function showInstallBanner() {
   let b = document.getElementById('installBanner');
   if (!b) { b = document.createElement('div'); b.id = 'installBanner'; b.className = 'install-banner'; document.body.appendChild(b); }
-  b.innerHTML = `<span>Install ${esc(noodledConfig.brandName || 'noodled')} for quick access &amp; offline notes</span>
-    <button class="btn btn-sm btn-accent" id="installYes">Install</button>
-    <button class="btn btn-sm" id="installNo">Not now</button>`;
+  /* translators: %s is the app/brand name */
+  b.innerHTML = `<span>${sprintf( __( 'Install %s for quick access & offline notes', 'noodled' ), esc(noodledConfig.brandName || 'noodled') )}</span>
+    <button class="btn btn-sm btn-accent" id="installYes">${esc(__( 'Install', 'noodled' ))}</button>
+    <button class="btn btn-sm" id="installNo">${esc(__( 'Not now', 'noodled' ))}</button>`;
   b.querySelector('#installYes').onclick = doInstall;
   b.querySelector('#installNo').onclick = () => { localStorage.setItem('noodled_install_dismissed', '1'); hideInstallBanner(); };
   b.classList.add('show');
@@ -3502,7 +3554,7 @@ async function doInstall() {
 function showUndoToast(msg, onUndo) {
   let t = document.getElementById('undoToast');
   if (!t) { t = document.createElement('div'); t.id = 'undoToast'; t.className = 'undo-toast'; document.body.appendChild(t); }
-  t.innerHTML = `<span class="ut-msg"></span><button type="button" class="ut-btn">Undo</button>`;
+  t.innerHTML = `<span class="ut-msg"></span><button type="button" class="ut-btn">${esc(__( 'Undo', 'noodled' ))}</button>`;
   t.querySelector('.ut-msg').textContent = msg;
   let done = false;
   t.querySelector('.ut-btn').onclick = async () => { if (done) return; done = true; t.classList.remove('show'); try { await onUndo(); } catch (e) {} };
@@ -3511,18 +3563,18 @@ function showUndoToast(msg, onUndo) {
   t._timer = setTimeout(() => t.classList.remove('show'), 6000);
 }
 async function undoDelete(id) {
-  try { await api.restore_note(id); } catch (e) { showToast('Undo failed'); return; }
+  try { await api.restore_note(id); } catch (e) { showToast(__( 'Undo failed', 'noodled' )); return; }
   await loadNotebooks(); await loadNotes(); updateTrashCount();
-  showToast('Restored');
+  showToast(__( 'Restored', 'noodled' ));
 }
 
 /* ── Recent-note quick switcher (Ctrl-E) ───────────────────── */
 function showRecentSwitcher() {
   const ids = _recentViewed.filter(id => !activeNote || id !== activeNote.id);
   const items = ids.map(id => notes.find(n => n.id === id)).filter(Boolean).slice(0, 8);
-  if (!items.length) { showToast('No recent notes yet'); return; }
+  if (!items.length) { showToast(__( 'No recent notes yet', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
-  el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp"><div class="cmdp-head">Recent notes</div><div class="cmdp-list" id="rsList">${items.map((n, i) => `<div class="cmdp-i ${i === 0 ? 'on' : ''}" data-id="${n.id}">📄 ${esc(n.title)}<span class="cmdp-sub">${esc(n.notebook || '')}</span></div>`).join('')}</div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp"><div class="cmdp-head">${esc(__( 'Recent notes', 'noodled' ))}</div><div class="cmdp-list" id="rsList">${items.map((n, i) => `<div class="cmdp-i ${i === 0 ? 'on' : ''}" data-id="${n.id}">📄 ${esc(n.title)}<span class="cmdp-sub">${esc(n.notebook || '')}</span></div>`).join('')}</div></div></div>`;
   const list = el.querySelector('#rsList');
   let hi = 0;
   const rows = [...list.querySelectorAll('.cmdp-i')];
@@ -3563,12 +3615,13 @@ function appendBlock(md) {
 }
 function openSlashMenu(x, y) {
   const opts = [
-    { label: 'Heading', icon: 'H', run: () => insertHeading() },
-    { label: 'Checklist', icon: '☑', run: () => insertChecklistItem() },
-    { label: 'Bullet list', icon: '•', run: () => insertBullet() },
-    { label: 'Divider', icon: '―', run: () => appendBlock('---') },
-    { label: 'Table', icon: '▦', run: () => appendBlock('| Column | Column |\n| --- | --- |\n|  |  |') },
-    { label: 'Today\'s date', icon: '🗓', run: () => appendBlock(new Date().toLocaleDateString()) },
+    { label: __( 'Heading', 'noodled' ), icon: 'H', run: () => insertHeading() },
+    { label: __( 'Checklist', 'noodled' ), icon: '☑', run: () => insertChecklistItem() },
+    { label: __( 'Bullet list', 'noodled' ), icon: '•', run: () => insertBullet() },
+    { label: __( 'Divider', 'noodled' ), icon: '―', run: () => appendBlock('---') },
+    /* translators: %s is a column header placeholder for a new table */
+    { label: __( 'Table', 'noodled' ), icon: '▦', run: () => appendBlock(`| ${__( 'Column', 'noodled' )} | ${__( 'Column', 'noodled' )} |\n| --- | --- |\n|  |  |`) },
+    { label: __( "Today's date", 'noodled' ), icon: '🗓', run: () => appendBlock(new Date().toLocaleDateString()) },
   ];
   let menu = document.getElementById('slashMenu');
   if (menu) menu.remove();
@@ -3664,16 +3717,16 @@ function paintAc() {
 
 /* ── Print / Save as PDF a single note ─────────────────────── */
 function printNote() {
-  if (!activeNote) { showToast('Open a note first'); return; }
+  if (!activeNote) { showToast(__( 'Open a note first', 'noodled' )); return; }
   let area = document.getElementById('printArea');
   if (!area) { area = document.createElement('div'); area.id = 'printArea'; document.body.appendChild(area); }
-  area.innerHTML = `<h1 class="print-title">${esc(activeNote.title || 'Untitled')}</h1><div class="print-body">${renderMarkdown(activeNote.body || '')}</div>`;
+  area.innerHTML = `<h1 class="print-title">${esc(activeNote.title || __( 'Untitled', 'noodled' ))}</h1><div class="print-body">${renderMarkdown(activeNote.body || '')}</div>`;
   window.print();
 }
 
 /* ── Download the current note as a .md file ───────────────── */
 function downloadNoteMd() {
-  if (!activeNote) { showToast('Open a note first'); return; }
+  if (!activeNote) { showToast(__( 'Open a note first', 'noodled' )); return; }
   const fm = ['---', 'title: ' + (activeNote.title || ''), 'created: ' + (activeNote.created || ''), 'modified: ' + (activeNote.modified || ''), '---', '', activeNote.body || ''].join('\n');
   const blob = new Blob([fm], { type: 'text/markdown' });
   const a = document.createElement('a');
