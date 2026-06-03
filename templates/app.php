@@ -180,7 +180,31 @@
 
 <script>
 const noodledConfig = <?php echo wp_json_encode( $config ); ?>;
+/* i18n floor: guarantee wp.i18n exists (returns source English) so the app can
+   never crash if the real @wordpress/i18n bundle fails to load. The real bundle
+   below overwrites this when present. */
+window.wp = window.wp || {};
+window.wp.i18n = window.wp.i18n || {
+  __: (t) => t, _x: (t) => t, _n: (s, p, n) => (n === 1 ? s : p), _nx: (s, p, n) => (n === 1 ? s : p),
+  sprintf: (f, ...a) => { let i = 0; return String(f).replace(/%(\d+\$)?[sd]/g, () => a[i++]); },
+  setLocaleData: () => {}, isRTL: () => false
+};
 </script>
+<script src="<?php echo esc_url( includes_url( 'js/dist/hooks.min.js' ) ); ?>"></script>
+<script src="<?php echo esc_url( includes_url( 'js/dist/i18n.min.js' ) ); ?>"></script>
+<?php
+// Load translations for the current locale if a compiled JSON exists (best-effort;
+// a translator drops languages/noodled-<locale>.json here once translated).
+$noodled_locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+$noodled_json   = NOODLED_PATH . 'languages/noodled-' . $noodled_locale . '.json';
+if ( file_exists( $noodled_json ) ) {
+	$noodled_data = json_decode( file_get_contents( $noodled_json ), true );
+	$noodled_msgs = $noodled_data['locale_data']['messages'] ?? null;
+	if ( $noodled_msgs ) {
+		echo '<script>wp.i18n.setLocaleData(' . wp_json_encode( $noodled_msgs ) . ", 'noodled');</script>\n";
+	}
+}
+?>
 <script src="<?php echo esc_url( NOODLED_URL . 'assets/js/noodled.js' ); ?>?v=<?php echo NOODLED_VERSION . '.' . filemtime( NOODLED_PATH . 'assets/js/noodled.js' ); ?>"></script>
 <script>
 if ('serviceWorker' in navigator) {

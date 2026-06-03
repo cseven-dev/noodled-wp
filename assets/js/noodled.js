@@ -1,6 +1,9 @@
 /* noodled for WordPress
    API adapter + UI logic */
 
+// i18n: wp.i18n is guaranteed by the floor shim + bundle loaded before this file.
+const { __, _n, _x, sprintf } = window.wp.i18n;
+
 // ── API Adapter ──
 const api = {
   _base: noodledConfig.apiBase,
