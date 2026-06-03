@@ -467,16 +467,15 @@ h1,h2,h3 { font-family: var(--font-display); font-weight: 900; letter-spacing: -
   /* Subtle card lean; the note text gets its own extra tilt below. */
   transform: rotate(-3deg);
 }
-/* fanned-deck look + each new note "lands" on the pile. The backings pivot from
-   the top edge so they splay DOWNWARD behind the card — clear of the floating
-   cards beside it, so nothing covers their text. */
+/* stacked-deck look: the backings sit squarely BEHIND the front card at the
+   same angle (no extra rotation), just offset down-right so they peek as a
+   clean pile rather than skewing the view. */
 .type-card::before, .type-card::after {
   content: ""; position: absolute; inset: 0; border-radius: 18px; z-index: -1;
   background: var(--white); border: 1px solid var(--rule); box-shadow: var(--shadow-md);
-  transform-origin: top center;
 }
-.type-card::before { transform: translate(4px, 13px) rotate(-2deg); }
-.type-card::after  { transform: translate(8px, 26px) rotate(-4deg); }
+.type-card::before { transform: translate(6px, 12px); }
+.type-card::after  { transform: translate(12px, 24px); }
 .type-card.land { animation: tcLand .52s var(--ease); }
 /* keep the card's -4deg lean through the land animation (no flicker to flat). */
 @keyframes tcLand { from { transform: translateY(-16px) scale(.975) rotate(-3deg); opacity: .55; } to { transform: translateY(0) scale(1) rotate(-3deg); opacity: 1; } }
