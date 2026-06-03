@@ -112,6 +112,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   showLoadingSkeleton();
 
+  // Start the independent reads immediately so they overlap the config round-trip
+  // instead of running in series (config -> notebooks -> notes was 3 serial RTTs).
+  const notesP = loadNotes().catch(e => console.error('Noodled: notes load failed', e.message));
+  const trashP = updateTrashCount().catch(() => {});
+
   try {
     config = await api.get_config();
   } catch (e) {
@@ -121,14 +126,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(config.theme || 'dark');
   applyReadingPrefs();
 
-  try {
-    await loadNotebooks();
-    await loadNotes();
-    updateTrashCount();
-  } catch (e) {
-    console.error('Noodled: load failed', e.message);
-    setStatus(__( 'Failed to load — try refreshing', 'noodled' ));
-  }
+  // Notebooks need config.notebook_order for the saved sort, so they follow config;
+  // notes/trash were already in flight in parallel.
+  await loadNotebooks().catch(e => console.error('Noodled: notebooks load failed', e.message));
+  await Promise.allSettled([ notesP, trashP ]);
 
   document.getElementById('splash')?.classList.add('hidden');
   document.addEventListener('keydown', handleGlobalKey);
@@ -1027,9 +1028,10 @@ async function deleteCurrentNote() {
   await loadNotebooks();
   await loadNotes();
   updateTrashCount();
-  // Push to GitHub so delete syncs across devices
-  try { await api.git_push(); } catch (e) {}
   showUndoToast(__( 'Note moved to trash', 'noodled' ), () => undoDelete(deletedId));
+  // Push to GitHub so delete syncs across devices — fire-and-forget so the UI
+  // doesn't block on the (multi-second) shell-out.
+  api.git_push().catch(() => {});
 }
 
 function toggleMarkdownView() {

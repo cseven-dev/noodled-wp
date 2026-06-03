@@ -40,6 +40,9 @@ CREATE TABLE {$wpdb->prefix}noodled_notes (
   KEY idx_notebook (notebook_id),
   KEY idx_deleted (deleted_at),
   KEY idx_modified (modified_at),
+  KEY idx_deleted_from (deleted_from),
+  KEY idx_list (notebook_id, deleted_at, pinned, modified_at),
+  KEY idx_browse (deleted_at, pinned, modified_at),
   FULLTEXT KEY idx_search (title, body)
 ) ENGINE=InnoDB $charset;
 

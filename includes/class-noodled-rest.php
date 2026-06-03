@@ -558,9 +558,19 @@ class Noodled_REST {
 			|| strpos( $mime, 'video/' ) === 0
 			|| $mime === 'application/pdf';
 		$fname  = str_replace( [ '"', "\r", "\n" ], '', $att['filename'] );
-		nocache_headers();
+		$size   = filesize( $path );
+		$mtime  = filemtime( $path );
+		// Attachments are immutable (stored under a random subfolder, never rewritten),
+		// so cache aggressively per the access-checked URL. Private = caches only in
+		// the user's browser, never a shared proxy. Conditional 304 skips the readfile.
+		$etag = '"' . md5( $att['id'] . '-' . $size . '-' . $mtime ) . '"';
+		$inm  = isset( $_SERVER['HTTP_IF_NONE_MATCH'] ) ? trim( wp_unslash( $_SERVER['HTTP_IF_NONE_MATCH'] ) ) : '';
+		header( 'Cache-Control: private, max-age=31536000, immutable' );
+		header( 'ETag: ' . $etag );
+		header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $mtime ) . ' GMT' );
+		if ( $inm === $etag ) { status_header( 304 ); exit; }
 		header( 'Content-Type: ' . $mime );
-		header( 'Content-Length: ' . filesize( $path ) );
+		header( 'Content-Length: ' . $size );
 		header( 'Content-Disposition: ' . ( $inline ? 'inline' : 'attachment' ) . '; filename="' . $fname . '"' );
 		header( 'X-Content-Type-Options: nosniff' );
 		// Neutralise stored HTML/SVG/XML/text so an uploaded file can't run scripts in our origin.

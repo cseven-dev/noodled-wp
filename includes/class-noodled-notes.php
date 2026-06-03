@@ -9,11 +9,18 @@ class Noodled_Notes {
 	}
 
 	private static function format_row( array $r ): array {
-		$nb = Noodled_Notebooks::get_by_id( (int) $r['notebook_id'] );
+		// The list query joins the notebook name in (nb_name) to avoid an N+1
+		// lookup; single-row callers (get_one/restore/etc.) fall back to a lookup.
+		if ( array_key_exists( 'nb_name', $r ) ) {
+			$nb_name = (string) $r['nb_name'];
+		} else {
+			$nb = Noodled_Notebooks::get_by_id( (int) $r['notebook_id'] );
+			$nb_name = $nb ? $nb['name'] : '';
+		}
 		return [
 			'id'       => (int) $r['id'],
 			'slug'     => $r['slug'],
-			'notebook' => $nb ? $nb['name'] : '',
+			'notebook' => $nb_name,
 			'title'    => $r['title'],
 			'body'     => $r['body'] ?? '',
 			'source'   => $r['source'] ?? '',
@@ -35,16 +42,23 @@ class Noodled_Notes {
 		global $wpdb;
 		$t  = self::table();
 		$at = $wpdb->prefix . 'noodled_attachments';
-		$cnt = "(SELECT COUNT(*) FROM {$at} a WHERE a.note_id = t.id) AS att_count";
+		$nb = $wpdb->prefix . 'noodled_notebooks';
+		// One LEFT JOIN for the notebook name and one aggregated JOIN for the
+		// attachment count, instead of an N+1 lookup per note plus a correlated
+		// COUNT subquery per row.
+		$join = "LEFT JOIN {$nb} n ON n.id = t.notebook_id "
+		      . "LEFT JOIN ( SELECT note_id, COUNT(*) AS cnt FROM {$at} GROUP BY note_id ) ac ON ac.note_id = t.id";
+		$cols = "t.*, n.name AS nb_name, COALESCE( ac.cnt, 0 ) AS att_count";
+		$order = "ORDER BY t.pinned DESC, t.modified_at DESC, t.created_at DESC";
 
 		if ( $notebook_id ) {
 			$rows = $wpdb->get_results( $wpdb->prepare(
-				"SELECT t.*, {$cnt} FROM {$t} t WHERE t.notebook_id = %d AND t.deleted_at IS NULL ORDER BY t.pinned DESC, t.modified_at DESC, t.created_at DESC",
+				"SELECT {$cols} FROM {$t} t {$join} WHERE t.notebook_id = %d AND t.deleted_at IS NULL {$order}",
 				$notebook_id
 			), ARRAY_A );
 		} else {
 			$rows = $wpdb->get_results(
-				"SELECT t.*, {$cnt} FROM {$t} t WHERE t.deleted_at IS NULL ORDER BY t.pinned DESC, t.modified_at DESC, t.created_at DESC",
+				"SELECT {$cols} FROM {$t} t {$join} WHERE t.deleted_at IS NULL {$order}",
 				ARRAY_A
 			);
 		}

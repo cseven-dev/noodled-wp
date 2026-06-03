@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noodled-v5';
+const CACHE_NAME = 'noodled-v6';
 const STATIC_ASSETS = [
   '/wp-content/plugins/noodled/assets/css/noodled.css',
   '/wp-content/plugins/noodled/assets/js/noodled.js',
@@ -35,16 +35,22 @@ self.addEventListener('fetch', event => {
   // and caching it risks serving one user's notes to another. Network-only.
   if (url.pathname.includes('/wp-json/')) return;
 
-  // Static assets: network-first so a deploy is picked up immediately. We only
-  // fall back to the cache when offline. (Stale-while-revalidate served the old
-  // bundle on every load, so new releases never reached the browser.)
+  // Static assets: stale-while-revalidate keyed by the FULL url (the ?v= query is
+  // version.filemtime, so every deploy is a fresh url = guaranteed cache miss =
+  // fresh fetch). Same-version repeat loads are served instantly from cache and
+  // revalidated in the background. This avoids the old bug where the cache key
+  // ignored the query and served a stale bundle after a deploy.
   if (STATIC_ASSETS.some(a => url.pathname.endsWith(a.split('/').pop()))) {
     event.respondWith(
-      fetch(event.request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
-      }).catch(() => caches.match(event.request))
+      caches.open(CACHE_NAME).then(cache =>
+        cache.match(event.request).then(cached => {
+          const network = fetch(event.request).then(response => {
+            if (response && response.ok) cache.put(event.request, response.clone());
+            return response;
+          }).catch(() => cached);
+          return cached || network;
+        })
+      )
     );
   }
 });
