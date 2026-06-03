@@ -162,7 +162,7 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
     <span class="bottom-nav-icon" aria-hidden="true">&#128269;</span>
     <span class="bottom-nav-label"><?php esc_html_e( 'Search', 'noodled' ); ?></span>
   </button>
-  <button class="bottom-nav-item bottom-nav-primary" onclick="createNote()" aria-label="<?php esc_attr_e( 'New note', 'noodled' ); ?>">
+  <button class="bottom-nav-item bottom-nav-primary" id="quickAddBtn" onclick="toggleQuickAdd(event)" aria-label="<?php esc_attr_e( 'Add', 'noodled' ); ?>" aria-haspopup="true" aria-expanded="false">
     <span class="bottom-nav-icon" aria-hidden="true">&#43;</span>
   </button>
   <button class="bottom-nav-item" onclick="syncPull()">
@@ -189,6 +189,10 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
 <div class="toast" id="toast"></div>
 <div id="modalContainer"></div>
 <div id="ctxContainer"></div>
+
+<!-- Quick-add speed dial (mobile + button) -->
+<input type="file" id="quickFilesInput" multiple style="display:none" onchange="quickHandleFiles(this)">
+<div id="quickAddContainer"></div>
 
 <script>
 const noodledConfig = <?php echo wp_json_encode( $config ); ?>;

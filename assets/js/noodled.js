@@ -561,10 +561,17 @@ function trackRecentNote(id) {
   if (_recentViewed.length > 12) _recentViewed.length = 12;
 }
 
+// A localized "date and time it was started" title, used as the default for
+// quick-add notes (new, upload, voice, location). The user can edit it after.
+function dateTimeTitle() {
+  try { return new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+  catch (e) { return new Date().toLocaleString(); }
+}
+
 async function createNote() {
   await doSave();
   const nb = activeNotebook || 'General';
-  const note = await api.create_note(nb, __( 'Untitled Note', 'noodled' ), '');
+  const note = await api.create_note(nb, dateTimeTitle(), '');
   await loadNotebooks();
   await loadNotes();
   activeNote = note;
@@ -576,6 +583,130 @@ async function createNote() {
     const input = document.getElementById('titleInput');
     if (input) { input.focus(); input.select(); }
   }, 100);
+}
+
+// ── Quick-add speed dial (the mobile + button) ──────────────────────────────
+// Opens a small menu: new note, photo/document, voice note, or location note.
+// Every option creates a note titled with the date/time it was started and
+// drops the user into the editor; the title stays editable afterwards.
+function quickAddOpen() {
+  const c = document.getElementById('quickAddContainer');
+  if (!c || c.dataset.open === '1') return;
+  const items = [
+    { icon: '📝', label: __( 'New note', 'noodled' ),         sub: __( 'Blank note', 'noodled' ),        run: quickAddNote },
+    { icon: '📎', label: __( 'Photo or document', 'noodled' ), sub: __( 'Upload files', 'noodled' ),      run: quickAddFiles },
+    { icon: '🎙️', label: __( 'Voice note', 'noodled' ),        sub: __( 'Dictate to text', 'noodled' ),   run: quickAddVoice },
+    { icon: '📍', label: __( 'Location note', 'noodled' ),     sub: __( 'Pin where you are', 'noodled' ), run: quickAddLocation },
+  ];
+  window._quickAddRun = items.map(it => it.run);
+  c.innerHTML =
+    '<div class="quick-add-scrim" id="quickAddScrim" onclick="quickAddClose()"></div>' +
+    '<div class="quick-add-menu" id="quickAddMenu" role="menu" aria-label="' + escAttr(__( 'Add', 'noodled' )) + '">' +
+      items.map((it, i) =>
+        '<button class="quick-add-item" role="menuitem" onclick="quickAddPick(' + i + ')">' +
+          '<span class="qa-icon" aria-hidden="true">' + it.icon + '</span>' +
+          '<span class="qa-label"><span>' + esc(it.label) + '</span><span class="qa-sub">' + esc(it.sub) + '</span></span>' +
+        '</button>'
+      ).join('') +
+    '</div>';
+  c.dataset.open = '1';
+  const btn = document.getElementById('quickAddBtn');
+  if (btn) { btn.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+  requestAnimationFrame(() => {
+    document.getElementById('quickAddScrim')?.classList.add('show');
+    document.getElementById('quickAddMenu')?.classList.add('show');
+  });
+  document.addEventListener('keydown', quickAddEsc);
+}
+
+function quickAddClose() {
+  const c = document.getElementById('quickAddContainer');
+  if (!c || c.dataset.open !== '1') return;
+  c.dataset.open = '0';
+  document.getElementById('quickAddScrim')?.classList.remove('show');
+  document.getElementById('quickAddMenu')?.classList.remove('show');
+  const btn = document.getElementById('quickAddBtn');
+  if (btn) { btn.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
+  document.removeEventListener('keydown', quickAddEsc);
+  setTimeout(() => { if (c.dataset.open !== '1') c.innerHTML = ''; }, 240);
+}
+
+function quickAddEsc(e) { if (e.key === 'Escape') quickAddClose(); }
+
+function toggleQuickAdd(e) {
+  if (e) e.stopPropagation();
+  const c = document.getElementById('quickAddContainer');
+  if (c && c.dataset.open === '1') quickAddClose(); else quickAddOpen();
+}
+
+function quickAddPick(i) {
+  const run = (window._quickAddRun || [])[i];
+  quickAddClose();
+  if (typeof run === 'function') run();
+}
+
+// Blank note titled with the date/time, straight into the editor.
+function quickAddNote() { createNote(); }
+
+// Voice note: new date/time note opened in the editor with dictation
+// (speech → text) auto-started, so the mic is live as soon as it opens.
+async function quickAddVoice() {
+  await doSave();
+  const nb = activeNotebook || 'General';
+  const note = await api.create_note(nb, dateTimeTitle(), '');
+  if (!note || note.error) { showToast(__( 'Could not create note', 'noodled' )); return; }
+  activeNote = note;
+  await loadNotebooks();
+  await loadNotes();
+  renderNoteList();
+  renderContent();
+  document.querySelector('.col-content')?.classList.add('open');
+  closeSidebar();
+  // Focus the body and begin listening once the editor is in the DOM.
+  setTimeout(() => {
+    const body = document.getElementById('noteBodyRaw') || document.getElementById('noteBody');
+    if (body) body.focus();
+    if (typeof dictating !== 'undefined' && !dictating) toggleVoiceMemo();
+  }, 250);
+}
+
+// Location note: capture the current GPS position and create a note with the
+// coordinates plus an embedded, pinned map, then open it in the editor.
+function quickAddLocation() {
+  if (!navigator.geolocation) { showToast(__( 'Location is not available on this device', 'noodled' )); return; }
+  showToast(__( 'Getting your location…', 'noodled' ));
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = Math.round(pos.coords.latitude * 1e6) / 1e6;
+      const lng = Math.round(pos.coords.longitude * 1e6) / 1e6;
+      createNoteFromLocation(lat, lng);
+    },
+    (err) => {
+      if (err && err.code === err.PERMISSION_DENIED) showToast(__( 'Location access denied', 'noodled' ));
+      else showToast(__( 'Could not get your location', 'noodled' ));
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+  );
+}
+
+async function createNoteFromLocation(lat, lng) {
+  await doSave();
+  const nb = activeNotebook || 'General';
+  // A coordinates line plus a standalone OpenStreetMap link; the renderer turns
+  // the link into an embedded map with a marker (see embedMedia).
+  const mapUrl = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=16/' + lat + '/' + lng;
+  /* translators: %1$s is latitude, %2$s is longitude */
+  const body = sprintf( __( '📍 %1$s, %2$s', 'noodled' ), lat, lng ) + '\n\n' + mapUrl + '\n';
+  const note = await api.create_note(nb, dateTimeTitle(), body);
+  if (!note || note.error) { showToast(__( 'Could not create note', 'noodled' )); return; }
+  activeNote = await api.get_note(null, note.id);
+  await loadNotebooks();
+  await loadNotes();
+  renderNoteList();
+  renderContent();
+  document.querySelector('.col-content')?.classList.add('open');
+  closeSidebar();
+  setTimeout(() => { const t = document.getElementById('titleInput'); if (t) { t.focus(); t.select(); } }, 100);
 }
 
 function showNoteContext(event, noteId) {
@@ -1239,14 +1370,27 @@ async function handleFiles(input) {
     showToast(sprintf( _n( '%d file added', '%d files added', ok, 'noodled' ), ok ));
     return;
   }
+  await createNoteFromFiles(files);
+}
 
+// Quick-add: always start a NEW note for the upload, even if one is already open.
+function quickAddFiles() {
+  const input = document.getElementById('quickFilesInput');
+  if (input) { input.value = ''; input.click(); }
+}
+async function quickHandleFiles(input) {
+  const files = Array.from(input.files || []);
+  if (files.length) await createNoteFromFiles(files);
+}
+
+// Create a fresh note titled with the date/time it was started, upload every
+// file into it, then drop the user straight into the editor to add text.
+async function createNoteFromFiles(files) {
   await doSave();
   const nb = activeNotebook || 'General';
-  const allImages = files.every(f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(f.name));
-  const title = (allImages ? __( 'Image Upload', 'noodled' ) + ' ' : __( 'Files', 'noodled' ) + ' ') + new Date().toLocaleString();
   /* translators: %d is the number of files being uploaded */
   showToast(sprintf( _n( 'Uploading %d file…', 'Uploading %d files…', files.length, 'noodled' ), files.length ));
-  const note = await api.create_note(nb, title, '');
+  const note = await api.create_note(nb, dateTimeTitle(), '');
   if (!note || note.error) { showToast(__( 'Could not create note', 'noodled' )); return; }
   let ok = 0;
   for (const f of files) {
@@ -1259,6 +1403,7 @@ async function handleFiles(input) {
   renderContent();
   document.querySelector('.col-content')?.classList.add('open');
   closeSidebar();
+  setTimeout(() => { const t = document.getElementById('titleInput'); if (t) { t.focus(); t.select(); } }, 100);
   /* translators: %d is the number of files added */
   showToast(sprintf( _n( '%d file added', '%d files added', ok, 'noodled' ), ok ));
 }
@@ -2499,6 +2644,18 @@ function embedMedia(url) {
   // Vimeo
   m = url.match(/vimeo\.com\/(\d+)/);
   if (m) return `<div class="embed-container"><iframe title="${escAttr(__( 'Embedded Vimeo video', 'noodled' ))}" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  // OpenStreetMap location link (e.g. a location note) → embedded map with a pin
+  if (/openstreetmap\.org/i.test(url)) {
+    const latM = url.match(/[?&#]mlat=(-?\d+(?:\.\d+)?)/i);
+    const lonM = url.match(/[?&#]mlon=(-?\d+(?:\.\d+)?)/i);
+    if (latM && lonM) {
+      const lat = parseFloat(latM[1]), lng = parseFloat(lonM[1]);
+      const d = 0.008; // ~1 km box around the pin
+      const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
+      const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
+      return `<div class="embed-container map-embed"><iframe title="${escAttr(__( 'Map location', 'noodled' ))}" src="${src}" frameborder="0" loading="lazy" style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe><a class="map-open" href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${esc(__( 'Open in OpenStreetMap', 'noodled' ))}</a></div>`;
+    }
+  }
   return null;
 }
 
