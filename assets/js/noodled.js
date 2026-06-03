@@ -58,6 +58,8 @@ const api = {
   empty_trash()                          { return this._fetch('/trash', { method: 'DELETE' }); },
   trash_count()                          { return this._fetch('/trash/count'); },
   search(query)                          { return this._fetch('/search?q=' + encodeURIComponent(query)); },
+  get_backlinks(title)                   { return this._fetch('/backlinks?title=' + encodeURIComponent(title)); },
+  get_bodies()                           { return this._fetch('/bodies'); },
   save_attachment(nb, noteId, name, b64) { return this._fetch('/attachments', { method: 'POST', body: JSON.stringify({ note_id: noteId, filename: name, data: b64 }) }); },
   delete_attachment(id)                  { return this._fetch('/attachments/' + id, { method: 'DELETE' }); },
   import_evernote(formData)              { return fetch(this._base + '/import/evernote', { method: 'POST', headers: { 'X-WP-Nonce': this._nonce }, credentials: 'same-origin', body: formData }).then(r => r.json()); },
@@ -388,6 +390,7 @@ async function deleteNotebook(name) {
 
 // ── Notes ──
 async function loadNotes() {
+  _bodiesLoaded = false; // list responses are body-free; re-hydrate lazily on demand
   try {
     notes = await api.get_notes(activeNotebook);
     // Cache for offline reading (keyed by notebook scope).
@@ -403,15 +406,41 @@ async function loadNotes() {
   filterNotes();
 }
 
+// Note bodies are no longer shipped in the list (fast first paint). Features that
+// genuinely need all content — search, tag cloud, link graph, stats — call this
+// to hydrate `notes[]` with bodies once per load via one lean request.
+let _bodiesLoaded = false;
+let _bodiesPromise = null;
+async function ensureBodies() {
+  if (_bodiesLoaded) return;
+  if (!_bodiesPromise) {
+    _bodiesPromise = (async () => {
+      try {
+        const rows = await api.get_bodies();
+        const byId = {};
+        (rows || []).forEach(r => { byId[r.id] = r.body; });
+        const merge = arr => arr.forEach(n => { if (n && n.body == null && byId[n.id] != null) n.body = byId[n.id]; });
+        merge(notes); merge(filteredNotes);
+        _bodiesLoaded = true;
+      } catch (e) { /* offline / failed → features degrade to title+preview */ }
+      finally { _bodiesPromise = null; }
+    })();
+  }
+  return _bodiesPromise;
+}
+
 function filterNotes() {
   searchQuery = document.getElementById('searchInput').value.toLowerCase();
   const q = searchQuery.trim();
   if (q) {
+    // Full-body search needs the bodies hydrated; fetch them once, then re-filter.
+    if (!_bodiesLoaded) ensureBodies().then(() => { if (searchQuery.trim()) filterNotes(); });
     // Token-AND: every word must appear somewhere (title, body, or notebook),
-    // so "dish pump" matches a note containing both words in any order.
+    // so "dish pump" matches a note containing both words in any order. Until
+    // bodies arrive this searches title/preview/notebook, then upgrades.
     const toks = q.split(/\s+/);
     filteredNotes = notes.filter(n => {
-      const hay = ((n.title || '') + ' ' + (n.body || '') + ' ' + (n.notebook || '')).toLowerCase();
+      const hay = ((n.title || '') + ' ' + (n.body || n.preview || '') + ' ' + (n.notebook || '')).toLowerCase();
       return toks.every(t => hay.includes(t));
     });
   } else {
@@ -481,20 +510,12 @@ function renderNoteList() {
 
 function renderNoteItem(n) {
   {
-    const preview = (n.body || '')
-      .replace(/^---[\s\S]*?---\n?/, '')    // strip frontmatter
-      .replace(/^#{1,3}\s+/gm, '')          // strip headings
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // strip images
-      .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1') // links to text
-      .replace(/\*\*(.+?)\*\*/g, '$1')      // bold
-      .replace(/\*(.+?)\*/g, '$1')           // italic
-      .replace(/`([^`]+)`/g, '$1')           // inline code
-      .replace(/^>\s+/gm, '')               // blockquotes
-      .replace(/^-\s+\[[ xX]\]\s*/gm, '')   // checklists
-      .replace(/^-\s+/gm, '')               // bullets
-      .replace(/^\d+\.\s+/gm, '')           // numbered lists
-      .replace(/\n+/g, ' ')                 // newlines to spaces
-      .trim().substring(0, 120);
+    // The server ships a ready-made preview + task counts so the list never
+    // carries (or re-parses) full note bodies. Fall back to body if present
+    // (e.g. a freshly-saved note merged in client-side).
+    const preview = (n.preview != null && n.preview !== '')
+      ? n.preview
+      : (n.body || '').replace(/[#>*`_~|\[\]]/g, '').replace(/\s+/g, ' ').trim().substring(0, 160);
     const isActive = activeNote && activeNote.id === n.id;
     const badge = n.source === 'plaud' ? '<span class="source-badge">plaud</span>' : '';
     const pin = n.pinned ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Pinned', 'noodled' )) + '">&#128204;</span>' : '';
@@ -502,7 +523,9 @@ function renderNoteItem(n) {
     const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '">&#128279;</span>' : '';
     /* translators: %d is the number of attachments */
     const attBadge = (n.att > 0) ? `<span class="att-badge" title="${escAttr(sprintf( _n( '%d attachment', '%d attachments', n.att, 'noodled' ), n.att ))}">&#128206; ${n.att}</span>` : '';
-    const tasks = checklistProgress(n.body);
+    // Task counts come from the server (n.tasks); fall back to scanning the body
+    // only if it happens to be present.
+    const tasks = (n.tasks && n.tasks.total > 0) ? n.tasks : (n.body ? checklistProgress(n.body) : null);
     /* translators: %1$d is completed tasks, %2$d is total tasks */
     const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${escAttr(sprintf( __( '%1$d of %2$d tasks done', 'noodled' ), tasks.done, tasks.total ))}">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
     const time = relativeTime(n.modified || n.created);
@@ -1686,7 +1709,10 @@ function renderMarkdown(text) {
       if (!inList || listType !== 'check') { closeList(); out.push('<ul class="checklist">'); inList = true; listType = 'check'; }
       const checked = checkMatch[1].toLowerCase() === 'x';
       const checkIdx = out.filter(l => l.includes('type="checkbox"')).length;
-      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[2])}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
+      // preventDefault stops the browser's native toggle so toggleCheck() is the
+      // single source of truth — otherwise the native flip + the markdown flip
+      // cancel out and the change never persists.
+      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[2])}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.preventDefault(); event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
       continue;
     }
     const bulletMatch = trimmed.match(/^-\s+(.+)$/);
@@ -2233,7 +2259,8 @@ function getAllTags() {
   return Array.from(tags).sort();
 }
 
-function showTagCloud() {
+async function showTagCloud() {
+  await ensureBodies(); // tags live in note bodies, hydrate them first
   const tags = getAllTags();
   if (!tags.length) { showToast(__( 'No tags found', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
@@ -2364,7 +2391,8 @@ async function submitQuickCapture() {
 }
 
 // ── Note linking graph ──
-function showLinkGraph() {
+async function showLinkGraph() {
+  await ensureBodies(); // wiki-links live in note bodies
   const links = {};
   const allNotes = notes;
   allNotes.forEach(n => {
@@ -2589,6 +2617,10 @@ function toggleVoiceMemo() {
   recognition.continuous = true;
   recognition.interimResults = true;
 
+  // The latest not-yet-finalized words, so a Stop mid-sentence can still commit
+  // them before the listening bar closes.
+  let pendingInterim = '';
+
   recognition.onresult = (event) => {
     let finalText = '', interim = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -2597,6 +2629,7 @@ function toggleVoiceMemo() {
       else interim += r[0].transcript;
     }
     if (finalText) insertDictation(finalText);
+    pendingInterim = interim;
     setDictationInterim(interim);
   };
 
@@ -2613,6 +2646,9 @@ function toggleVoiceMemo() {
   // continuous mode can still end on a long pause — restart unless the user stopped.
   recognition.onend = () => {
     if (dictating) { try { recognition.start(); return; } catch (_) {} }
+    // The user stopped: commit any half-spoken sentence the engine didn't
+    // finalize, THEN close the bar — so nothing in flight is lost.
+    if (pendingInterim && pendingInterim.trim()) { insertDictation(pendingInterim); pendingInterim = ''; }
     dictating = false;
     setDictateBtn(false);
   };
@@ -2630,8 +2666,11 @@ function toggleVoiceMemo() {
 
 function stopDictation() {
   dictating = false;
-  if (recognition) { try { recognition.stop(); } catch (_) {} }
-  setDictateBtn(false);
+  // Let recognition.stop() finalize the current phrase and fire onend, which
+  // flushes any pending words and then closes the bar. Only close immediately
+  // if there's nothing to stop.
+  if (recognition) { try { recognition.stop(); } catch (_) { setDictateBtn(false); } }
+  else setDictateBtn(false);
 }
 
 // ── Bookmark sections / TOC ──
@@ -2711,8 +2750,8 @@ function embedMedia(url) {
 function mapEmbedHtml(lat, lng, linkUrl) {
   const cfg = (typeof noodledConfig !== 'undefined' && noodledConfig.map) || {};
   const provider = cfg.provider || 'osm';
-  const open = linkUrl || ('https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=16/' + lat + '/' + lng);
-  const openLink = `<a class="map-open" href="${open.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${esc(__( 'Open in maps', 'noodled' ))}</a>`;
+  // Tapping the button offers Apple Maps / Google Maps / Waze (see openMapNav).
+  const openLink = `<button type="button" class="map-nav-btn" contenteditable="false" onclick="event.preventDefault(); event.stopPropagation(); openMapNav(${lat}, ${lng})"><span aria-hidden="true">&#129517;</span> ${esc(__( 'Directions', 'noodled' ))}</button>`;
   const title = escAttr(__( 'Map location', 'noodled' ));
 
   if (provider === 'gmaps' && cfg.gmapsKey) {
@@ -2730,6 +2769,31 @@ function mapEmbedHtml(lat, lng, linkUrl) {
   const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
   return `<div class="embed-container map-embed"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
 }
+
+// Tapping a location-note map's Directions button: choose which app to open the
+// coordinates in. Universal deep links so each app opens natively on mobile.
+function openMapNav(lat, lng) {
+  const apple  = `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent('Location')}`;
+  const google = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const waze   = `https://waze.com/ul?ll=${lat}%2C${lng}&navigate=yes`;
+  const app = (href, icon, label) =>
+    `<a class="map-nav-app" href="${href}" target="_blank" rel="noopener noreferrer" onclick="closeMapNav()"><span class="mn-icon" aria-hidden="true">${icon}</span>${esc(label)}</a>`;
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){closeMapNav();}">
+    <div class="modal map-nav-modal">
+      <h3>${esc(__( 'Open in…', 'noodled' ))}</h3>
+      <div class="map-nav-list">
+        ${app(apple,  '🍎', __( 'Apple Maps', 'noodled' ))}
+        ${app(google, '🗺️', __( 'Google Maps', 'noodled' ))}
+        ${app(waze,   '🚗', __( 'Waze', 'noodled' ))}
+      </div>
+      <div class="modal-buttons" style="margin-top:14px">
+        <button class="btn btn-sm" onclick="closeMapNav()">${esc(__( 'Cancel', 'noodled' ))}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function closeMapNav() { const el = document.getElementById('modalContainer'); if (el) el.innerHTML = ''; }
 
 // ── Typewriter mode ──
 let typewriterMode = false;
@@ -2759,7 +2823,8 @@ document.addEventListener('selectionchange', () => {
 });
 
 // ── Note statistics dashboard ──
-function showStats() {
+async function showStats() {
+  await ensureBodies(); // word counts need the full bodies
   const totalNotes = notes.length;
   const totalWords = notes.reduce((sum, n) => {
     const w = (n.body || '').trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -2878,22 +2943,21 @@ function showSaveIndicator(state) {
 }
 
 // ── Backlinks panel ──
-function getBacklinks(noteTitle) {
-  if (!noteTitle) return [];
-  const lower = noteTitle.toLowerCase();
-  return notes.filter(n => {
-    const body = (n.body || '').toLowerCase();
-    return body.includes('[[' + lower + ']]');
-  });
-}
-
-function renderBacklinks() {
+// Resolved server-side (a targeted [[title]] query) so opening a note never
+// needs every other note's body on the client.
+async function renderBacklinks() {
   if (!activeNote) return;
-  const backlinks = getBacklinks(activeNote.title);
+  const note = activeNote;
+  let backlinks = [];
+  try { backlinks = await api.get_backlinks(note.title); } catch (e) { return; }
+  if (activeNote !== note) return; // user navigated away while we were fetching
   const el = document.getElementById('editorFooter');
-  if (!el) return;
-  if (backlinks.length) {
-    const links = backlinks.map(n => `<a href="#" class="backlink" onclick="event.preventDefault();selectNote(${n.id})">${esc(n.title)}</a>`).join(', ');
+  if (!el || !Array.isArray(backlinks) || !backlinks.length) return;
+  const links = backlinks
+    .filter(n => n.id !== note.id)
+    .map(n => `<a href="#" class="backlink" onclick="event.preventDefault();selectNote(${n.id})">${esc(n.title)}</a>`)
+    .join(', ');
+  if (links) {
     /* translators: %s is a comma-separated list of note links */
     el.innerHTML += `<div class="backlinks-line">${sprintf( __( 'Linked from: %s', 'noodled' ), links )}</div>`;
   }

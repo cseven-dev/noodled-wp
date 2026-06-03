@@ -875,8 +875,25 @@ body.reading-mode .rendered-content { cursor: default; }
 .quick-add-item .qa-sub { font-size: 12px; color: var(--text-muted); }
 
 /* Map embed (location notes) */
-.map-embed { display: flex; flex-direction: column; gap: 6px; margin: 0.5em 0; }
+.map-embed { display: flex; flex-direction: column; gap: 8px; margin: 0.5em 0; }
 .map-embed .map-open { font-size: 12px; color: var(--accent); align-self: flex-start; }
+.map-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  background: var(--accent); color: #fff; border: none; border-radius: 20px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: transform 0.1s ease, background 0.15s ease;
+}
+.map-nav-btn:hover { background: var(--accent-hover); }
+.map-nav-btn:active { transform: scale(0.96); }
+.map-nav-list { display: flex; flex-direction: column; gap: 8px; }
+.map-nav-app {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-bright); font-size: 15px; font-weight: 500; text-decoration: none;
+  transition: background 0.15s ease;
+}
+.map-nav-app:hover { background: var(--bg-item-hover); }
+.map-nav-app .mn-icon { font-size: 22px; line-height: 1; }
 
 /* ── Dictation "Listening" bar ── */
 .dictation-bar {

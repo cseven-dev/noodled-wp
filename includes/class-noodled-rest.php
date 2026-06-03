@@ -77,6 +77,12 @@ class Noodled_REST {
 		register_rest_route( $ns, '/search', [
 			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'search' ], ] + $auth,
 		] );
+		register_rest_route( $ns, '/backlinks', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'backlinks' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/bodies', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'note_bodies' ], ] + $auth,
+		] );
 
 		// Attachments
 		register_rest_route( $ns, '/attachments', [
@@ -705,6 +711,19 @@ class Noodled_REST {
 		$nb_ids   = self::accessible_notebook_ids();
 		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
 		return new \WP_REST_Response( Noodled_Notes::search( $q, $nb_ids, $note_ids ) );
+	}
+
+	public static function backlinks( \WP_REST_Request $req ): \WP_REST_Response {
+		$title    = (string) $req->get_param( 'title' );
+		$nb_ids   = self::accessible_notebook_ids();
+		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
+		return new \WP_REST_Response( Noodled_Notes::backlinks( $title, $nb_ids, $note_ids ) );
+	}
+
+	public static function note_bodies( \WP_REST_Request $req ): \WP_REST_Response {
+		$nb_ids   = self::accessible_notebook_ids();
+		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
+		return new \WP_REST_Response( Noodled_Notes::bodies( $nb_ids, $note_ids ) );
 	}
 
 	// ── Attachments ──

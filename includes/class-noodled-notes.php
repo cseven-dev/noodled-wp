@@ -8,7 +8,11 @@ class Noodled_Notes {
 		return $wpdb->prefix . 'noodled_notes';
 	}
 
-	private static function format_row( array $r ): array {
+	// List responses ($with_body = false) ship a short server-built preview and
+	// task counts instead of the whole body, so a heavy notebook isn't a giant
+	// payload parsed on every load. The editor (single-row callers) still gets
+	// the full body.
+	private static function format_row( array $r, bool $with_body = true ): array {
 		// The list query joins the notebook name in (nb_name) to avoid an N+1
 		// lookup; single-row callers (get_one/restore/etc.) fall back to a lookup.
 		if ( array_key_exists( 'nb_name', $r ) ) {
@@ -17,18 +21,53 @@ class Noodled_Notes {
 			$nb = Noodled_Notebooks::get_by_id( (int) $r['notebook_id'] );
 			$nb_name = $nb ? $nb['name'] : '';
 		}
-		return [
+		$body = $r['body'] ?? '';
+		$out  = [
 			'id'       => (int) $r['id'],
 			'slug'     => $r['slug'],
 			'notebook' => $nb_name,
 			'title'    => $r['title'],
-			'body'     => $r['body'] ?? '',
 			'source'   => $r['source'] ?? '',
 			'pinned'   => (bool) $r['pinned'],
 			'created'  => $r['created_at'] ? substr( $r['created_at'], 0, 16 ) : '',
 			'modified' => $r['modified_at'] ? substr( $r['modified_at'], 0, 16 ) : '',
 			'att'      => isset( $r['att_count'] ) ? (int) $r['att_count'] : 0,
+			'preview'  => self::preview_of( $body ),
+			'tasks'    => self::task_counts( $body ),
 		];
+		if ( $with_body ) $out['body'] = $body;
+		return $out;
+	}
+
+	// A plain-text snippet of the note body for the list, with markdown stripped.
+	private static function preview_of( string $body ): string {
+		$s = $body;
+		$s = preg_replace( '/```.*?```/s', ' ', $s );              // fenced code
+		$s = preg_replace( '/!\[[^\]]*\]\([^)]*\)/', ' ', $s );    // images
+		$s = preg_replace( '/\[([^\]]*)\]\([^)]*\)/', '$1', $s );  // links → text
+		$s = preg_replace( '/\[\[([^\]]+)\]\]/', '$1', $s );       // wiki links
+		$s = preg_replace( '/^\s{0,3}#{1,6}\s*/m', '', $s );       // headings
+		$s = preg_replace( '/^\s*[-*+]\s+\[[ xX]\]\s*/m', '', $s );// task markers
+		$s = preg_replace( '/^\s*[-*+]\s+/m', '', $s );            // bullets
+		$s = preg_replace( '/^\s*\d+\.\s+/m', '', $s );            // numbered
+		$s = preg_replace( '/^\s*>\s?/m', '', $s );                // blockquote
+		$s = preg_replace( '/[*_`~>#|]/', '', $s );                // stray md chars
+		$s = preg_replace( '/\s+/', ' ', (string) $s );            // collapse ws
+		$s = trim( (string) $s );
+		if ( function_exists( 'mb_strlen' ) && mb_strlen( $s ) > 160 ) {
+			return mb_substr( $s, 0, 160 ) . '…';
+		}
+		return strlen( $s ) > 160 ? substr( $s, 0, 160 ) . '…' : $s;
+	}
+
+	// Checklist progress for the list badge, without shipping the body.
+	private static function task_counts( string $body ): array {
+		if ( ! preg_match_all( '/^\s*[-*+]\s+\[([ xX])\]/m', $body, $m ) ) {
+			return [ 'done' => 0, 'total' => 0 ];
+		}
+		$done = 0;
+		foreach ( $m[1] as $c ) { if ( strtolower( $c ) === 'x' ) $done++; }
+		return [ 'done' => $done, 'total' => count( $m[1] ) ];
 	}
 
 	public static function slug( string $title ): string {
@@ -63,7 +102,7 @@ class Noodled_Notes {
 			);
 		}
 
-		return array_map( [ __CLASS__, 'format_row' ], $rows ?: [] );
+		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
 	}
 
 	public static function get_one( int $id ): ?array {
@@ -152,7 +191,7 @@ class Noodled_Notes {
 			"SELECT * FROM " . self::table() . " WHERE $where ORDER BY deleted_at DESC",
 			ARRAY_A
 		);
-		return array_map( [ __CLASS__, 'format_row' ], $rows ?: [] );
+		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
 	}
 
 	public static function trash_count( array $notebook_ids = [] ): int {
@@ -245,13 +284,44 @@ class Noodled_Notes {
 				"SELECT * FROM " . self::table() . " WHERE $where AND MATCH(title, body) AGAINST(%s IN BOOLEAN MODE) ORDER BY modified_at DESC",
 				'*' . $query . '*'
 			), ARRAY_A );
-			if ( $rows ) return array_map( [ __CLASS__, 'format_row' ], $rows );
+			if ( $rows ) return array_map( static fn( $r ) => self::format_row( $r, false ), $rows );
 		}
 		$like = '%' . $wpdb->esc_like( $query ) . '%';
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM " . self::table() . " WHERE $where AND (title LIKE %s OR body LIKE %s) ORDER BY modified_at DESC",
 			$like, $like
 		), ARRAY_A );
-		return array_map( [ __CLASS__, 'format_row' ], $rows ?: [] );
+		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
+	}
+
+	// Notes that link to a given title via a [[wiki-link]] (for the backlinks
+	// panel), resolved server-side so the list never has to ship every body.
+	public static function backlinks( string $title, array $notebook_ids = [], array $extra_note_ids = [] ): array {
+		global $wpdb;
+		$title = trim( $title );
+		if ( $title === '' ) return [];
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$where    = "deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids))";
+		$like     = '%[[' . $wpdb->esc_like( $title ) . ']]%';
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT * FROM " . self::table() . " WHERE $where AND body LIKE %s ORDER BY modified_at DESC",
+			$like
+		), ARRAY_A );
+		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
+	}
+
+	// Lightweight id→body list for client features that scan all note content
+	// (search, tag cloud, link graph, stats). Fetched lazily so the note list
+	// itself stays body-free for fast first paint.
+	public static function bodies( array $notebook_ids = [], array $extra_note_ids = [] ): array {
+		global $wpdb;
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$where    = "deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids))";
+		$rows = $wpdb->get_results( "SELECT id, body FROM " . self::table() . " WHERE $where", ARRAY_A );
+		$out = [];
+		foreach ( $rows ?: [] as $r ) $out[] = [ 'id' => (int) $r['id'], 'body' => $r['body'] ?? '' ];
+		return $out;
 	}
 }
