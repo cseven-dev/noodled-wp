@@ -1372,11 +1372,11 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 
 /* ── Responsive: mobile ── */
 @media (max-width: 768px) {
-  .main { flex-direction: column; position: relative; height: calc(100vh - 42px); }
+  .main { flex-direction: column; position: relative; height: calc(100vh - 52px); }
 
   /* Sidebar: slide-in drawer with overlay */
   .col-notebooks {
-    position: fixed; left: -260px; top: 42px; bottom: 0; z-index: 60;
+    position: fixed; left: -260px; top: 52px; bottom: 0; z-index: 60;
     width: 260px; transition: left 0.25s ease;
     border-right: 1px solid var(--border);
     box-shadow: 4px 0 24px rgba(0,0,0,0.5);
@@ -1408,7 +1408,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 
   /* Content: full screen slide-in */
   .col-content {
-    position: fixed; top: 42px; left: 0; right: 0; bottom: 0; z-index: 40;
+    position: fixed; top: 52px; left: 0; right: 0; bottom: 0; z-index: 40;
     background: var(--bg-content);
     flex-direction: column;
     transform: translateX(100%);
@@ -1428,13 +1428,15 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   .editor-actions { gap: 2px; }
   .editor-actions .toolbar-divider { display: none; }
 
-  /* Toolbar: compact, always on top. Keep clear of rounded corners / notches. */
+  /* Toolbar: fixed height so a taller control (e.g. the bigger hamburger) can't
+     grow the bar past what the layout reserves below it. Keep clear of notches. */
   .toolbar {
-    padding: 8px 14px; gap: 8px; position: fixed; top: 0; left: 0; right: 0; z-index: 70;
+    height: 52px; box-sizing: border-box; align-items: center;
+    padding: 0 14px; gap: 8px; position: fixed; top: 0; left: 0; right: 0; z-index: 70;
     padding-left: max(14px, env(safe-area-inset-left, 14px));
     padding-right: max(14px, env(safe-area-inset-right, 14px));
   }
-  .main { margin-top: 42px; }
+  .main { margin-top: 52px; }
   .toolbar .logo { font-size: 16px; }
   .toolbar .hide-mobile { display: none; }
   .toolbar .spacer { flex: 1; }
@@ -1476,7 +1478,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   .fab { display: none; }
 
   /* Adjust for bottom nav */
-  .main { height: calc(100vh - 42px - 72px); }
+  .main { height: calc(100vh - 52px - 72px); } /* toolbar 52 + bottom-nav 72 */
   .col-notes { padding-bottom: 0; }
 
 
