@@ -560,6 +560,13 @@ body {
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 .modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,120,212,0.15); }
+/* The blanket rule above is for text fields. Checkboxes/radios must NOT be
+   stretched to 100% width with input padding/border — that shoves their label
+   off the edge (e.g. the "Drop folder" toggle). Reset them to native sizing. */
+.modal input[type="checkbox"], .modal input[type="radio"] {
+  width: auto; padding: 0; margin: 0; border: none; background: none; border-radius: 0;
+  flex: 0 0 auto; box-shadow: none;
+}
 .modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ── Confirm dialog ── */
