@@ -208,8 +208,8 @@ class Noodled_Settings {
 					<span style="display:flex;flex-direction:column;line-height:1.05"><b><?php echo esc_html( $brand ); ?></b><span><?php esc_html_e( 'control room', 'noodled' ); ?></span></span>
 				</div>
 				<div class="nood-spacer"></div>
-				<a class="nood-toggle" href="<?php echo esc_url( add_query_arg( [ 'tab' => $tab, 'nood_theme' => $other ] ) ); ?>"><?php echo $theme === 'dark' ? '&#9728;&#65038; ' . esc_html__( 'Light', 'noodled' ) : '&#9789; ' . esc_html__( 'Dark', 'noodled' ); ?></a>
-				<a class="nood-link" href="<?php echo esc_url( admin_url() ); ?>"><?php echo esc_html__( 'WP', 'noodled' ); ?>&nbsp;<?php echo esc_html__( 'Admin', 'noodled' ); ?> &#8599;</a>
+				<a class="nood-toggle" href="<?php echo esc_url( add_query_arg( [ 'tab' => $tab, 'nood_theme' => $other ] ) ); ?>"><?php echo $theme === 'dark' ? '<span aria-hidden="true">&#9728;&#65038;</span> ' . esc_html__( 'Light', 'noodled' ) : '<span aria-hidden="true">&#9789;</span> ' . esc_html__( 'Dark', 'noodled' ); ?></a>
+				<a class="nood-link" href="<?php echo esc_url( admin_url() ); ?>"><?php echo esc_html__( 'WP', 'noodled' ); ?>&nbsp;<?php echo esc_html__( 'Admin', 'noodled' ); ?> <span aria-hidden="true">&#8599;</span></a>
 			</div>
 			<div class="nood-wrap">
 				<nav class="nood-tabs" aria-label="<?php esc_attr_e( 'Noodled sections', 'noodled' ); ?>">
@@ -294,7 +294,7 @@ class Noodled_Settings {
 					/* translators: 1: date, 2: number of notes created that day */
 					$bar_title = sprintf( _n( '%1$s · %2$d note', '%1$s · %2$d notes', $count, 'noodled' ), $date, $count );
 					?>
-					<div class="bar" title="<?php echo esc_attr( $bar_title ); ?>">
+					<div class="bar" role="img" aria-label="<?php echo esc_attr( $bar_title ); ?>" title="<?php echo esc_attr( $bar_title ); ?>">
 						<b><?php echo $count ?: ''; ?></b>
 						<i style="height:<?php echo (int) $h; ?>%"></i>
 						<span><?php echo esc_html( gmdate( 'j', strtotime( $date ) ) ); ?></span>

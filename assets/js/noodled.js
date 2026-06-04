@@ -169,8 +169,17 @@ function applyTheme(mode) {
 // When in auto mode, follow live OS changes.
 if (_systemDark) { try { _systemDark.addEventListener('change', () => { if (config.theme === 'auto') applyTheme('auto'); }); } catch (e) {} }
 
+// Briefly enable color transitions so a theme switch eases rather than snaps.
+function themeFlash() {
+  const h = document.documentElement;
+  h.classList.add('theme-switching');
+  clearTimeout(window._themeFlashT);
+  window._themeFlashT = setTimeout(() => h.classList.remove('theme-switching'), 380);
+}
+
 async function toggleTheme() {
   const next = config.theme === 'dark' ? 'light' : (config.theme === 'light' ? 'auto' : 'dark');
+  themeFlash();
   applyTheme(next);
   /* translators: %s is the current theme mode (dark, light, or auto) */
   showToast(sprintf( __( 'Theme: %s', 'noodled' ), next ));
@@ -711,7 +720,7 @@ function renderNoteItem(n) {
            oncontextmenu="event.preventDefault(); showNoteContext(event, ${n.id})">
         <div class="title">${checkbox}${pin}${star}${sharedBadge}${highlightMatch(n.title, searchQuery)}${badge}</div>
         <div class="meta">
-          <span title="${escAttr(fullDate)}">${esc(time)}</span>
+          <span class="note-time" data-ts="${escAttr(fullDate)}" title="${escAttr(fullDate)}">${esc(time)}</span>
           <span>${esc(n.notebook)}</span>
           ${attBadge}
           ${taskBadge}
@@ -890,14 +899,32 @@ function quickAddLocation() {
   );
 }
 
+// Best-effort reverse geocode (OpenStreetMap Nominatim) → a short place name.
+async function reverseGeocode(lat, lng) {
+  try {
+    const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=' + lat + '&lon=' + lng;
+    const res = await fetch(url, { headers: { 'Accept-Language': navigator.language || 'en' } });
+    if (!res.ok) return '';
+    const d = await res.json();
+    const a = d.address || {};
+    const road = [a.house_number, a.road].filter(Boolean).join(' ');
+    const place = a.city || a.town || a.village || a.suburb || a.county || '';
+    return [road, place].filter(Boolean).join(', ') || (d.display_name ? d.display_name.split(',').slice(0, 2).join(',') : '');
+  } catch (e) { return ''; }
+}
+
 async function createNoteFromLocation(lat, lng) {
   await doSave();
   const nb = activeNotebook || 'General';
-  // A coordinates line plus a standalone OpenStreetMap link; the renderer turns
-  // the link into an embedded map with a marker (see embedMedia).
+  const place = await reverseGeocode(lat, lng);
+  // A coordinates line (with the place name when we have one) plus a standalone
+  // OpenStreetMap link; the renderer turns the link into an embedded pinned map.
   const mapUrl = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=16/' + lat + '/' + lng;
   /* translators: %1$s is latitude, %2$s is longitude */
-  const body = sprintf( __( '📍 %1$s, %2$s', 'noodled' ), lat, lng ) + '\n\n' + mapUrl + '\n';
+  const coords = sprintf( __( '📍 %1$s, %2$s', 'noodled' ), lat, lng );
+  /* translators: %1$s is a place name (e.g. street, city), %2$s is latitude, %3$s is longitude */
+  const head = place ? sprintf( __( '📍 Near %1$s (%2$s, %3$s)', 'noodled' ), place, lat, lng ) : coords;
+  const body = head + '\n\n' + mapUrl + '\n';
   const note = await api.create_note(nb, dateTimeTitle(), body);
   if (!note || note.error) { showToast(__( 'Could not create note', 'noodled' )); return; }
   activeNote = await api.get_note(null, note.id);
@@ -1000,7 +1027,7 @@ async function moveNote(noteId, toNotebook) {
     await api.move_note(fromNotebook, noteId, toNotebook);
     loadNotebooks(); // refresh notebook counts in the background
     /* translators: %s is the destination notebook name */
-    showToast(sprintf( __( 'Moved to %s', 'noodled' ), toNotebook ));
+    showUndoToast(sprintf( __( 'Moved to %s', 'noodled' ), toNotebook ), () => moveNote(noteId, fromNotebook));
     return;
   } catch (e) {
     showToast(__( 'Could not move note', 'noodled' ));
@@ -1461,6 +1488,7 @@ function renderMenuDashboard() {
 
 // Set theme directly (dashboard segmented control) and persist it.
 async function setTheme(mode) {
+  themeFlash();
   applyTheme(mode);
   document.querySelectorAll('.md-seg').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
   try { await api.set_config('theme', mode); } catch (e) {}
@@ -2076,6 +2104,14 @@ function renderMarkdown(text) {
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s) { return (s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+// Keep "2m ago" timestamps honest without a full re-render: re-tick every minute.
+setInterval(() => {
+  document.querySelectorAll('.note-time[data-ts]').forEach(s => {
+    const t = relativeTime(s.dataset.ts);
+    if (t && s.textContent !== t) s.textContent = t;
+  });
+}, 60000);
+
 function relativeTime(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr.replace(' ', 'T') + (dateStr.includes('Z') ? '' : 'Z'));
@@ -2089,14 +2125,29 @@ function relativeTime(dateStr) {
   if (diff < 172800) return __( 'yesterday', 'noodled' );
   /* translators: %d is the number of days ago */
   if (diff < 604800) return sprintf( __( '%dd ago', 'noodled' ), Math.floor(diff / 86400) );
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric' });
 }
 
+function dismissToast(t, now) {
+  if (!t) return;
+  clearTimeout(t._t);
+  t.classList.remove('show');
+  setTimeout(() => t.remove(), now ? 0 : 240);
+}
 function showToast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
+  let stack = document.getElementById('toastStack');
+  if (!stack) { stack = document.createElement('div'); stack.id = 'toastStack'; document.body.appendChild(stack); }
+  // If the newest toast is the same message, just refresh its timer (no clutter).
+  const last = stack.lastElementChild;
+  if (last && last.dataset.msg === msg && last.classList.contains('show')) {
+    clearTimeout(last._t); last._t = setTimeout(() => dismissToast(last), 2200); return;
+  }
+  const t = document.createElement('div');
+  t.className = 'toast-item'; t.dataset.msg = msg; t.textContent = msg;
+  stack.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  t._t = setTimeout(() => dismissToast(t), 2200);
+  while (stack.children.length > 4) dismissToast(stack.firstElementChild, true);
 }
 
 function setStatus(msg) {
@@ -2640,7 +2691,7 @@ async function showTagCloud() {
 // ── Note templates ──
 const defaultTemplates = [
   { name: __( 'Meeting Notes', 'noodled' ), body: __( '## Meeting Notes\n\n**Date:** \n**Attendees:** \n\n### Agenda\n- \n\n### Action Items\n- [ ] \n\n### Notes\n', 'noodled' ) },
-  { name: __( 'Journal Entry', 'noodled' ), body: '## ' + new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + __( '\n\n### Gratitude\n- \n\n### Today\n\n\n### Reflection\n', 'noodled' ) },
+  { name: __( 'Journal Entry', 'noodled' ), body: '## ' + new Date().toLocaleDateString(undefined, {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + __( '\n\n### Gratitude\n- \n\n### Today\n\n\n### Reflection\n', 'noodled' ) },
   { name: __( 'Project Plan', 'noodled' ), body: __( '## Project: \n\n### Goal\n\n\n### Tasks\n- [ ] \n- [ ] \n- [ ] \n\n### Timeline\n\n| Phase | Start | End |\n|-------|-------|-----|\n| Planning | | |\n| Execution | | |\n| Review | | |\n\n### Notes\n', 'noodled' ) },
   { name: __( 'Quick List', 'noodled' ), body: __( '## List\n\n- [ ] \n- [ ] \n- [ ] \n', 'noodled' ) },
 ];
@@ -2849,7 +2900,7 @@ function closeSplitView() {
 // ── Daily journal ──
 async function openDailyJournal() {
   const today = new Date();
-  const title = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const title = today.toLocaleDateString(undefined, {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const nbName = 'Journal';
 
   // Check if today's entry exists
@@ -3732,8 +3783,8 @@ function showCommandPalette() {
   if (owner) cmds.splice(3, 0, { icon: '👥', label: __( 'Manage people', 'noodled' ), run: () => manageUsers() });
 
   el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp">
-    <input id="cmdpInput" placeholder="${escAttr(__( 'Type a command or note…', 'noodled' ))}" autocomplete="off" aria-label="${escAttr(__( 'Command palette', 'noodled' ))}">
-    <div class="cmdp-list" id="cmdpList"></div></div></div>`;
+    <input id="cmdpInput" placeholder="${escAttr(__( 'Type a command or note…', 'noodled' ))}" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="cmdpList" aria-activedescendant="" aria-label="${escAttr(__( 'Command palette', 'noodled' ))}">
+    <div class="cmdp-list" id="cmdpList" role="listbox" aria-label="${escAttr(__( 'Results', 'noodled' ))}"></div></div></div>`;
   const input = el.querySelector('#cmdpInput');
   const list = el.querySelector('#cmdpList');
   let results = [], hi = 0;
@@ -3752,10 +3803,11 @@ function showCommandPalette() {
     list.innerHTML = results.length ? results.map((r, i) => {
       const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}` : `📄 ${esc(r.item.title)}`;
       const sub = r.type === 'note' ? `<span class="cmdp-sub">${esc(r.item.notebook || '')}</span>` : '';
-      return `<div class="cmdp-i ${i === hi ? 'on' : ''}" data-i="${i}">${label}${sub}</div>`;
+      return `<div class="cmdp-i ${i === hi ? 'on' : ''}" data-i="${i}" id="cmdp-opt-${i}" role="option" aria-selected="${i === hi ? 'true' : 'false'}">${label}${sub}</div>`;
     }).join('') : '<div class="cmdp-empty">' + esc(__( 'No matches', 'noodled' )) + '</div>';
     const on = list.querySelector('.cmdp-i.on');
     if (on) on.scrollIntoView({ block: 'nearest' });
+    input.setAttribute('aria-activedescendant', results.length ? 'cmdp-opt-' + hi : '');
   }
   function run(r) { document.getElementById('modalContainer').innerHTML = ''; if (!r) return; if (r.type === 'cmd') r.item.run(); else selectNote(r.item.id); }
 

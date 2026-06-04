@@ -155,6 +155,7 @@ class Noodled_App {
 		$j_welcome    = esc_js( __( 'Welcome!', 'noodled' ) );
 		$j_continue   = esc_js( __( 'Continue', 'noodled' ) );
 		$j_signin     = esc_js( __( 'Sign in', 'noodled' ) );
+		$j_login      = esc_js( __( 'Log in', 'noodled' ) );
 		$j_reqbtn     = esc_js( __( 'Request a noodle', 'noodled' ) );
 		$j_reqrecv    = esc_js( __( 'Request received!', 'noodled' ) );
 		$j_enteremail = esc_js( __( 'Please enter your email.', 'noodled' ) );
@@ -168,7 +169,7 @@ class Noodled_App {
 .n-login-overlay.show{display:flex}
 .n-login-box{background:#1a1a1f;border:1px solid #2a2a35;border-radius:16px;padding:36px;width:380px;max-width:90vw;color:#b0b0b8}
 .n-login-box h3{color:#e8e8ef;margin:0 0 4px;font-size:16px}
-.n-login-box .sub{color:#9a9aa8;font-size:12px;margin-bottom:20px}
+.n-login-box .sub{color:#b9b9c6;font-size:12px;margin-bottom:20px}
 .n-login-input{width:100%;padding:12px 16px;border:1px solid #2a2a35;border-radius:10px;background:#252530;color:#e8e8ef;font-size:16px;outline:none;margin-bottom:10px;box-sizing:border-box}
 .n-login-input:focus{border-color:{$accent};box-shadow:0 0 0 3px rgba(0,120,212,0.15)}
 .n-login-btn{width:100%;padding:12px;border:none;border-radius:10px;background:{$accent};color:#fff;font-size:14px;font-weight:600;cursor:pointer}
@@ -227,7 +228,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.g
   if(cta){
     const a=document.createElement('button');
     a.type='button';
-    a.textContent='Log in';
+    a.textContent='{$j_login}';
     a.className='btn btn--ghost';
     a.onclick=function(e){e.preventDefault();nOpenLogin();};
     cta.parentNode.insertBefore(a,cta);
