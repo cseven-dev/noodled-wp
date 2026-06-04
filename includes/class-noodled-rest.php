@@ -7,6 +7,21 @@ class Noodled_REST {
 
 	public static function init() {
 		add_action( 'rest_api_init', [ __CLASS__, 'register_routes' ] );
+		// Per-user note data must never be stored by a shared cache (CDN / host
+		// page cache) or it could be served to another family member. Mark every
+		// noodled REST response private + no-store at the server (the correct
+		// layer); the client's cache-buster param stays as defence-in-depth.
+		add_filter( 'rest_post_dispatch', [ __CLASS__, 'no_store_headers' ], 10, 3 );
+	}
+
+	public static function no_store_headers( $response, $server, $request ) {
+		if ( $request instanceof \WP_REST_Request && strpos( (string) $request->get_route(), '/noodled/v1' ) === 0 ) {
+			if ( $response instanceof \WP_REST_Response ) {
+				$response->header( 'Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0' );
+				$response->header( 'Vary', 'Cookie' );
+			}
+		}
+		return $response;
 	}
 
 	public static function register_routes() {
@@ -90,6 +105,12 @@ class Noodled_REST {
 		] );
 		register_rest_route( $ns, '/attachments/(?P<id>\d+)', [
 			[ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'delete_attachment' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/attachments/reorder', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'reorder_attachments' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/attachments/(?P<id>\d+)/alt', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_attachment_alt' ], ] + $auth,
 		] );
 
 		// Per-user Evernote import (each user imports their own .enex from the app)
@@ -751,6 +772,26 @@ class Noodled_REST {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		Noodled_Attachments::delete( (int) $req['id'] );
+		return new \WP_REST_Response( true );
+	}
+
+	public static function reorder_attachments( \WP_REST_Request $req ): \WP_REST_Response {
+		$note_id = (int) $req->get_param( 'note_id' );
+		$ids     = (array) $req->get_param( 'ids' );
+		if ( ! $note_id || ! self::verify_note_write( $note_id ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
+		}
+		Noodled_Attachments::reorder( $note_id, array_map( 'intval', $ids ) );
+		return new \WP_REST_Response( true );
+	}
+
+	public static function set_attachment_alt( \WP_REST_Request $req ): \WP_REST_Response {
+		$id      = (int) $req['id'];
+		$note_id = Noodled_Attachments::note_id_of( $id );
+		if ( ! $note_id || ! self::verify_note_write( $note_id ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
+		}
+		Noodled_Attachments::set_alt( $id, (string) $req->get_param( 'alt' ) );
 		return new \WP_REST_Response( true );
 	}
 

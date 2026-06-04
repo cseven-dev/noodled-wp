@@ -243,7 +243,7 @@ class Noodled_Attachments {
 	public static function get_for_note( int $note_id ): array {
 		global $wpdb;
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM " . self::table() . " WHERE note_id = %d ORDER BY created_at ASC",
+			"SELECT * FROM " . self::table() . " WHERE note_id = %d ORDER BY sort_order ASC, created_at ASC, id ASC",
 			$note_id
 		), ARRAY_A );
 
@@ -254,8 +254,32 @@ class Noodled_Attachments {
 				'url'      => self::proxy_url( (int) $r['id'] ),
 				'mime'     => $r['mime_type'],
 				'size'     => (int) $r['file_size'],
+				'alt'      => $r['alt'] ?? '',
 				'exif'     => ! empty( $r['exif'] ) ? json_decode( $r['exif'], true ) : null,
 			];
 		}, $rows ?: [] );
+	}
+
+	/** Persist a new display order for a note's attachments. */
+	public static function reorder( int $note_id, array $ordered_ids ): bool {
+		global $wpdb;
+		$i = 0;
+		foreach ( $ordered_ids as $id ) {
+			$wpdb->update( self::table(), [ 'sort_order' => $i ], [ 'id' => (int) $id, 'note_id' => $note_id ] );
+			$i++;
+		}
+		return true;
+	}
+
+	/** Update an attachment's alt text. */
+	public static function set_alt( int $id, string $alt ): bool {
+		global $wpdb;
+		$wpdb->update( self::table(), [ 'alt' => sanitize_text_field( $alt ) ], [ 'id' => $id ] );
+		return true;
+	}
+
+	public static function note_id_of( int $id ): int {
+		global $wpdb;
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT note_id FROM " . self::table() . " WHERE id = %d", $id ) );
 	}
 }

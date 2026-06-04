@@ -62,6 +62,8 @@ const api = {
   get_bodies()                           { return this._fetch('/bodies'); },
   save_attachment(nb, noteId, name, b64) { return this._fetch('/attachments', { method: 'POST', body: JSON.stringify({ note_id: noteId, filename: name, data: b64 }) }); },
   delete_attachment(id)                  { return this._fetch('/attachments/' + id, { method: 'DELETE' }); },
+  reorder_attachments(noteId, ids)       { return this._fetch('/attachments/reorder', { method: 'POST', body: JSON.stringify({ note_id: noteId, ids }) }); },
+  set_attachment_alt(id, alt)            { return this._fetch('/attachments/' + id + '/alt', { method: 'POST', body: JSON.stringify({ alt }) }); },
   import_evernote(formData)              { return fetch(this._base + '/import/evernote', { method: 'POST', headers: { 'X-WP-Nonce': this._nonce }, credentials: 'same-origin', body: formData }).then(r => r.json()); },
   admin_users()                          { return this._fetch('/admin/users'); },
   admin_invite(email, name, role, drop)  { return this._fetch('/admin/users', { method: 'POST', body: JSON.stringify({ email, name, role, drop }) }); },
@@ -3502,7 +3504,7 @@ function renderAttachmentGallery() {
     if (isImageAttachment(a)) {
       const img = document.createElement('img');
       img.className = 'gallery-thumb';
-      img.src = a.url; img.alt = name; img.loading = 'lazy';
+      img.src = a.url; img.alt = a.alt || name; img.loading = 'lazy';
       img.onclick = () => openLightbox(images, images.indexOf(a));
       item.appendChild(img);
     } else {
@@ -3524,9 +3526,28 @@ function renderAttachmentGallery() {
     del.className = 'gal-del'; del.type = 'button'; del.title = __( 'Delete', 'noodled' ); del.setAttribute('aria-label', __( 'Delete attachment', 'noodled' )); del.innerHTML = '&#10005;';
     del.onclick = (e) => { e.stopPropagation(); deleteAttachment(a.id); };
     item.appendChild(del);
+    // Drag to reorder (desktop). Touch devices tap to open; DnD doesn't fire.
+    item.setAttribute('draggable', 'true');
+    item.addEventListener('dragstart', (e) => { _galDragId = a.id; if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'; item.classList.add('gal-dragging'); });
+    item.addEventListener('dragend', () => item.classList.remove('gal-dragging'));
+    item.addEventListener('dragover', (e) => { e.preventDefault(); item.classList.add('gal-drop'); });
+    item.addEventListener('dragleave', () => item.classList.remove('gal-drop'));
+    item.addEventListener('drop', (e) => { e.preventDefault(); item.classList.remove('gal-drop'); galReorder(_galDragId, a.id); });
     gallery.appendChild(item);
   });
   host.insertBefore(gallery, host.firstChild);
+}
+
+let _galDragId = 0;
+function galReorder(fromId, toId) {
+  if (!activeNote || !fromId || fromId === toId) return;
+  const arr = activeNote.attachments || [];
+  const fi = arr.findIndex(x => x.id === fromId), ti = arr.findIndex(x => x.id === toId);
+  if (fi < 0 || ti < 0) return;
+  const [moved] = arr.splice(fi, 1);
+  arr.splice(ti, 0, moved);
+  renderAttachmentGallery();
+  api.reorder_attachments(activeNote.id, arr.filter(x => !x._pending && x.id).map(x => x.id)).catch(() => {});
 }
 
 // Lightbox for image attachments, captioned with stored EXIF.
@@ -3560,8 +3581,9 @@ function renderLightbox() {
   lbResetZoom();
   const lbImg = document.getElementById('lbImg');
   lbImg.src = a.url;
-  lbImg.alt = a.filename || a.name || __( 'Attachment image', 'noodled' );
-  document.getElementById('lbCaption').innerHTML = lightboxCaption(a);
+  lbImg.alt = a.alt || a.filename || a.name || __( 'Attachment image', 'noodled' );
+  document.getElementById('lbCaption').innerHTML = lightboxCaption(a) +
+    `<div class="lb-alt-row"><input class="lb-alt" id="lbAlt" value="${escAttr(a.alt || '')}" placeholder="${escAttr(__( 'Describe this image (alt text)…', 'noodled' ))}" aria-label="${escAttr(__( 'Image alt text', 'noodled' ))}" onchange="saveLightboxAlt()"></div>`;
   const nav = _lbImages.length > 1;
   document.querySelectorAll('#noodledLightbox .lb-nav').forEach(b => b.style.display = nav ? '' : 'none');
 }
@@ -3593,6 +3615,14 @@ function lightboxStep(d) {
 function closeLightbox() {
   const lb = document.getElementById('noodledLightbox');
   if (lb) lb.style.display = 'none';
+}
+function saveLightboxAlt() {
+  const a = _lbImages[_lbIndex];
+  const inp = document.getElementById('lbAlt');
+  if (!a || !inp) return;
+  a.alt = inp.value;
+  api.set_attachment_alt(a.id, a.alt).catch(() => {});
+  document.querySelectorAll('.attachment-gallery .gallery-thumb').forEach(img => { if (img.src === a.url) img.alt = a.alt || a.filename || ''; });
 }
 function downloadLightboxImage() {
   const a = _lbImages[_lbIndex];
