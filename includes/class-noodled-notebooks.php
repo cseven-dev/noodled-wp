@@ -63,8 +63,30 @@ class Noodled_Notebooks {
 				'owner'  => (int) $r['owner_id'],
 				'drop'   => $is_drop,
 				'color'  => $r['color'] ?? '',
+				'parent' => (int) ( $r['parent_id'] ?? 0 ),
 			];
 		}, $rows ?: [] );
+	}
+
+	/** Nest a notebook under another (owner only). Empty parent = top level. */
+	public static function set_parent( int $user_id, string $name, string $parent_name ): array {
+		global $wpdb; $t = self::table();
+		$id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$t} WHERE name = %s AND owner_id = %d", $name, $user_id ) );
+		if ( ! $id ) return [ 'error' => __( 'Notebook not found', 'noodled' ) ];
+		$parent_id = 0;
+		if ( $parent_name !== '' ) {
+			$parent_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$t} WHERE name = %s AND owner_id = %d", $parent_name, $user_id ) );
+			if ( ! $parent_id ) return [ 'error' => __( 'Parent notebook not found', 'noodled' ) ];
+			if ( $parent_id === $id ) return [ 'error' => __( 'A notebook cannot contain itself', 'noodled' ) ];
+			// Walk up from the proposed parent; hitting $id would create a loop.
+			$cur = $parent_id; $guard = 0;
+			while ( $cur && $guard++ < 100 ) {
+				if ( $cur === $id ) return [ 'error' => __( 'That would create a loop', 'noodled' ) ];
+				$cur = (int) $wpdb->get_var( $wpdb->prepare( "SELECT parent_id FROM {$t} WHERE id = %d", $cur ) );
+			}
+		}
+		$wpdb->update( $t, [ 'parent_id' => $parent_id ], [ 'id' => $id ] );
+		return [ 'ok' => true ];
 	}
 
 	/** Set a notebook's accent color (owner only). Empty string clears it. */

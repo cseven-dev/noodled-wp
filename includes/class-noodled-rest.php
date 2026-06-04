@@ -42,6 +42,9 @@ class Noodled_REST {
 		register_rest_route( $ns, '/notebooks/color', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_notebook_color' ], ] + $auth,
 		] );
+		register_rest_route( $ns, '/notebooks/parent', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_notebook_parent' ], ] + $auth,
+		] );
 		// Notebook sharing (owner-initiated, user-to-user)
 		register_rest_route( $ns, '/notebooks/(?P<id>\d+)/shares', [
 			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'notebook_shares' ], ] + $auth,
@@ -69,6 +72,13 @@ class Noodled_REST {
 		] );
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/revisions', [
 			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'note_revisions' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/notes/(?P<id>\d+)/task-toggle', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'toggle_task' ], ] + $auth,
+		] );
+		// Cross-note task agenda
+		register_rest_route( $ns, '/tasks', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'get_tasks' ], ] + $auth,
 		] );
 		// Reminders (note-attached, per-user)
 		register_rest_route( $ns, '/reminders', [
@@ -441,6 +451,12 @@ class Noodled_REST {
 		return new \WP_REST_Response( true );
 	}
 
+	public static function set_notebook_parent( \WP_REST_Request $req ): \WP_REST_Response {
+		$name = (string) $req->get_param( 'name' );
+		if ( ! $name ) return new \WP_REST_Response( [ 'error' => __( 'Name required', 'noodled' ) ], 400 );
+		return new \WP_REST_Response( Noodled_Notebooks::set_parent( self::current_user_id(), $name, (string) $req->get_param( 'parent' ) ) );
+	}
+
 	public static function delete_notebook( \WP_REST_Request $req ): \WP_REST_Response {
 		$name = $req->get_param( 'name' );
 		if ( ! $name ) return new \WP_REST_Response( [ 'error' => __( 'Name required', 'noodled' ) ], 400 );
@@ -679,6 +695,22 @@ class Noodled_REST {
 			return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
 		}
 		return new \WP_REST_Response( Noodled_Notes::get_revisions( $id ) );
+	}
+
+	// Every open/done checklist item across the notebooks + notes the user can read.
+	public static function get_tasks(): \WP_REST_Response {
+		$uid     = self::current_user_id();
+		$nb_ids  = array_map( static fn( $nb ) => (int) $nb['id'], Noodled_Notebooks::get_for_user( $uid ) );
+		$note_ids = Noodled_Permissions::shared_note_ids_for_user( $uid );
+		return new \WP_REST_Response( Noodled_Notes::tasks_for( $nb_ids, $note_ids ) );
+	}
+
+	public static function toggle_task( \WP_REST_Request $req ): \WP_REST_Response {
+		$id = (int) $req['id'];
+		if ( ! self::verify_note_write( $id ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
+		}
+		return new \WP_REST_Response( Noodled_Notes::toggle_task( $id, (int) $req->get_param( 'idx' ) ) );
 	}
 
 	/* ── Reminders (per-user, note-attached) ── */

@@ -91,7 +91,18 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
     </div>
     <div class="nb-all active" id="nbAll" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'All notes', 'noodled' ); ?>" onclick="selectNotebook(null)"><?php esc_html_e( 'All Notes', 'noodled' ); ?></div>
     <div class="nb-list" id="nbList"></div>
+    <div class="nb-smart-list" id="smartList"></div>
     <div style="border-top:1px solid var(--border);margin-top:auto;padding-top:4px">
+      <div class="nb-item" id="nbTasks" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'All tasks', 'noodled' ); ?>" onclick="showTasks()">
+        <span class="nb-name">&#9745; <?php esc_html_e( 'Tasks', 'noodled' ); ?></span>
+        <span class="count" id="taskCount"></span>
+      </div>
+      <div class="nb-item" id="nbCalendar" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Calendar', 'noodled' ); ?>" onclick="showCalendar()">
+        <span class="nb-name">&#128197; <?php esc_html_e( 'Calendar', 'noodled' ); ?></span>
+      </div>
+      <div class="nb-item" id="nbGraph" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Link graph', 'noodled' ); ?>" onclick="showGraph()">
+        <span class="nb-name">&#128376; <?php esc_html_e( 'Graph', 'noodled' ); ?></span>
+      </div>
       <div class="nb-item" id="nbStarred" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Starred notes', 'noodled' ); ?>" onclick="showStarred()">
         <span class="nb-name">&#9733; <?php esc_html_e( 'Starred', 'noodled' ); ?></span>
       </div>

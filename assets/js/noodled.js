@@ -46,6 +46,7 @@ const api = {
   rename_notebook(oldName, newName)       { return this._fetch('/notebooks/rename', { method: 'POST', body: JSON.stringify({ old_name: oldName, new_name: newName }) }); },
   delete_notebook(name)                  { return this._fetch('/notebooks/delete', { method: 'POST', body: JSON.stringify({ name }) }); },
   set_notebook_color(name, color)        { return this._fetch('/notebooks/color', { method: 'POST', body: JSON.stringify({ name, color }) }); },
+  set_notebook_parent(name, parent)      { return this._fetch('/notebooks/parent', { method: 'POST', body: JSON.stringify({ name, parent }) }); },
   get_notes(notebook)                    { return this._fetch('/notes' + (notebook ? '?notebook=' + encodeURIComponent(notebook) : '')); },
   get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId); },
   create_note(notebook, title, body)     { return this._fetch('/notes', { method: 'POST', body: JSON.stringify({ notebook, title, body: body || '' }) }); },
@@ -86,6 +87,8 @@ const api = {
   note_share(noteId, email, canWrite)    { return this._fetch('/notes/' + noteId + '/shares', { method: 'POST', body: JSON.stringify({ email, access: canWrite ? 'write' : 'read' }) }); },
   note_unshare(noteId, email)            { return this._fetch('/notes/' + noteId + '/unshare', { method: 'POST', body: JSON.stringify({ email }) }); },
   get_revisions(noteId)                  { return this._fetch('/notes/' + noteId + '/revisions'); },
+  get_tasks()                            { return this._fetch('/tasks'); },
+  toggle_task(noteId, idx)               { return this._fetch('/notes/' + noteId + '/task-toggle', { method: 'POST', body: JSON.stringify({ idx }) }); },
   // Reminders (note-attached, per-user). `at` is epoch milliseconds.
   get_reminders()                        { return this._fetch('/reminders'); },
   create_reminder(noteId, at, label)     { return this._fetch('/reminders', { method: 'POST', body: JSON.stringify({ note_id: noteId, at, label }) }); },
@@ -227,31 +230,55 @@ const nbColors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#
 
 function renderNotebooks() {
   const el = document.getElementById('nbList');
-  el.innerHTML = notebooks.map((nb, i) => {
+  // Group by parent_id to render a collapsible tree. Sibling order follows the
+  // notebooks array (already sorted by sort_order from the server).
+  const childrenOf = {};
+  notebooks.forEach(nb => { const p = nb.parent || 0; (childrenOf[p] = childrenOf[p] || []).push(nb); });
+  const known = new Set(notebooks.map(n => n.id));
+  const collapsed = new Set(config.nb_collapsed || []);
+  let ci = 0; // color index, advanced in traversal order
+
+  function nbItem(nb, depth) {
     const name = nb.name;
     // Display label may differ from the addressing name (e.g. a member's drop
     // folder shows as "Shared with {Admin}" but is still addressed by name).
     const label = nb.label || nb.name;
     const active = activeNotebook === name ? ' active' : '';
-    const color = nb.color ? (nb.color[0] === '#' ? nb.color : '#' + nb.color) : nbColors[i % nbColors.length];
+    const color = nb.color ? (nb.color[0] === '#' ? nb.color : '#' + nb.color) : nbColors[ci % nbColors.length];
+    ci++;
+    const kids = childrenOf[nb.id] || [];
+    const isCollapsed = collapsed.has(name);
+    const caret = kids.length
+      ? `<span class="nb-caret${isCollapsed ? '' : ' open'}" role="button" tabindex="0" aria-label="${escAttr(__( 'Expand or collapse', 'noodled' ))}" aria-expanded="${isCollapsed ? 'false' : 'true'}" onclick="event.stopPropagation();toggleNbCollapse('${esc(name)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleNbCollapse('${esc(name)}')}"><span aria-hidden="true">&#9656;</span></span>`
+      : '<span class="nb-caret-spacer" aria-hidden="true"></span>';
     const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">&#128279;</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
     /* translators: %s is the notebook name */
     const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
-    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, '${esc(name)}')">
-      <span class="nb-color" style="background:${color}"></span>
+    let html = `<div class="nb-item${active}" role="button" tabindex="0" style="padding-left:${8 + depth * 14}px" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, '${esc(name)}')">
+      ${caret}<span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
     </div>`;
-  }).join('');
+    if (kids.length && !isCollapsed) html += kids.map(k => nbItem(k, depth + 1)).join('');
+    return html;
+  }
 
-  document.getElementById('nbAll').className = 'nb-all' + (activeNotebook === null && !viewingTrash && !viewingStarred ? ' active' : '');
+  const roots = (childrenOf[0] || []).slice();
+  // Orphans (parent points at a notebook the user can't see) render at top level.
+  notebooks.forEach(nb => { if (nb.parent && !known.has(nb.parent)) roots.push(nb); });
+  el.innerHTML = roots.map(nb => nbItem(nb, 0)).join('');
+
+  document.getElementById('nbAll').className = 'nb-all' + (activeNotebook === null && !viewingTrash && !viewingStarred && !viewingTasks && _activeSmart === null ? ' active' : '');
+  renderSmartNotebooks();
   setupNotebookDrag();
 }
 
 async function selectNotebook(name) {
   viewingTrash = false;
   viewingStarred = false;
+  viewingTasks = false;
+  _activeSmart = null;
   activeNotebook = name;
   renderNotebooks();
   renderNoteListSkeleton(); // shimmer while the new notebook's notes load
@@ -266,6 +293,39 @@ async function createNotebook() {
   selectNotebook(name);
 }
 
+function toggleNbCollapse(name) {
+  const set = new Set(config.nb_collapsed || []);
+  if (set.has(name)) set.delete(name); else set.add(name);
+  config.nb_collapsed = [...set];
+  api.set_config('nb_collapsed', config.nb_collapsed).catch(() => {});
+  renderNotebooks();
+}
+function moveNotebookInto(name) {
+  const nb = notebooks.find(n => n.name === name); if (!nb) return;
+  const candidates = notebooks.filter(n => n.name !== name && n.access === 'owner');
+  const opts = `<option value="">${esc(__( 'Top level', 'noodled' ))}</option>`
+    + candidates.map(c => `<option value="${escAttr(c.name)}"${nb.parent === c.id ? ' selected' : ''}>${esc(c.label || c.name)}</option>`).join('');
+  const el = document.getElementById('modalContainer');
+  /* translators: %s is the notebook name */
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
+    <div class="modal" style="max-width:360px">
+      <h3>${esc(sprintf( __( 'Move "%s" into…', 'noodled' ), nb.label || nb.name ))}</h3>
+      <select id="nbParentSel" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;margin-bottom:12px">${opts}</select>
+      <div class="modal-buttons">
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" onclick="doMoveNotebook('${esc(name)}')">${esc(__( 'Move', 'noodled' ))}</button>
+      </div>
+    </div></div>`;
+}
+async function doMoveNotebook(name) {
+  const parent = document.getElementById('nbParentSel')?.value || '';
+  const r = await api.set_notebook_parent(name, parent).catch(() => null);
+  document.getElementById('modalContainer').innerHTML = '';
+  if (r && r.error) { showToast(r.error); return; }
+  await loadNotebooks();
+  showToast(__( 'Notebook moved', 'noodled' ));
+}
+
 function showNbContext(event, name) {
   const nb = notebooks.find(n => n.name === name);
   const items = [
@@ -274,6 +334,7 @@ function showNbContext(event, name) {
     { label: __( 'Set cover image', 'noodled' ), action: () => setNotebookCover(name) },
   ];
   if (nb && nb.access === 'owner') {
+    items.push({ label: __( 'Move into…', 'noodled' ), action: () => moveNotebookInto(name) });
     items.push({ label: __( 'Share...', 'noodled' ), action: () => showShareDialog(nb) });
   }
   items.push({ sep: true });
@@ -1141,6 +1202,9 @@ async function moveNote(noteId, toNotebook) {
 
 async function selectTrash() {
   viewingTrash = true;
+  viewingStarred = false;
+  viewingTasks = false;
+  _activeSmart = null;
   activeNotebook = null;
   activeNote = null;
   notes = await api.get_trash();
@@ -1199,6 +1263,7 @@ function renderContent() {
         <button class="btn btn-sm" onclick="copyBody()" title="${escAttr(__( 'Copy', 'noodled' ))}" aria-label="${escAttr(__( 'Copy note', 'noodled' ))}"><span aria-hidden="true">&#128203;</span></button>
         <button class="btn btn-sm" onclick="uploadFiles()" title="${escAttr(__( 'Add files', 'noodled' ))}" aria-label="${escAttr(__( 'Add files', 'noodled' ))}"><span aria-hidden="true">&#128206;</span></button>
         <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="${escAttr(__( 'Dictate', 'noodled' ))}" aria-label="${escAttr(__( 'Dictate', 'noodled' ))}"><span aria-hidden="true">&#127908;</span></button>
+        <button class="btn btn-sm" onclick="recordAudioMemo()" id="audioBtn" aria-pressed="false" title="${escAttr(__( 'Record audio memo', 'noodled' ))}" aria-label="${escAttr(__( 'Record audio memo', 'noodled' ))}"><span aria-hidden="true">&#128308;</span></button>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <div class="toolbar-menu-wrap">
           <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="${escAttr(__( 'More tools', 'noodled' ))}" aria-label="${escAttr(__( 'More tools', 'noodled' ))}" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
@@ -1241,6 +1306,8 @@ function renderContent() {
   updateWordCount();
   renderBacklinks();
   renderAttachmentGallery();
+  resolveTransclusions();
+  renderRichBlocks();
   // Opened from a search? Briefly highlight the matches in the body.
   if ((searchQuery || '').trim()) setTimeout(highlightSearchInBody, 40);
   // Fade in transition
@@ -1251,6 +1318,30 @@ function renderContent() {
   if (activeNote) {
     localStorage.setItem('noodled_last_note', activeNote.id);
     document.title = activeNote.title + ' — ' + (noodledConfig.brandName || 'noodled');
+  }
+}
+
+// Resolve ![[Note Title]] embeds: pull the target note's body and render it
+// inline. Dedupes by note id (so A->B->A can't loop) and goes a few levels deep.
+async function resolveTransclusions(root) {
+  root = root || document.getElementById('noteBody');
+  if (!root) return;
+  const seen = new Set();
+  if (activeNote) seen.add(activeNote.id);
+  for (let pass = 0; pass < 4; pass++) {
+    const blocks = [...root.querySelectorAll('.transclude[data-embed]:not([data-resolved])')];
+    if (!blocks.length) break;
+    for (const el of blocks) {
+      el.setAttribute('data-resolved', '1');
+      const title = el.getAttribute('data-embed') || '';
+      const note = (notes || []).find(n => (n.title || '').toLowerCase() === title.toLowerCase());
+      if (!note) { el.innerHTML = `<div class="transclude-head">${esc(title)}</div><div class="transclude-missing">${esc(__( 'Note not found', 'noodled' ))}</div>`; continue; }
+      if (seen.has(note.id)) { el.innerHTML = `<div class="transclude-head">${esc(title)}</div><div class="transclude-missing">${esc(__( 'Already shown above', 'noodled' ))}</div>`; continue; }
+      seen.add(note.id);
+      let body = note.body;
+      if (body == null) { try { const full = await api.get_note(null, note.id); body = full ? full.body : ''; } catch (e) { body = ''; } }
+      el.innerHTML = `<div class="transclude-head" role="button" tabindex="0" onclick="selectNote(${note.id})" onkeydown="if(event.key==='Enter')selectNote(${note.id})">${esc(title)} &rsaquo;</div><div class="transclude-body">${renderMarkdown(body || '')}</div>`;
+    }
   }
 }
 
@@ -1736,6 +1827,20 @@ function htmlToMarkdown(el) {
     if (node.nodeType === 3) { const t = node.textContent; if (t.trim()) lines.push(t); return; }
     if (node.nodeType !== 1) return;
     const tag = node.nodeName;
+    // Transclusion blocks are non-editable and carry their source in data-embed.
+    if (node.classList && node.classList.contains('transclude')) { lines.push('![[' + (node.getAttribute('data-embed') || '') + ']]'); return; }
+    // Rich blocks (mermaid/math/callout) stash exact source in a data attribute.
+    if (node.classList && node.classList.contains('mermaid-block')) { lines.push('```mermaid'); lines.push(_b64dec(node.getAttribute('data-code') || '')); lines.push('```'); return; }
+    if (node.classList && node.classList.contains('math-block')) { lines.push('```' + (node.getAttribute('data-lang') || 'math')); lines.push(_b64dec(node.getAttribute('data-code') || '')); lines.push('```'); return; }
+    if (node.classList && node.classList.contains('callout')) { lines.push(_b64dec(node.getAttribute('data-callout') || '')); return; }
+    // Code blocks: lang from data-lang, live source from the <pre> (still editable).
+    if (node.classList && node.classList.contains('code-block')) {
+      const pre = node.querySelector('pre');
+      lines.push('```' + (node.getAttribute('data-lang') || ''));
+      lines.push(pre ? pre.textContent : '');
+      lines.push('```');
+      return;
+    }
     if (tag === 'H1') { lines.push('# ' + node.textContent); return; }
     if (tag === 'H2') { lines.push('## ' + node.textContent); return; }
     if (tag === 'H3') { lines.push('### ' + node.textContent); return; }
@@ -2215,7 +2320,33 @@ function renderMarkdown(text) {
     if (bulletMatch) { if (!inList || listType !== 'ul') { closeList(); out.push('<ul>'); inList = true; listType = 'ul'; } out.push(`<li>${inlineFormat(escLine(bulletMatch[1]))}</li>`); continue; }
     const numMatch = trimmed.match(/^\d+\.\s+(.+)$/);
     if (numMatch) { if (!inList || listType !== 'ol') { closeList(); out.push('<ol>'); inList = true; listType = 'ol'; } out.push(`<li>${inlineFormat(escLine(numMatch[1]))}</li>`); continue; }
+    // Callouts: > [!type] Title  (use [!type]- for a collapsible one). Consumes
+    // following > lines as the body.
+    const calloutMatch = trimmed.match(/^>\s*\[!([a-zA-Z]+)\](-?)\s*(.*)$/);
+    if (calloutMatch) {
+      closeList();
+      const ctype = calloutMatch[1].toLowerCase();
+      const collapsible = calloutMatch[2] === '-';
+      const ctitle = calloutMatch[3].trim();
+      const srcLines = [raw];
+      const bodyParts = [];
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith('>')) {
+        i++;
+        srcLines.push(lines[i]);
+        const c = lines[i].trim().replace(/^>\s?/, '');
+        bodyParts.push(c === '' ? '' : inlineFormat(escLine(c)));
+      }
+      out.push(calloutHtml(ctype, ctitle, bodyParts, collapsible, srcLines.join('\n')));
+      continue;
+    }
     if (trimmed.startsWith('> ')) { closeList(); out.push(`<blockquote>${inlineFormat(escLine(trimmed.substring(2)))}</blockquote>`); continue; }
+    // Note transclusion: a line that is only ![[Note Title]] embeds that note.
+    const embedMatch = trimmed.match(/^!\[\[([^\]]+)\]\]$/);
+    if (embedMatch) {
+      closeList();
+      out.push(`<div class="transclude" data-embed="${escAttr(embedMatch[1].trim())}" contenteditable="false"><div class="transclude-body">${esc(__( 'Loading…', 'noodled' ))}</div></div>`);
+      continue;
+    }
     // Table rows
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       closeList();
@@ -2583,6 +2714,8 @@ function isStarred(noteId) {
 async function showStarred() {
   viewingStarred = true;
   viewingTrash = false;
+  viewingTasks = false;
+  _activeSmart = null;
   activeNotebook = null;
   const stars = config.starred || [];
   const allNotes = await api.get_notes(null);
@@ -2592,6 +2725,257 @@ async function showStarred() {
   document.getElementById('nbAll').className = 'nb-all';
   document.querySelectorAll('.nb-item').forEach(el => el.classList.remove('active'));
   document.getElementById('nbStarred').classList.add('active');
+}
+
+// ── Unified task / agenda view ──
+let viewingTasks = false;
+let _agendaTasks = [];
+async function showTasks() {
+  viewingTasks = true; viewingTrash = false; viewingStarred = false; activeNotebook = null; _activeSmart = null;
+  let tasks = [];
+  try { tasks = await api.get_tasks(); } catch (e) {}
+  _agendaTasks = Array.isArray(tasks) ? tasks : [];
+  renderNotebooks();
+  document.getElementById('nbAll').className = 'nb-all';
+  document.querySelectorAll('.nb-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('nbTasks')?.classList.add('active');
+  renderAgenda();
+}
+function taskDisplayText(text) {
+  return (text || '').replace(/\s*(?:\u{1F4C5}|@due|due:)\s*\d{4}-\d{2}-\d{2}/u, '').trim();
+}
+function formatDue(due) {
+  try { return new Date(due + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+  catch (e) { return due; }
+}
+function agendaTaskRow(t) {
+  const dueBadge = t.due ? `<span class="agenda-due">${esc(formatDue(t.due))}</span>` : '';
+  return `<div class="agenda-task ${t.done ? 'done' : ''}">
+    <input type="checkbox" ${t.done ? 'checked' : ''} aria-label="${escAttr(taskDisplayText(t.text))}" onclick="toggleAgendaTask(${t.note_id}, ${t.idx}, this)">
+    <div class="agenda-body" role="button" tabindex="0" onclick="selectNote(${t.note_id})" onkeydown="if(event.key==='Enter'){selectNote(${t.note_id});}">
+      <div class="agenda-text">${esc(taskDisplayText(t.text))}</div>
+      <div class="agenda-meta">${esc(t.title || __( 'Untitled', 'noodled' ))}${t.notebook ? ' &middot; ' + esc(t.notebook) : ''}${dueBadge}</div>
+    </div>
+  </div>`;
+}
+function renderAgenda() {
+  const list = document.getElementById('noteList');
+  if (!list) return;
+  const tasks = _agendaTasks || [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const open = tasks.filter(t => !t.done), done = tasks.filter(t => t.done);
+  const b = { overdue: [], today: [], upcoming: [], someday: [] };
+  open.forEach(t => {
+    if (!t.due) { b.someday.push(t); return; }
+    const d = new Date(t.due + 'T00:00:00');
+    if (d < today) b.overdue.push(t);
+    else if (d.getTime() === today.getTime()) b.today.push(t);
+    else b.upcoming.push(t);
+  });
+  const byDue = (x, y) => (x.due || '9999').localeCompare(y.due || '9999');
+  [b.overdue, b.today, b.upcoming].forEach(a => a.sort(byDue));
+  const tc = document.getElementById('taskCount'); if (tc) tc.textContent = open.length || '';
+  const sec = (label, arr, cls) => arr.length
+    ? `<div class="agenda-sec ${cls || ''}"><div class="agenda-head">${esc(label)} <span>${arr.length}</span></div>${arr.map(agendaTaskRow).join('')}</div>` : '';
+  let html = sec(__( 'Overdue', 'noodled' ), b.overdue, 'overdue')
+    + sec(__( 'Today', 'noodled' ), b.today, 'today')
+    + sec(__( 'Upcoming', 'noodled' ), b.upcoming)
+    + sec(__( 'No date', 'noodled' ), b.someday);
+  if (done.length) {
+    html += `<details class="agenda-sec"><summary class="agenda-head">${esc(__( 'Completed', 'noodled' ))} <span>${done.length}</span></summary>${done.map(agendaTaskRow).join('')}</details>`;
+  }
+  if (!tasks.length) {
+    html = `<div style="padding:32px 20px;text-align:center;color:var(--text-muted);font-size:13px">${esc(__( 'No tasks yet. Add a checklist to any note and it shows up here.', 'noodled' ))}</div>`;
+  }
+  list.innerHTML = html;
+}
+async function toggleAgendaTask(noteId, idx, el) {
+  if (el) el.disabled = true;
+  const r = await api.toggle_task(noteId, idx).catch(() => null);
+  const t = (_agendaTasks || []).find(x => x.note_id === noteId && x.idx === idx);
+  if (t) t.done = !t.done;
+  if (r && !r.error && activeNote && activeNote.id === noteId) { activeNote.body = r.body; renderContent(); }
+  renderAgenda();
+}
+
+// ── Smart notebooks / saved searches ──
+let _activeSmart = null;
+function renderSmartNotebooks() {
+  const el = document.getElementById('smartList');
+  if (!el) return;
+  const sns = config.smart_notebooks || [];
+  el.innerHTML = sns.map((sn, i) =>
+    `<div class="nb-item smart-item${_activeSmart === i ? ' active' : ''}" role="button" tabindex="0" aria-label="${escAttr(sn.name)}" onclick="showSmartNotebook(${i})" oncontextmenu="event.preventDefault();deleteSmartNotebook(${i})" onkeydown="if(event.key==='Enter')showSmartNotebook(${i})">
+      <span class="nb-name">&#128269; ${esc(sn.name)}</span>
+    </div>`).join('')
+    + `<div class="nb-item smart-add" role="button" tabindex="0" onclick="createSmartNotebook()" onkeydown="if(event.key==='Enter')createSmartNotebook()" aria-label="${escAttr(__( 'New smart notebook', 'noodled' ))}"><span class="nb-name" style="color:var(--text-muted)">+ ${esc(__( 'Smart notebook', 'noodled' ))}</span></div>`;
+}
+// Match a note against a saved query: free text + key:value tokens
+// (has:task|open|file, source:x, notebook:x, tag:x, modified:Nd, created:Nd).
+function matchSmartQuery(note, q) {
+  const tokens = (q || '').trim().split(/\s+/).filter(Boolean);
+  const free = [];
+  for (const tok of tokens) {
+    const mm = tok.match(/^(tag|has|source|notebook|modified|created):(.+)$/i);
+    if (!mm) { free.push(tok.toLowerCase()); continue; }
+    const key = mm[1].toLowerCase(), v = mm[2].toLowerCase();
+    if (key === 'has') {
+      const t = note.tasks || {};
+      if (v === 'task' && !(t.total > 0)) return false;
+      if (v === 'open' && !(t.total > (t.done || 0))) return false;
+      if (v === 'done' && !((t.done || 0) > 0)) return false;
+      if (v === 'file' && !(note.att > 0)) return false;
+    } else if (key === 'source') { if ((note.source || '').toLowerCase() !== v) return false; }
+    else if (key === 'notebook') { if ((note.notebook || '').toLowerCase() !== v) return false; }
+    else if (key === 'modified' || key === 'created') {
+      const days = parseInt(v, 10);
+      if (days) { const ts = note[key]; if (!ts) return false; const age = (Date.now() - new Date(String(ts).replace(' ', 'T')).getTime()) / 86400000; if (age > days) return false; }
+    } else if (key === 'tag') {
+      const hay = ((note.body || '') + ' ' + (note.title || '') + ' ' + (note.preview || '')).toLowerCase();
+      if (!new RegExp('#' + v.replace(/[^a-z0-9_-]/g, '') + '\\b').test(hay)) return false;
+    }
+  }
+  if (free.length) {
+    const hay = ((note.title || '') + ' ' + (note.preview || '') + ' ' + (note.body || '')).toLowerCase();
+    if (!free.every(w => hay.includes(w))) return false;
+  }
+  return true;
+}
+async function showSmartNotebook(i) {
+  const sn = (config.smart_notebooks || [])[i];
+  if (!sn) return;
+  viewingTrash = false; viewingStarred = false; viewingTasks = false; activeNotebook = null;
+  _activeSmart = i;
+  let all = [];
+  try { all = await api.get_notes(null); } catch (e) {}
+  try {
+    const rows = await api.get_bodies(); const byId = {};
+    (rows || []).forEach(r => { byId[r.id] = r.body; });
+    (all || []).forEach(n => { if (byId[n.id] != null) n.body = byId[n.id]; });
+  } catch (e) {}
+  notes = (all || []).filter(n => matchSmartQuery(n, sn.query));
+  filterNotes();
+  renderNotebooks();
+}
+function createSmartNotebook() {
+  const el = document.getElementById('modalContainer');
+  const inStyle = 'width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;box-sizing:border-box';
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
+    <div class="modal" style="max-width:420px">
+      <h3>${esc(__( 'New smart notebook', 'noodled' ))}</h3>
+      <label for="snName" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'Name', 'noodled' ))}</label>
+      <input id="snName" style="${inStyle};margin-bottom:10px" placeholder="${escAttr(__( 'e.g. Open tasks', 'noodled' ))}">
+      <label for="snQuery" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'Query', 'noodled' ))}</label>
+      <input id="snQuery" style="${inStyle};margin-bottom:6px" placeholder="${escAttr(__( 'e.g. has:open tag:work modified:7d', 'noodled' ))}">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">${esc(__( 'Tokens: has:task / has:open / has:file, tag:x, source:x, notebook:x, modified:Nd, created:Nd, plus any free text.', 'noodled' ))}</div>
+      <div class="modal-buttons">
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" onclick="saveSmartNotebook()">${esc(__( 'Create', 'noodled' ))}</button>
+      </div>
+    </div></div>`;
+}
+async function saveSmartNotebook() {
+  const name = (document.getElementById('snName')?.value || '').trim();
+  const query = (document.getElementById('snQuery')?.value || '').trim();
+  if (!name || !query) { showToast(__( 'Give it a name and a query', 'noodled' )); return; }
+  config.smart_notebooks = config.smart_notebooks || [];
+  config.smart_notebooks.push({ name, query });
+  await api.set_config('smart_notebooks', config.smart_notebooks).catch(() => {});
+  document.getElementById('modalContainer').innerHTML = '';
+  renderSmartNotebooks();
+  showSmartNotebook(config.smart_notebooks.length - 1);
+}
+async function deleteSmartNotebook(i) {
+  const sns = config.smart_notebooks || [];
+  if (!sns[i]) return;
+  const ok = await showConfirm(sprintf( __( 'Delete smart notebook "%s"?', 'noodled' ), sns[i].name ));
+  if (!ok) return;
+  sns.splice(i, 1);
+  config.smart_notebooks = sns;
+  await api.set_config('smart_notebooks', sns).catch(() => {});
+  if (_activeSmart === i) { _activeSmart = null; selectNotebook(null); }
+  else renderSmartNotebooks();
+}
+
+// ── Link graph (wiki-link map of notes) ──
+async function showGraph() {
+  let all = [], bodies = [];
+  try { all = await api.get_notes(null); } catch (e) {}
+  try { bodies = await api.get_bodies(); } catch (e) {}
+  const byId = {}; (bodies || []).forEach(r => { byId[r.id] = r.body; });
+  const titleToId = {}; (all || []).forEach(n => { titleToId[(n.title || '').toLowerCase()] = n.id; });
+  const edges = [], deg = {};
+  (all || []).forEach(n => {
+    const body = byId[n.id] || n.body || '';
+    const seen = new Set();
+    const re = /\[\[([^\]\|]+)(?:\|[^\]]+)?\]\]/g; let m;
+    while ((m = re.exec(body))) {
+      const tid = titleToId[m[1].trim().toLowerCase()];
+      if (tid && tid !== n.id && !seen.has(tid)) {
+        seen.add(tid); edges.push({ s: n.id, t: tid });
+        deg[n.id] = (deg[n.id] || 0) + 1; deg[tid] = (deg[tid] || 0) + 1;
+      }
+    }
+  });
+  let nodes = (all || []).map(n => ({ id: n.id, title: n.title || __( 'Untitled', 'noodled' ), deg: deg[n.id] || 0 }))
+    .filter(n => n.deg > 0)
+    .sort((a, b) => b.deg - a.deg);
+  let dropped = 0; const CAP = 120;
+  if (nodes.length > CAP) { dropped = nodes.length - CAP; nodes = nodes.slice(0, CAP); }
+  const keep = new Set(nodes.map(n => n.id));
+  renderGraph(nodes, edges.filter(e => keep.has(e.s) && keep.has(e.t)), dropped);
+}
+function layoutGraph(nodes, edges, w, h) {
+  const k = Math.sqrt((w * h) / Math.max(1, nodes.length)) * 0.6;
+  const idx = {}; nodes.forEach((n, i) => { idx[n.id] = i; const a = i / nodes.length * Math.PI * 2; n.x = w / 2 + Math.cos(a) * w * 0.32; n.y = h / 2 + Math.sin(a) * h * 0.32; });
+  for (let iter = 0; iter < 120; iter++) {
+    const disp = nodes.map(() => ({ x: 0, y: 0 }));
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      let dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y; const d = Math.hypot(dx, dy) || 0.01;
+      const f = k * k / d, ux = dx / d, uy = dy / d;
+      disp[i].x += ux * f; disp[i].y += uy * f; disp[j].x -= ux * f; disp[j].y -= uy * f;
+    }
+    edges.forEach(e => {
+      const a = idx[e.s], b = idx[e.t]; if (a == null || b == null) return;
+      let dx = nodes[a].x - nodes[b].x, dy = nodes[a].y - nodes[b].y; const d = Math.hypot(dx, dy) || 0.01;
+      const f = d * d / k, ux = dx / d, uy = dy / d;
+      disp[a].x -= ux * f; disp[a].y -= uy * f; disp[b].x += ux * f; disp[b].y += uy * f;
+    });
+    const temp = (1 - iter / 120) * (w * 0.06);
+    nodes.forEach((n, i) => {
+      const dl = Math.hypot(disp[i].x, disp[i].y) || 0.01;
+      n.x += disp[i].x / dl * Math.min(dl, temp); n.y += disp[i].y / dl * Math.min(dl, temp);
+      n.x = Math.max(24, Math.min(w - 24, n.x)); n.y = Math.max(24, Math.min(h - 24, n.y));
+    });
+  }
+}
+function renderGraph(nodes, edges, dropped) {
+  const W = 800, H = 600;
+  const el = document.getElementById('modalContainer');
+  if (!nodes.length) {
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''"><div class="modal" style="max-width:380px"><h3>${esc(__( 'Link graph', 'noodled' ))}</h3><p style="font-size:13px;color:var(--text-muted)">${esc(__( 'No links between notes yet. Connect notes with [[wiki-links]] and they will appear here.', 'noodled' ))}</p><div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
+    return;
+  }
+  layoutGraph(nodes, edges, W, H);
+  const idx = {}; nodes.forEach((n, i) => { idx[n.id] = i; });
+  const lines = edges.map(e => { const a = nodes[idx[e.s]], b = nodes[idx[e.t]]; return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="graph-edge"/>`; }).join('');
+  const circles = nodes.map(n => {
+    const r = 4 + Math.min(8, n.deg);
+    const active = activeNote && activeNote.id === n.id;
+    const open = `document.getElementById('modalContainer').innerHTML='';selectNote(${n.id})`;
+    return `<g class="graph-node${active ? ' active' : ''}" tabindex="0" role="button" aria-label="${escAttr(n.title)}" onclick="${open}" onkeydown="if(event.key==='Enter'){${open};}"><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}"/><text x="${n.x.toFixed(1)}" y="${(n.y - r - 3).toFixed(1)}">${esc(n.title.slice(0, 24))}</text></g>`;
+  }).join('');
+  /* translators: 1: number shown, 2: number hidden */
+  const note = dropped ? `<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px">${esc(sprintf( __( 'Showing the %1$d most-linked notes (%2$d more hidden).', 'noodled' ), nodes.length, dropped ))}</div>` : '';
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
+    <div class="modal graph-modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0;font-size:15px">${esc(__( 'Link graph', 'noodled' ))}</h3>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''" aria-label="${escAttr(__( 'Close', 'noodled' ))}"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <svg class="graph-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escAttr(__( 'Note link graph', 'noodled' ))}">${lines}${circles}</svg>
+      ${note}
+    </div></div>`;
 }
 
 // ── Duplicate note ──
@@ -3265,25 +3649,68 @@ function closeSplitView() {
 }
 
 // ── Daily journal ──
-async function openDailyJournal() {
-  const today = new Date();
-  const title = today.toLocaleDateString(undefined, {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+async function openDailyJournal() { return openJournalForDate(null); }
+
+// Open (or create) the Journal entry for a given YYYY-MM-DD (today if null).
+async function openJournalForDate(key) {
+  const d = key ? new Date(key + 'T12:00:00') : new Date();
+  const title = d.toLocaleDateString(undefined, {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const nbName = 'Journal';
-
-  // Check if today's entry exists
   const allNotes = await api.get_notes(nbName);
-  const existing = allNotes.find(n => n.title === title);
-  if (existing) {
-    selectNote(existing.id);
-    return;
-  }
-
-  // Create new journal entry
+  const existing = (allNotes || []).find(n => n.title === title);
+  if (existing) { selectNote(existing.id); return; }
   const body = `## ${title}` + __( '\n\n### Today\n\n\n### Notes\n\n', 'noodled' );
   const note = await api.create_note(nbName, title, body);
   await loadNotebooks();
   await loadNotes();
   if (note && !note.error) selectNote(note.id);
+}
+
+// ── Calendar view (journal navigation + notes-by-date markers) ──
+let _calMonth = null;
+async function showCalendar() {
+  if (!_calMonth) { const n = new Date(); _calMonth = new Date(n.getFullYear(), n.getMonth(), 1); }
+  let all = [];
+  try { all = await api.get_notes(null); } catch (e) {}
+  const days = {};
+  (all || []).forEach(n => {
+    [n.created, n.modified].forEach(d => { if (d) { const k = String(d).slice(0, 10); days[k] = (days[k] || 0) + 1; } });
+  });
+  renderCalendar(days);
+}
+function calShift(delta) { _calMonth = new Date(_calMonth.getFullYear(), _calMonth.getMonth() + delta, 1); showCalendar(); }
+function calPick(key) { document.getElementById('modalContainer').innerHTML = ''; openJournalForDate(key); }
+function renderCalendar(days) {
+  const pad = x => String(x).padStart(2, '0');
+  const y = _calMonth.getFullYear(), m = _calMonth.getMonth();
+  const startDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const t = new Date(); const tk = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+  const monthLabel = _calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const dowHeaders = [...Array(7)].map((_, i) => `<div class="cal-dowh">${esc(new Date(2023, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'narrow' }))}</div>`).join('');
+  let cells = '';
+  for (let i = 0; i < startDow; i++) cells += '<div class="cal-cell empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${y}-${pad(m + 1)}-${pad(d)}`;
+    const has = days[key];
+    cells += `<div class="cal-cell${key === tk ? ' today' : ''}${has ? ' has' : ''}" role="button" tabindex="0" aria-label="${escAttr(key)}" onclick="calPick('${key}')" onkeydown="if(event.key==='Enter')calPick('${key}')"><span>${d}</span>${has ? '<i class="cal-dot" aria-hidden="true"></i>' : ''}</div>`;
+  }
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
+    <div class="modal cal-modal" style="max-width:340px">
+      <div class="cal-nav">
+        <button class="btn btn-sm" onclick="calShift(-1)" aria-label="${escAttr(__( 'Previous month', 'noodled' ))}"><span aria-hidden="true">&lsaquo;</span></button>
+        <h3 style="margin:0;font-size:15px">${esc(monthLabel)}</h3>
+        <button class="btn btn-sm" onclick="calShift(1)" aria-label="${escAttr(__( 'Next month', 'noodled' ))}"><span aria-hidden="true">&rsaquo;</span></button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);text-align:center;margin:-2px 0 8px">${esc(__( 'Tap a day to open its journal. Dots mark days with notes.', 'noodled' ))}</div>
+      <div class="cal-grid cal-dow">${dowHeaders}</div>
+      <div class="cal-grid">${cells}</div>
+      <div class="modal-buttons" style="margin-top:10px">
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" onclick="document.getElementById('modalContainer').innerHTML='';openDailyJournal()">${esc(__( "Today's journal", 'noodled' ))}</button>
+      </div>
+    </div></div>`;
 }
 
 // ── Dictation (speech-to-text) ──
@@ -3450,6 +3877,45 @@ function stopDictation() {
   // if there's nothing to stop.
   if (recognition) { try { recognition.stop(); } catch (_) { setDictateBtn(false); } }
   else setDictateBtn(false);
+}
+
+// ── Audio memos (record + attach + concurrent transcription) ──
+let _audioRec = null, _audioChunks = [], _audioStream = null;
+async function recordAudioMemo() {
+  if (_audioRec && _audioRec.state === 'recording') { stopAudioMemo(); return; }
+  if (!activeNote) { showToast(__( 'Select a note first', 'noodled' )); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { showToast(__( 'Audio recording is not supported in this browser', 'noodled' )); return; }
+  try { _audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { showToast(__( 'Microphone access denied', 'noodled' )); return; }
+  const mime = (window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm')) ? 'audio/webm'
+    : (window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) ? 'audio/mp4' : '';
+  _audioChunks = [];
+  try { _audioRec = mime ? new MediaRecorder(_audioStream, { mimeType: mime }) : new MediaRecorder(_audioStream); }
+  catch (e) { _audioRec = new MediaRecorder(_audioStream); }
+  _audioRec.ondataavailable = e => { if (e.data && e.data.size) _audioChunks.push(e.data); };
+  _audioRec.onstop = async () => {
+    try { (_audioStream.getTracks() || []).forEach(t => t.stop()); } catch (e) {}
+    const type = (_audioRec && _audioRec.mimeType) || mime || 'audio/webm';
+    const ext = type.includes('mp4') ? 'm4a' : (type.includes('ogg') ? 'ogg' : 'webm');
+    const blob = new Blob(_audioChunks, { type });
+    setAudioRecUI(false);
+    if (!blob.size) return;
+    const name = __( 'Voice memo', 'noodled' ) + ' ' + dateTimeTitle() + '.' + ext;
+    try { await attachFile(new File([blob], name, { type })); } catch (e) {}
+  };
+  _audioRec.start();
+  setAudioRecUI(true);
+  showToast(__( 'Recording…', 'noodled' ));
+  // Transcribe live into the note using the existing dictation pipeline.
+  if (!dictating) { try { toggleVoiceMemo(); } catch (e) {} }
+}
+function stopAudioMemo() {
+  try { if (_audioRec && _audioRec.state !== 'inactive') _audioRec.stop(); } catch (e) {}
+  if (dictating) stopDictation();
+}
+function setAudioRecUI(on) {
+  const btn = document.getElementById('audioBtn');
+  if (btn) { btn.classList.toggle('recording', on); btn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
 }
 
 // ── Bookmark sections / TOC ──
@@ -4524,12 +4990,92 @@ else noodledPolishInit();
    ============================================================ */
 
 // ── Code blocks: lightweight highlighting + copy button ──────
+// UTF-8 safe base64 for stashing block source in a data attribute (round-trip).
+function _b64enc(s) { try { return btoa(unescape(encodeURIComponent(s))); } catch (e) { return ''; } }
+function _b64dec(s) { try { return decodeURIComponent(escape(atob(s))); } catch (e) { return ''; } }
+
 function codeBlockHtml(lines, lang) {
   const code = lines.join('\n');
+  const l = (lang || '').toLowerCase();
+  const escSrc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // ```mermaid and ```math render to a diagram / formula (lazy libs); the source
+  // is stashed in data-code so editing the note round-trips losslessly.
+  if (l === 'mermaid') {
+    return `<div class="rich-block mermaid-block" data-code="${_b64enc(code)}" contenteditable="false"><pre class="rich-src">${escSrc(code)}</pre><div class="mermaid-out"></div></div>`;
+  }
+  if (l === 'math' || l === 'latex' || l === 'katex') {
+    return `<div class="rich-block math-block" data-lang="${esc(l)}" data-code="${_b64enc(code)}" contenteditable="false"><pre class="rich-src">${escSrc(code)}</pre><div class="math-out"></div></div>`;
+  }
   const label = lang ? `<span class="cb-lang">${esc(lang)}</span>` : '<span class="cb-lang"></span>';
-  return `<div class="code-block"><div class="cb-head" contenteditable="false">${label}`
+  return `<div class="code-block" data-lang="${esc(lang || '')}"><div class="cb-head" contenteditable="false">${label}`
     + `<button class="cb-copy" type="button" onclick="copyCodeBlock(this)">${esc(__( 'Copy', 'noodled' ))}</button></div>`
     + `<pre><code>${highlightCode(code)}</code></pre></div>`;
+}
+
+// Render a [!type] callout (optionally collapsible via [!type]-). Source stashed
+// in data-callout for lossless round-trip.
+function calloutHtml(type, title, bodyParts, collapsible, src) {
+  const enc = _b64enc(src);
+  const body = bodyParts.join('<br>');
+  const icons = { note: '📝', info: 'ℹ️', tip: '💡', warning: '⚠️', danger: '🛑', success: '✅', question: '❓', quote: '❝', example: '🔎', bug: '🐛' };
+  const ic = icons[type] || '📌';
+  const titleText = title ? esc(title) : esc(type.charAt(0).toUpperCase() + type.slice(1));
+  const head = `<div class="callout-head"><span class="callout-ic" aria-hidden="true">${ic}</span><span class="callout-title">${titleText}</span></div>`;
+  const bodyHtml = body ? `<div class="callout-body">${body}</div>` : '';
+  if (collapsible) {
+    return `<details class="callout callout-${esc(type)}" data-callout="${enc}" contenteditable="false"><summary>${head}</summary>${bodyHtml}</details>`;
+  }
+  return `<div class="callout callout-${esc(type)}" data-callout="${enc}" contenteditable="false">${head}${bodyHtml}</div>`;
+}
+
+// Lazy-load an external lib (scripts + css), once, from a CDN. Fails gracefully
+// offline, in which case rich blocks keep showing their source.
+const _libs = {};
+function loadLib(key, urls) {
+  if (_libs[key]) return _libs[key];
+  _libs[key] = (async () => {
+    for (const u of urls) {
+      await new Promise((res, rej) => {
+        let el;
+        if (u.endsWith('.css')) { el = document.createElement('link'); el.rel = 'stylesheet'; el.href = u; }
+        else { el = document.createElement('script'); el.src = u; }
+        el.onload = res; el.onerror = rej; document.head.appendChild(el);
+      });
+    }
+  })();
+  return _libs[key];
+}
+async function renderRichBlocks(root) {
+  root = root || document.getElementById('noteBody');
+  if (!root) return;
+  const mer = [...root.querySelectorAll('.mermaid-block:not([data-done])')];
+  const mat = [...root.querySelectorAll('.math-block:not([data-done])')];
+  if (mer.length) {
+    try {
+      await loadLib('mermaid', ['https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js']);
+      if (window.mermaid) {
+        const light = document.documentElement.getAttribute('data-theme') === 'light';
+        window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: light ? 'default' : 'dark' });
+        for (let k = 0; k < mer.length; k++) {
+          const el = mer[k]; el.setAttribute('data-done', '1');
+          const src = _b64dec(el.getAttribute('data-code') || '');
+          try { const r = await window.mermaid.render('mmd' + k + '_' + (root.childElementCount), src); el.querySelector('.mermaid-out').innerHTML = r.svg; el.querySelector('.rich-src').style.display = 'none'; } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  }
+  if (mat.length) {
+    try {
+      await loadLib('katex', ['https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css', 'https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js']);
+      if (window.katex) {
+        mat.forEach(el => {
+          el.setAttribute('data-done', '1');
+          const src = _b64dec(el.getAttribute('data-code') || '');
+          try { window.katex.render(src, el.querySelector('.math-out'), { displayMode: true, throwOnError: false }); el.querySelector('.rich-src').style.display = 'none'; } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }
 }
 function highlightCode(code) {
   const e = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

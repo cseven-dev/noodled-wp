@@ -105,6 +105,72 @@ class Noodled_Notes {
 		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
 	}
 
+	/**
+	 * Aggregate checklist items across the given notebooks + directly-shared notes
+	 * into a flat task list. `idx` is the checkbox's document-order position within
+	 * its note (matching the client's toggleCheck index), so a task can be toggled
+	 * back at its source. A trailing date token (📅 / @due / due:) becomes `due`.
+	 */
+	public static function tasks_for( array $nb_ids, array $note_ids ): array {
+		global $wpdb;
+		$t  = self::table();
+		$nb = $wpdb->prefix . 'noodled_notebooks';
+		$clauses = [];
+		if ( $nb_ids )   $clauses[] = 't.notebook_id IN (' . implode( ',', array_map( 'intval', $nb_ids ) ) . ')';
+		if ( $note_ids ) $clauses[] = 't.id IN (' . implode( ',', array_map( 'intval', $note_ids ) ) . ')';
+		if ( ! $clauses ) return [];
+		$where = '(' . implode( ' OR ', $clauses ) . ') AND t.deleted_at IS NULL';
+		$rows  = $wpdb->get_results(
+			"SELECT t.id, t.title, t.body, n.name AS nb_name
+			   FROM {$t} t LEFT JOIN {$nb} n ON n.id = t.notebook_id
+			  WHERE {$where} ORDER BY t.modified_at DESC",
+			ARRAY_A
+		);
+		$out = [];
+		foreach ( $rows ?: [] as $r ) {
+			$idx = 0;
+			foreach ( explode( "\n", (string) $r['body'] ) as $line ) {
+				if ( ! preg_match( '/^\s*[-*+]\s+\[([ xX])\]\s+(.*\S)/u', $line, $m ) ) continue;
+				$text = trim( $m[2] );
+				$due  = null;
+				if ( preg_match( '/(?:\x{1F4C5}|@due|due:)\s*(\d{4}-\d{2}-\d{2})/u', $text, $dm ) ) {
+					$due = $dm[1];
+				}
+				$out[] = [
+					'note_id'  => (int) $r['id'],
+					'title'    => $r['title'],
+					'notebook' => $r['nb_name'],
+					'text'     => $text,
+					'done'     => ( $m[1] !== ' ' ),
+					'idx'      => $idx,
+					'due'      => $due,
+				];
+				$idx++;
+			}
+		}
+		return $out;
+	}
+
+	// Flip the idx-th checklist item in a note (document order) and save.
+	public static function toggle_task( int $id, int $idx ): array {
+		global $wpdb;
+		$body  = (string) $wpdb->get_var( $wpdb->prepare( "SELECT body FROM " . self::table() . " WHERE id = %d", $id ) );
+		$lines = explode( "\n", $body );
+		$count = 0; $changed = false;
+		foreach ( $lines as $k => $line ) {
+			if ( preg_match( '/^(\s*[-*+]\s+\[)([ xX])(\].*)$/', $line, $m ) ) {
+				if ( $count === $idx ) {
+					$lines[ $k ] = $m[1] . ( $m[2] === ' ' ? 'x' : ' ' ) . $m[3];
+					$changed = true;
+					break;
+				}
+				$count++;
+			}
+		}
+		if ( ! $changed ) return [ 'error' => __( 'Task not found', 'noodled' ) ];
+		return self::update( $id, [ 'body' => implode( "\n", $lines ) ] );
+	}
+
 	public static function get_one( int $id ): ?array {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare(
