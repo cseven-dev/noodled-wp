@@ -1377,43 +1377,54 @@ function toggleAppMenu() {
   if (c && c.classList.contains('open')) closeMenuDashboard(); else openMenuDashboard();
 }
 function menuDashPick(fn) {
-  closeMenuDashboard();
-  setTimeout(() => { try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {} }, 200);
+  // Close synchronously (no animation/timeout) so the action stays inside the
+  // user gesture — required for the file picker (Photo or document) and the mic
+  // permission prompt — and never opens behind the closing panel.
+  const c = document.getElementById('menuDashboard');
+  if (c) { c.classList.remove('open'); c.innerHTML = ''; }
+  document.body.classList.remove('menu-dash-open');
+  document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', 'false');
+  document.removeEventListener('keydown', menuDashEsc);
+  try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {}
 }
 
 function renderMenuDashboard() {
   const isOwner = !!(typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.owner);
   const userName = (typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.name) || '';
   const sections = [
-    { title: __( 'Create', 'noodled' ), items: [
-      { icon: '📝', label: __( 'New note', 'noodled' ), fn: 'createNote' },
-      { icon: '🧩', label: __( 'New from template', 'noodled' ), fn: 'showTemplates' },
-      { icon: '📓', label: __( 'Daily journal', 'noodled' ), fn: 'openDailyJournal' },
-      { icon: '⚡', label: __( 'Quick capture', 'noodled' ), fn: 'toggleQuickCapture' },
-      { icon: '📎', label: __( 'Add files', 'noodled' ), fn: 'uploadFiles' },
+    { title: __( 'Start a note', 'noodled' ), items: [
+      { icon: '📝', label: __( 'New note', 'noodled' ), fn: 'createNote', desc: __( "A blank page with today's date already on it. No staring required.", 'noodled' ) },
+      { icon: '📎', label: __( 'Photo or document', 'noodled' ), fn: 'quickAddFiles', desc: __( "Drop in a photo, a PDF, or fifty. We'll start the note for you.", 'noodled' ) },
+      { icon: '🎙️', label: __( 'Voice note', 'noodled' ), fn: 'quickAddVoice', desc: __( "Talk, don't type. The mic's already listening.", 'noodled' ) },
+      { icon: '📍', label: __( 'Location note', 'noodled' ), fn: 'quickAddLocation', desc: __( 'Drop a pin where you stand. Future-you will want to know.', 'noodled' ) },
+    ] },
+    { title: __( 'Capture', 'noodled' ), items: [
+      { icon: '🧩', label: __( 'New from template', 'noodled' ), fn: 'showTemplates', desc: __( 'Start from a shape, not a blank stare.', 'noodled' ) },
+      { icon: '📓', label: __( 'Daily journal', 'noodled' ), fn: 'openDailyJournal', desc: __( "Today's page, ready and waiting. Brain-dump and go.", 'noodled' ) },
+      { icon: '⚡', label: __( 'Quick capture', 'noodled' ), fn: 'toggleQuickCapture', desc: __( 'A thought, before it wanders off. In and out in two seconds.', 'noodled' ) },
     ] },
     { title: __( 'Organize', 'noodled' ), items: [
-      { icon: '🏷️', label: __( 'Browse tags', 'noodled' ), fn: 'showTagCloud' },
-      { icon: '🗂️', label: __( 'Manage tags', 'noodled' ), fn: 'manageTags' },
-      { icon: '🔗', label: __( 'Note links', 'noodled' ), fn: 'showLinkGraph' },
-      { icon: '📊', label: __( 'Statistics', 'noodled' ), fn: 'showStats' },
+      { icon: '🏷️', label: __( 'Browse tags', 'noodled' ), fn: 'showTagCloud', desc: __( "Every #hashtag you've ever scribbled, gathered in one spot.", 'noodled' ) },
+      { icon: '🗂️', label: __( 'Manage tags', 'noodled' ), fn: 'manageTags', desc: __( 'Rename the typos. Retire the ones from 2019.', 'noodled' ) },
+      { icon: '🔗', label: __( 'Note links', 'noodled' ), fn: 'showLinkGraph', desc: __( 'See the whole tangle. Your notes were never a list.', 'noodled' ) },
+      { icon: '📊', label: __( 'Statistics', 'noodled' ), fn: 'showStats', desc: __( "Proof you've been busy. Or proof you haven't.", 'noodled' ) },
     ] },
     { title: __( 'Tools', 'noodled' ), items: [
-      { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), fn: 'showFocusOptions' },
-      { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), fn: 'showShortcutsHelp' },
+      { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), fn: 'showFocusOptions', desc: __( 'A Pomodoro nudge for the days your brain wanders.', 'noodled' ) },
+      { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), fn: 'showShortcutsHelp', desc: __( 'The fast way to do everything. Cheat sheet included.', 'noodled' ) },
     ] },
     { title: __( 'Data & sync', 'noodled' ), items: [
-      { icon: '🔄', label: __( 'Sync now', 'noodled' ), fn: 'syncPull' },
-      { icon: '📥', label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote' },
-      { icon: '💾', label: __( 'Export backup', 'noodled' ), fn: 'exportBackup' },
-      { icon: '📦', label: __( 'Import backup', 'noodled' ), fn: 'importBackup' },
+      { icon: '🔄', label: __( 'Sync now', 'noodled' ), fn: 'syncPull', desc: __( "Push and pull with GitHub now. Don't wait for the clock.", 'noodled' ) },
+      { icon: '📥', label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote', desc: __( "Bring the old shoebox over. We'll unpack the .enex.", 'noodled' ) },
+      { icon: '💾', label: __( 'Export backup', 'noodled' ), fn: 'exportBackup', desc: __( 'Zip the whole lot up. Belt, meet suspenders.', 'noodled' ) },
+      { icon: '📦', label: __( 'Import backup', 'noodled' ), fn: 'importBackup', desc: __( 'Put a backup back. No questions asked.', 'noodled' ) },
     ] },
   ];
   const accountItems = [];
-  if (isOwner) accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers' });
-  accountItems.push({ icon: '🚪', label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true });
+  if (isOwner) accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers', desc: __( 'Invite the family. Hand out PINs, not passwords.', 'noodled' ) });
+  accountItems.push({ icon: '🚪', label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true, desc: __( 'Lock it up behind you.', 'noodled' ) });
 
-  const card = (it) => `<button class="md-card${it.danger ? ' md-danger' : ''}" onclick="menuDashPick('${it.fn}')"><span class="md-ic" aria-hidden="true">${it.icon}</span><span class="md-lbl">${esc(it.label)}</span></button>`;
+  const card = (it) => `<button class="md-card${it.danger ? ' md-danger' : ''}" onclick="menuDashPick('${it.fn}')"><span class="md-ic" aria-hidden="true">${it.icon}</span><span class="md-txt"><span class="md-lbl">${esc(it.label)}</span><span class="md-desc">${esc(it.desc || '')}</span></span></button>`;
   const section = (s) => `<section class="md-sec"><h3 class="md-sec-t">${esc(s.title)}</h3><div class="md-grid">${s.items.map(card).join('')}</div></section>`;
 
   const theme = config.theme || 'dark';
