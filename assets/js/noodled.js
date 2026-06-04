@@ -1878,21 +1878,27 @@ async function toggleCheck(checkIndex) {
   if (!activeNote) return;
   haptic();
   const el = document.getElementById('noteBody');
-  if (el) activeNote.body = htmlToMarkdown(el);
-  const lines = activeNote.body.split('\n');
-  // Find the nth checkbox line
-  let count = 0;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^-\s+\[[ xX]\]/.test(lines[i].trim())) {
-      if (count === checkIndex) {
-        if (/- \[ \]/.test(lines[i])) lines[i] = lines[i].replace('- [ ]', '- [x]');
-        else lines[i] = lines[i].replace(/- \[[xX]\]/, '- [ ]');
-        break;
+  if (el) {
+    // The native click already flipped the checkbox in the DOM — serialize that
+    // straight to markdown. This is the single source of truth, so the change
+    // always persists (no second toggle to cancel it out).
+    activeNote.body = htmlToMarkdown(el);
+  } else {
+    // Fallback (no live contenteditable, e.g. a non-rendered context): toggle the
+    // nth checklist line in the stored markdown by index.
+    const lines = (activeNote.body || '').split('\n');
+    let count = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^-\s+\[[ xX]\]/.test(lines[i].trim())) {
+        if (count === checkIndex) {
+          lines[i] = /- \[ \]/.test(lines[i]) ? lines[i].replace('- [ ]', '- [x]') : lines[i].replace(/- \[[xX]\]/, '- [ ]');
+          break;
+        }
+        count++;
       }
-      count++;
     }
+    activeNote.body = lines.join('\n');
   }
-  activeNote.body = lines.join('\n');
   await api.save_note(activeNote.notebook, activeNote.id, activeNote.title, activeNote.body);
   renderContent();
 }
@@ -2014,7 +2020,9 @@ function renderMarkdown(text) {
       // preventDefault stops the browser's native toggle so toggleCheck() is the
       // single source of truth — otherwise the native flip + the markdown flip
       // cancel out and the change never persists.
-      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[2])}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.preventDefault(); event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
+      // Let the checkbox flip natively; toggleCheck just serializes the new DOM
+      // state. (No preventDefault + no markdown re-toggle = no double-toggle.)
+      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[2].trim() || __( 'Checklist item', 'noodled' ))}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
       continue;
     }
     const bulletMatch = trimmed.match(/^-\s+(.+)$/);
