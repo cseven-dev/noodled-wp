@@ -15,7 +15,7 @@
 <meta property="og:url" content="https://noodled.ca/">
 <meta property="og:title" content="Noodled — A Local-First Markdown Note-Taking App for WordPress">
 <meta property="og:description" content="A fast, private notes app where your half-baked thoughts get to connect, link up, and actually go somewhere. Plain markdown. Yours forever. Runs on your own WordPress.">
-<meta property="og:image" content="https://noodled.ca/wp-content/plugins/noodled/assets/icon-512.png">
+<meta property="og:image" content="https://noodled.ca/wp-content/plugins/noodled/assets/og-image.png">
 <meta property="og:site_name" content="Noodled">
 <meta property="og:locale" content="en_CA">
 
@@ -23,7 +23,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Noodled — Local-First Markdown Notes for WordPress">
 <meta name="twitter:description" content="A fast, private notes app with wiki-links, GitHub sync, voice memos, and 50+ power tools. Runs on your own WordPress. Free.">
-<meta name="twitter:image" content="https://noodled.ca/wp-content/plugins/noodled/assets/icon-512.png">
+<meta name="twitter:image" content="https://noodled.ca/wp-content/plugins/noodled/assets/og-image.png">
 
 <!-- Structured Data -->
 <script type="application/ld+json">
@@ -1490,6 +1490,36 @@ html.dark .tc-plaud { color: var(--n-blue-hi); }
           { type: `<h3>I\u2019ve got this</h3>Watched 3 YouTube videos. Now confident <em>and</em> wrong. Parts ordered. Told the family \u201CI\u2019ve got it.\u201D <span class="wlink">[[I do not got it]]</span> <span class="tt">#fixit</span>` } ] },
       { file: "dev / shipped-it.md", steps: [
           { type: `<h3>Famous last words</h3>\u201CIt works on my machine.\u201D Shipped it. It did not, in fact, work on the machine. A memoir, in production. <span class="tt">#programming</span>` } ] },
+      { file: "dev / css-again.md", steps: [
+          { type: `<h3>Two hours. One div.</h3>Just needed to center it. Tried flexbox, grid, margin auto, and a quiet prayer. It is now perfectly centered on every screen except mine. <span class="tt">#css</span>` } ] },
+      { file: "dev / it-works-now.md", attach: FILE("stack-trace.txt"), steps: [
+          { type: `<h3>Changed nothing. Works now.</h3>Reverted my "fix," reloaded, and it just... works. I have learned nothing and I am deeply afraid. <span class="wlink">[[do not touch it]]</span> <span class="tt">#programming</span>` } ] },
+      { file: "dev / npm-install.md", steps: [
+          { type: `<h3>npm install</h3>Pulled 1,400 packages to make one button slightly rounder. node_modules now has its own gravitational field. <span class="tt">#frontend</span>` } ] },
+      { file: "cats / coworker.md", attach: PHOTO("cam2"), steps: [
+          { type: `<h3>Standup, interrupted</h3>The cat strolled across the keyboard and pushed straight to main. Honestly? Cleaner than my last PR. <span class="tt">#cats</span>` } ] },
+      { file: "cats / 3am.md", steps: [
+          { type: `<h3>3:04am</h3>The cat has decided the hallway requires sprinting. Full speed. Both directions. A welfare check on the entire household. <span class="tt">#cats</span>` } ] },
+      { file: "family / tech-support.md", steps: [
+          { type: `<h3>Helping Mom with the laptop</h3>Step 1: breathe. Step 2: "no, the OTHER click." Step 3: it was muted the entire time. Nobody fist-fought. Personal growth. <span class="wlink">[[she clicked the toolbar ad again]]</span> <span class="tt">#patience</span>` } ] },
+      { file: "family / the-printer.md", attach: PHOTO("cam3"), steps: [
+          { type: `<h3>The printer war, day 9</h3>Mom swears it's "out of ink." It is out of paper. We both walked away. Slowly. <span class="tt">#techsupport</span>` } ] },
+      { file: "groceries / toddler-menu.md", steps: [
+          { type: `<h3>Grocery list (per the 2-year-old)</h3>1. mac and cheese\n2. the OTHER mac and cheese\n3. cheese, but the orange one\n4. (vetoed: every vegetable known to science)\n5. mac and cheese <span class="tt">#groceries</span>` } ] },
+      { file: "home / honey-do.md", attach: FILE("the-list.pdf"), steps: [
+          { type: `<h3>The Honey-Do list has arrived</h3>"Honey, do the gutters." "Honey, do the shelf." "Honey, do the thing from March." It's not a list, it's a roadmap. With deadlines. And a stakeholder. <span class="wlink">[[the thing from March]]</span> <span class="tt">#honeydo</span>` } ] },
+      { file: "home / honey-do-2.md", steps: [
+          { type: `<h3>Sprint review: Honey-Do</h3>Closed 1 ticket (changed a lightbulb). Reopened: 3. New blocker: "while you're up there..." Velocity trending down. <span class="tt">#honeydo</span> <span class="tt">#home</span>` } ] },
+      { file: "dev / the-bug.md", steps: [
+          { type: `<h3>Four hours of debugging</h3>It was a missing comma. Then the comma was fine. It was me. I was the missing comma all along. <span class="tt">#programming</span>` } ] },
+      { file: "cats / logistics.md", steps: [
+          { type: `<h3>Supply chain update</h3>Bought the cat a $40 bed. Cat sleeps exclusively in the $0 box it shipped in. The box has been <span class="wlink">[[promoted to furniture]]</span>. <span class="tt">#cats</span>` } ] },
+      { file: "home / negotiations.md", steps: [
+          { type: `<h3>Dinner negotiations, round 6</h3>Offered: nuggets, fruit, one noble pea. Counter-offer: mac and cheese, in the blue bowl, NOT the green one. Deal reached. <span class="tt">#parenting</span>` } ] },
+      { file: "family / passwords.md", steps: [
+          { type: `<h3>"What's my password?"</h3>It's the one on the sticky note. On the monitor. That you are currently looking at. I love you so much. <span class="tt">#techsupport</span>` } ] },
+      { file: "home / saturday.md", attach: PLAUD("0:51"), steps: [
+          { type: `<h3>Voice memo, while "relaxing"</h3>"Honey, do you have a sec?" Reader: I did not have a sec. The sec became the whole Saturday. It's backlog grooming, but for the garage. <span class="tt">#honeydo</span>` } ] },
     ];
 
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));

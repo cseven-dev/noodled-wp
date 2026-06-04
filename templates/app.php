@@ -17,6 +17,21 @@ $noodled_asset = function ( $rel ) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="<?php echo esc_attr( Noodled_Settings::get_brand_name() ); ?>">
+<?php
+$noodled_brand = Noodled_Settings::get_brand_name();
+$noodled_og_img = esc_url( NOODLED_URL . 'assets/og-image.png' );
+$noodled_og_desc = esc_attr__( 'A fast, private, local-first markdown notes app. Wiki-links, sync, voice memos, offline PWA, and family sharing.', 'noodled' );
+?>
+<!-- Social / link-share preview -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="<?php echo esc_attr( $noodled_brand ); ?>">
+<meta property="og:title" content="<?php echo esc_attr( $noodled_brand ); ?>">
+<meta property="og:description" content="<?php echo $noodled_og_desc; ?>">
+<meta property="og:image" content="<?php echo $noodled_og_img; ?>">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<?php echo esc_attr( $noodled_brand ); ?>">
+<meta name="twitter:description" content="<?php echo $noodled_og_desc; ?>">
+<meta name="twitter:image" content="<?php echo $noodled_og_img; ?>">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-HMPWDP2MTN"></script>
 <script>
@@ -31,7 +46,7 @@ $noodled_asset = function ( $rel ) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,900;1,9..144,500&display=swap" rel="stylesheet">
-<link rel="apple-touch-icon" href="<?php echo esc_url( NOODLED_URL . 'assets/icon-192.png' ); ?>">
+<link rel="apple-touch-icon" sizes="180x180" href="<?php echo esc_url( NOODLED_URL . 'assets/apple-touch-icon.png' ); ?>">
 <link rel="stylesheet" href="<?php echo esc_url( $noodled_asset( 'assets/css/noodled.css' ) ); ?>">
 <?php $accent = Noodled_Settings::get_accent_color(); if ( $accent && $accent !== '#0078d4' ) : ?>
 <style>:root { --accent: <?php echo esc_attr( $accent ); ?>; --accent-hover: <?php echo esc_attr( $accent ); ?>cc; }</style>
