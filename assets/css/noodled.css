@@ -1248,16 +1248,19 @@ html.theme-switching * {
 .noodled-lightbox .lb-caption a { color: var(--accent); }
 .noodled-lightbox .lb-close,
 .noodled-lightbox .lb-del,
+.noodled-lightbox .lb-dl,
 .noodled-lightbox .lb-nav {
   position: absolute; background: rgba(255,255,255,0.1); color: #fff; border: none;
   cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   transition: background 0.15s;
 }
 .noodled-lightbox .lb-close:hover,
+.noodled-lightbox .lb-dl:hover,
 .noodled-lightbox .lb-nav:hover { background: rgba(255,255,255,0.22); }
 .noodled-lightbox .lb-del:hover { background: #d63638; }
 .noodled-lightbox .lb-close { top: 18px; right: 20px; width: 40px; height: 40px; font-size: 18px; }
 .noodled-lightbox .lb-del { top: 18px; right: 70px; width: 40px; height: 40px; font-size: 16px; }
+.noodled-lightbox .lb-dl { top: 18px; right: 120px; width: 40px; height: 40px; font-size: 16px; }
 .noodled-lightbox .lb-nav { top: 50%; transform: translateY(-50%); width: 48px; height: 48px; font-size: 28px; }
 .noodled-lightbox .lb-prev { left: 16px; }
 .noodled-lightbox .lb-next { right: 16px; }

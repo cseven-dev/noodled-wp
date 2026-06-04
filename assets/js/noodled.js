@@ -3541,6 +3541,7 @@ function openLightbox(images, index) {
     lb.className = 'noodled-lightbox';
     lb.innerHTML = `
       <button class="lb-close" onclick="closeLightbox()" aria-label="${escAttr(__( 'Close', 'noodled' ))}">&#10005;</button>
+      <button class="lb-dl" onclick="downloadLightboxImage()" aria-label="${escAttr(__( 'Download', 'noodled' ))}">&#11015;&#65039;</button>
       <button class="lb-del" onclick="deleteLightboxImage()" aria-label="${escAttr(__( 'Delete', 'noodled' ))}">&#128465;&#65039;</button>
       <button class="lb-nav lb-prev" onclick="lightboxStep(-1)" aria-label="${escAttr(__( 'Previous', 'noodled' ))}">&#8249;</button>
       <div class="lb-stage"><img id="lbImg" alt=""><div class="lb-caption" id="lbCaption"></div></div>
@@ -3592,6 +3593,13 @@ function lightboxStep(d) {
 function closeLightbox() {
   const lb = document.getElementById('noodledLightbox');
   if (lb) lb.style.display = 'none';
+}
+function downloadLightboxImage() {
+  const a = _lbImages[_lbIndex];
+  if (!a || !a.url) return;
+  const link = document.createElement('a');
+  link.href = a.url; link.download = a.filename || a.name || 'image';
+  document.body.appendChild(link); link.click(); link.remove();
 }
 async function deleteLightboxImage() {
   const a = _lbImages[_lbIndex];
