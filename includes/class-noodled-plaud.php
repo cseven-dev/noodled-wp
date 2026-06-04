@@ -41,7 +41,7 @@ class Noodled_Plaud {
 	public static function sync( int $owner_id = 0 ): array {
 		$token = self::get_token();
 		if ( empty( $token ) ) {
-			return [ 'error' => 'No Plaud token configured. Add it in Settings → Noodled.' ];
+			return [ 'error' => __( 'No Plaud token configured. Add it in Settings → Noodled.', 'noodled' ) ];
 		}
 
 		// List recordings
@@ -53,7 +53,7 @@ class Noodled_Plaud {
 		// Ensure notebook exists
 		$notebook_id = Noodled_Notebooks::ensure( self::$notebook_name, $owner_id );
 		if ( ! $notebook_id ) {
-			return [ 'error' => 'Could not create Plaud Transcripts notebook' ];
+			return [ 'error' => __( 'Could not create Plaud Transcripts notebook', 'noodled' ) ];
 		}
 
 		global $wpdb;
@@ -154,12 +154,14 @@ class Noodled_Plaud {
 		] );
 
 		if ( is_wp_error( $response ) ) {
-			return [ 'error' => 'Plaud connection failed: ' . $response->get_error_message() ];
+			/* translators: %s is the connection error detail */
+			return [ 'error' => sprintf( __( 'Plaud connection failed: %s', 'noodled' ), $response->get_error_message() ) ];
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( $code !== 200 ) {
-			return [ 'error' => 'Plaud API returned HTTP ' . $code ];
+			/* translators: %d is the HTTP status code */
+			return [ 'error' => sprintf( __( 'Plaud API returned HTTP %d', 'noodled' ), $code ) ];
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );

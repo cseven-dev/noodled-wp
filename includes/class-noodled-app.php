@@ -173,6 +173,7 @@ class Noodled_App {
 .n-login-input:focus{border-color:{$accent};box-shadow:0 0 0 3px rgba(0,120,212,0.15)}
 .n-login-btn{width:100%;padding:12px;border:none;border-radius:10px;background:{$accent};color:#fff;font-size:14px;font-weight:600;cursor:pointer}
 .n-login-btn:hover{filter:brightness(1.1)}
+.n-login-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .n-login-btn:disabled{opacity:0.5}
 .n-login-msg{margin-top:12px;font-size:13px;text-align:center;min-height:20px}
 .n-login-msg.error{color:#f87171}
@@ -242,7 +243,7 @@ HTML;
 <style>
 .ngn-form{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;max-width:540px;margin:0 auto}
 .ngn-input{flex:1 1 180px;min-width:0;padding:13px 16px;border:1px solid rgba(0,0,0,0.16);border-radius:10px;background:#fff;color:#1A1A1A;font-size:16px;font-family:inherit;outline:none}
-.ngn-input::placeholder{color:#9a9a9a}
+.ngn-input::placeholder{color:#767676}
 .ngn-input:focus{border-color:{$accent};box-shadow:0 0 0 3px rgba(0,120,212,0.16)}
 .ngn-form .btn{flex:0 0 auto}
 .ngn-msg{flex-basis:100%;text-align:center;margin-top:6px;font-size:14px;min-height:20px}

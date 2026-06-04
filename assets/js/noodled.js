@@ -1675,10 +1675,14 @@ async function handleEvernoteImport(input) {
     await loadNotebooks();
     await loadNotes();
     const n = res.imported || 0;
-    /* translators: %d is the number of notes imported */
-    let m = sprintf( _n( 'Imported %d note', 'Imported %d notes', n, 'noodled' ), n );
-    /* translators: %d is the number of notes skipped during import */
-    if (res.skipped) m += ', ' + sprintf( _n( '%d skipped', '%d skipped', res.skipped, 'noodled' ), res.skipped );
+    let m;
+    if (res.skipped) {
+      /* translators: %1$d is notes imported, %2$d is notes skipped */
+      m = sprintf( __( 'Imported %1$d notes, %2$d skipped', 'noodled' ), n, res.skipped );
+    } else {
+      /* translators: %d is the number of notes imported */
+      m = sprintf( _n( 'Imported %d note', 'Imported %d notes', n, 'noodled' ), n );
+    }
     showToast(m);
   } catch (e) { showToast(__( 'Import failed', 'noodled' )); }
 }
@@ -1990,7 +1994,7 @@ function setStatus(msg) {
 function showPrompt(title, label, defaultVal = '') {
   return new Promise(resolve => {
     const el = document.getElementById('modalContainer');
-    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${title}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${label}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">${esc(__( 'Cancel', 'noodled' ))}</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">${esc(__( 'OK', 'noodled' ))}</button></div></div></div>`;
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${esc(title)}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${esc(label)}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">${esc(__( 'Cancel', 'noodled' ))}</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">${esc(__( 'OK', 'noodled' ))}</button></div></div></div>`;
     window.resolve_modal = (val) => { el.innerHTML = ''; resolve(val); };
     const inp = document.getElementById('modalInput');
     inp.focus();
@@ -3134,7 +3138,7 @@ function toggleFindReplace() {
     <input id="frReplace" placeholder="${escAttr(__( 'Replace...', 'noodled' ))}" aria-label="${escAttr(__( 'Replace with', 'noodled' ))}">
     <button class="btn btn-sm" onclick="doReplace(false)">${esc(__( 'Replace', 'noodled' ))}</button>
     <button class="btn btn-sm" onclick="doReplace(true)">${esc(__( 'All', 'noodled' ))}</button>
-    <button class="btn btn-sm" onclick="toggleFindReplace()">&#10005;</button>
+    <button class="btn btn-sm" onclick="toggleFindReplace()" title="${escAttr(__( 'Close', 'noodled' ))}" aria-label="${escAttr(__( 'Close find and replace', 'noodled' ))}"><span aria-hidden="true">&#10005;</span></button>
   `;
   const toolbar = document.querySelector('.content-toolbar');
   if (toolbar) toolbar.after(bar);

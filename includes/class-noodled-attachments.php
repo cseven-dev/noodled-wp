@@ -48,29 +48,30 @@ class Noodled_Attachments {
 		// Never allow dot-files / server-config names (e.g. .htaccess). sanitize_file_name
 		// keeps a leading dot, so strip it before validating.
 		$filename = ltrim( $filename, '.' );
-		if ( $filename === '' ) return [ 'error' => 'Invalid filename' ];
+		if ( $filename === '' ) return [ 'error' => __( 'Invalid filename', 'noodled' ) ];
 
 		// Allowlist the extension — reject scripts, configs and anything unknown.
 		$ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
 		if ( $ext === '' || ! in_array( $ext, self::$allowed_extensions, true ) ) {
-			return [ 'error' => 'File type not allowed: .' . $ext ];
+			/* translators: %s is the rejected file extension */
+			return [ 'error' => sprintf( __( 'File type not allowed: %s', 'noodled' ), '.' . $ext ) ];
 		}
 
 		// Size limit (check base64 length before decoding — base64 is ~33% larger)
 		if ( strlen( $data_b64 ) > self::$max_upload_bytes * 1.34 ) {
-			return [ 'error' => 'File too large (max 10 MB)' ];
+			return [ 'error' => __( 'File too large (max 10 MB)', 'noodled' ) ];
 		}
 
 		$data = base64_decode( $data_b64 );
-		if ( $data === false ) return [ 'error' => 'Invalid base64 data' ];
-		if ( strlen( $data ) > self::$max_upload_bytes ) return [ 'error' => 'File too large (max 10 MB)' ];
+		if ( $data === false ) return [ 'error' => __( 'Invalid base64 data', 'noodled' ) ];
+		if ( strlen( $data ) > self::$max_upload_bytes ) return [ 'error' => __( 'File too large (max 10 MB)', 'noodled' ) ];
 
 		// Content must match the claimed type for images — blocks a script disguised
 		// as a .png that an Apache handler override could otherwise execute.
 		$is_image = in_array( $ext, self::$image_extensions, true );
 		if ( $is_image ) {
 			$info = @getimagesizefromstring( $data );
-			if ( $info === false ) return [ 'error' => 'That file is not a valid image.' ];
+			if ( $info === false ) return [ 'error' => __( 'That file is not a valid image.', 'noodled' ) ];
 		}
 
 		// Determine a TRUSTWORTHY mime from the bytes (not the attacker-chosen name).

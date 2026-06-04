@@ -302,7 +302,7 @@ async function handleLogin(e) {
   const msg = document.getElementById('loginMsg');
 
   btn.disabled = true;
-  btn.textContent = 'Sending...';
+  btn.textContent = '<?php echo esc_js( __( 'Sending…', 'noodled' ) ); ?>';
   msg.textContent = '';
   msg.className = 'login-msg';
 
@@ -318,7 +318,7 @@ async function handleLogin(e) {
       msg.textContent = data.error;
       msg.className = 'login-msg error';
       btn.disabled = false;
-      btn.textContent = 'Continue';
+      btn.textContent = '<?php echo esc_js( __( 'Continue', 'noodled' ) ); ?>';
     } else {
       document.getElementById('stepEmail').style.display = 'none';
       document.getElementById('stepPin').style.display = 'block';
@@ -326,7 +326,7 @@ async function handleLogin(e) {
       document.getElementById('pinInput').focus();
     }
   } catch (err) {
-    msg.textContent = 'Something went wrong. Try again.';
+    msg.textContent = '<?php echo esc_js( __( 'Something went wrong. Try again.', 'noodled' ) ); ?>';
     msg.className = 'login-msg error';
     btn.disabled = false;
     btn.textContent = 'Continue';
@@ -340,7 +340,7 @@ async function handlePin(e) {
   const msg = document.getElementById('loginMsg');
 
   btn.disabled = true;
-  btn.textContent = 'Verifying...';
+  btn.textContent = '<?php echo esc_js( __( 'Verifying…', 'noodled' ) ); ?>';
   msg.textContent = '';
   msg.className = 'login-msg';
 
@@ -356,14 +356,15 @@ async function handlePin(e) {
       msg.textContent = data.error;
       msg.className = 'login-msg error';
       btn.disabled = false;
-      btn.textContent = 'Sign in';
+      btn.textContent = '<?php echo esc_js( __( 'Sign in', 'noodled' ) ); ?>';
     } else {
-      msg.innerHTML = '&#10003; Welcome back, ' + data.name + '!';
+      /* translators: %s is the member's name */
+      msg.textContent = '✓ ' + '<?php echo esc_js( __( 'Welcome back, %s!', 'noodled' ) ); ?>'.replace('%s', data.name);
       msg.className = 'login-msg success';
       setTimeout(() => window.location.href = '<?php echo esc_url( Noodled_App::get_app_url() ); ?>' + '?_=' + Date.now(), 500);
     }
   } catch (err) {
-    msg.textContent = 'Something went wrong. Try again.';
+    msg.textContent = '<?php echo esc_js( __( 'Something went wrong. Try again.', 'noodled' ) ); ?>';
     msg.className = 'login-msg error';
     btn.disabled = false;
     btn.textContent = 'Sign in';
@@ -391,7 +392,7 @@ async function handleRegister(e) {
   const msg = document.getElementById('loginMsg');
 
   btn.disabled = true;
-  btn.textContent = 'Creating...';
+  btn.textContent = '<?php echo esc_js( __( 'Creating…', 'noodled' ) ); ?>';
   msg.textContent = '';
 
   try {
@@ -406,21 +407,21 @@ async function handleRegister(e) {
       msg.textContent = data.error;
       msg.className = 'login-msg error';
     } else if (data.pending) {
-      msg.innerHTML = '&#10003; Account created! Waiting for admin approval.';
+      msg.textContent = '✓ ' + '<?php echo esc_js( __( 'Account created! Waiting for admin approval.', 'noodled' ) ); ?>';
       msg.className = 'login-msg success';
     } else {
-      msg.innerHTML = '&#10003; Account created! A PIN has been sent to your email.';
+      msg.textContent = '✓ ' + '<?php echo esc_js( __( 'Account created! A PIN has been sent to your email.', 'noodled' ) ); ?>';
       msg.className = 'login-msg success';
       loginEmail = email;
       setTimeout(() => showStep('stepPin'), 1500);
     }
   } catch (err) {
-    msg.textContent = 'Something went wrong. Try again.';
+    msg.textContent = '<?php echo esc_js( __( 'Something went wrong. Try again.', 'noodled' ) ); ?>';
     msg.className = 'login-msg error';
   }
 
   btn.disabled = false;
-  btn.textContent = 'Create account';
+  btn.textContent = '<?php echo esc_js( __( 'Create account', 'noodled' ) ); ?>';
 }
 </script>
 

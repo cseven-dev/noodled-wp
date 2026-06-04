@@ -8,12 +8,12 @@ class Noodled_Evernote {
 	 */
 	public static function import( string $file_path, int $owner_id = 0 ): array {
 		if ( ! file_exists( $file_path ) ) {
-			return [ 'error' => 'File not found' ];
+			return [ 'error' => __( 'File not found', 'noodled' ) ];
 		}
 
 		$xml = @simplexml_load_file( $file_path );
 		if ( ! $xml ) {
-			return [ 'error' => 'Invalid .enex file' ];
+			return [ 'error' => __( 'Invalid .enex file', 'noodled' ) ];
 		}
 
 		$imported = 0;

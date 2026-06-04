@@ -535,7 +535,7 @@ class Noodled_Settings {
 			const role = document.getElementById('invite-role').value;
 			const drop = document.getElementById('invite-drop').checked;
 			const status = document.getElementById('invite-status');
-			if (!email) { status.textContent = 'Email required'; return; }
+			if (!email) { status.textContent = '<?php echo esc_js( __( 'Email required', 'noodled' ) ); ?>'; return; }
 			const res = await fetch(_api + '/admin/users', {
 				method: 'POST',
 				headers: { 'X-WP-Nonce': _nonce, 'Content-Type': 'application/json' },
@@ -543,12 +543,12 @@ class Noodled_Settings {
 				body: JSON.stringify({ email, name, role, drop })
 			});
 			const data = await res.json();
-			status.textContent = data.error || 'Invited!';
+			status.textContent = data.error || '<?php echo esc_js( __( 'Invited!', 'noodled' ) ); ?>';
 			if (!data.error) setTimeout(() => location.reload(), 500);
 		}
 
 		async function noodledDeleteUser(id) {
-			if (!confirm('Remove this user?')) return;
+			if (!confirm('<?php echo esc_js( __( 'Remove this user?', 'noodled' ) ); ?>')) return;
 			await fetch(_api + '/admin/users/' + id, {
 				method: 'DELETE',
 				headers: { 'X-WP-Nonce': _nonce },
@@ -569,7 +569,7 @@ class Noodled_Settings {
 		}
 
 		async function noodledDeny(id) {
-			if (!confirm('Deny and remove this request?')) return;
+			if (!confirm('<?php echo esc_js( __( 'Deny and remove this request?', 'noodled' ) ); ?>')) return;
 			await fetch(_api + '/admin/users/' + id, {
 				method: 'DELETE',
 				headers: { 'X-WP-Nonce': _nonce },
@@ -601,7 +601,7 @@ class Noodled_Settings {
 			});
 			const data = await res.json();
 			if (data.error) { out.textContent = data.error; return; }
-			out.innerHTML = 'PIN <strong>' + data.pin + '</strong>' + (data.emailed ? ' — emailed ✓' : ' — email failed');
+			out.innerHTML = '<?php echo esc_js( __( 'PIN', 'noodled' ) ); ?> <strong>' + data.pin + '</strong>' + (data.emailed ? ' <?php echo esc_js( __( '— emailed ✓', 'noodled' ) ); ?>' : ' <?php echo esc_js( __( '— email failed', 'noodled' ) ); ?>');
 		}
 		</script>
 		<?php
@@ -641,7 +641,7 @@ class Noodled_Settings {
 					const btn = document.getElementById('noodled-import-btn');
 					const status = document.getElementById('noodled-import-status');
 					btn.disabled = true;
-					status.textContent = ' Importing...';
+					status.textContent = ' <?php echo esc_js( __( 'Importing…', 'noodled' ) ); ?>';
 					try {
 						const res = await fetch('<?php echo esc_url( rest_url( 'noodled/v1/sync/import' ) ); ?>', {
 							method: 'POST',
@@ -649,9 +649,16 @@ class Noodled_Settings {
 							credentials: 'same-origin'
 						});
 						const data = await res.json();
-						status.textContent = data.error ? ' Error: ' + data.error : ' Imported ' + (data.notebooks || 0) + ' notebooks, ' + (data.notes || 0) + ' notes';
+						if (data.error) {
+							/* translators: %s is the error detail */
+							status.textContent = ' ' + '<?php echo esc_js( __( 'Error:', 'noodled' ) ); ?>' + ' ' + data.error;
+						} else {
+							/* translators: %1$s is notebook count, %2$s is note count */
+							const tpl = '<?php echo esc_js( __( 'Imported %1$s notebooks, %2$s notes', 'noodled' ) ); ?>';
+							status.textContent = ' ' + tpl.replace('%1$s', data.notebooks || 0).replace('%2$s', data.notes || 0);
+						}
 					} catch (e) {
-						status.textContent = ' Failed: ' + e.message;
+						status.textContent = ' ' + '<?php echo esc_js( __( 'Failed:', 'noodled' ) ); ?>' + ' ' + e.message;
 					}
 					btn.disabled = false;
 				}

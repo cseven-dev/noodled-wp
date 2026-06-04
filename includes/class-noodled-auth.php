@@ -80,7 +80,7 @@ class Noodled_Auth {
 				. '</td></tr></table>';
 		}
 
-		$html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>'
+		$html = '<!DOCTYPE html><html lang="' . esc_attr( str_replace( '_', '-', get_locale() ) ) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>'
 			. '<body style="margin:0;padding:0;background:#faf6f0;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif">'
 			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6f0;padding:32px 12px"><tr><td align="center">'
 			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #ecebe6;border-radius:16px;overflow:hidden">'

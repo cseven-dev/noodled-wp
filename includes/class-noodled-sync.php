@@ -22,7 +22,7 @@ class Noodled_Sync {
 	 */
 	public static function push_note( int $note_id ): array {
 		if ( ! Noodled_GitHub::is_configured() ) {
-			return [ 'error' => 'GitHub not configured' ];
+			return [ 'error' => __( 'GitHub not configured', 'noodled' ) ];
 		}
 
 		global $wpdb;
@@ -30,10 +30,10 @@ class Noodled_Sync {
 			"SELECT * FROM {$wpdb->prefix}noodled_notes WHERE id = %d", $note_id
 		), ARRAY_A );
 
-		if ( ! $row ) return [ 'error' => 'Note not found' ];
+		if ( ! $row ) return [ 'error' => __( 'Note not found', 'noodled' ) ];
 
 		$nb = Noodled_Notebooks::get_by_id( (int) $row['notebook_id'] );
-		if ( ! $nb ) return [ 'error' => 'Notebook not found' ];
+		if ( ! $nb ) return [ 'error' => __( 'Notebook not found', 'noodled' ) ];
 
 		$note_data = [
 			'title'    => $row['title'],
@@ -91,7 +91,7 @@ class Noodled_Sync {
 	 */
 	public static function full_import(): array {
 		if ( ! Noodled_GitHub::is_configured() ) {
-			return [ 'error' => 'GitHub not configured' ];
+			return [ 'error' => __( 'GitHub not configured', 'noodled' ) ];
 		}
 
 		$tree = Noodled_GitHub::get_tree();
