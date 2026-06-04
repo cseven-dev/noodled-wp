@@ -222,7 +222,7 @@ function renderNotebooks() {
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
     /* translators: %s is the notebook name */
     const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
-    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')">
+    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
@@ -520,6 +520,27 @@ function onSearch() { updateSearchClear(); filterNotes(); }
 // Light haptic tap on supported devices (mobile). Silently no-ops elsewhere.
 function haptic(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern || 8); } catch (e) {} }
 
+// Drag a note row onto a notebook to move it (desktop drag-and-drop).
+let _dragNoteId = 0;
+function noteDragStart(e, id) {
+  _dragNoteId = id;
+  if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(id)); } catch (_) {} }
+  document.body.classList.add('dragging-note');
+}
+function noteDragEnd() {
+  document.body.classList.remove('dragging-note');
+  document.querySelectorAll('.nb-item.drop-target').forEach(el => el.classList.remove('drop-target'));
+}
+function noteDragOver(e) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('drop-target'); }
+function noteDrop(e, notebookName) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drop-target');
+  const id = _dragNoteId || +((e.dataTransfer && e.dataTransfer.getData('text/plain')) || 0);
+  _dragNoteId = 0;
+  document.body.classList.remove('dragging-note');
+  if (id && notebookName) moveNote(id, notebookName);
+}
+
 function cycleSort() {
   const modes = ['modified', 'created', 'alpha'];
   const labels = { modified: __( 'Modified', 'noodled' ), created: __( 'Created', 'noodled' ), alpha: __( 'A-Z', 'noodled' ) };
@@ -725,6 +746,7 @@ function renderNoteItem(n) {
     return `
       <div class="note-item ${isActive ? 'active' : ''}" data-note-id="${n.id}" style="${colorStyle}"
            ${rowRole}
+           ${bulkMode ? '' : `draggable="true" ondragstart="noteDragStart(event, ${n.id})" ondragend="noteDragEnd()"`}
            onclick="${bulkMode ? `toggleBulkSelect(${n.id}, event)` : `handleNoteTap(event, ${n.id})`}"
            oncontextmenu="event.preventDefault(); showNoteContext(event, ${n.id})">
         <div class="title">${checkbox}${pin}${star}${sharedBadge}${highlightMatch(n.title, searchQuery)}${badge}</div>
@@ -2062,8 +2084,8 @@ function renderMarkdown(text) {
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => `<img src="${safeUrl(url)}" alt="${attrText(alt)}">`)
       .replace(/\[\[([^\]]+)\]\]/g, (match, title) => {
         const target = notes.find(n => n.title.toLowerCase() === title.toLowerCase().trim());
-        if (target) return `<a href="#" class="wikilink" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
-        return `<a href="#" class="wikilink broken" onclick="event.preventDefault()">${esc(title)}</a>`;
+        if (target) return `<a href="#" class="wikilink" title="${escAttr((target.preview || target.title || '').slice(0, 140))}" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
+        return `<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), title.trim() ))}" onclick="event.preventDefault()">${esc(title)}</a>`;
       })
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${txt}</a>`)
       // Autolink bare URLs (not already inside a markdown link's href/text).
@@ -4474,9 +4496,9 @@ function editorAutocomplete() {
 function showAutocomplete(type, typed, matches, range) {
   if (!matches.length) { hideAutocomplete(); return; }
   let box = document.getElementById('acBox');
-  if (!box) { box = document.createElement('div'); box.id = 'acBox'; box.className = 'ac-box'; document.body.appendChild(box); }
+  if (!box) { box = document.createElement('div'); box.id = 'acBox'; box.className = 'ac-box'; box.setAttribute('role', 'listbox'); document.body.appendChild(box); }
   _acState = { type, typed, matches, hi: 0 };
-  box.innerHTML = matches.map((mtext, i) => `<div class="ac-i ${i === 0 ? 'on' : ''}" data-i="${i}">${type === 'link' ? '🔗' : '#'} ${esc(mtext)}</div>`).join('');
+  box.innerHTML = matches.map((mtext, i) => `<div class="ac-i ${i === 0 ? 'on' : ''}" data-i="${i}" id="ac-opt-${i}" role="option" aria-selected="${i === 0 ? 'true' : 'false'}">${type === 'link' ? '🔗' : '#'} ${esc(mtext)}</div>`).join('');
   let rect; try { rect = range.getBoundingClientRect(); } catch (_) {}
   const x = (rect && rect.left) || 120, y = (rect && rect.bottom) || 160;
   box.style.left = Math.min(x, window.innerWidth - box.offsetWidth - 12) + 'px';
@@ -4508,7 +4530,7 @@ function acNav(e) {
 }
 function paintAc() {
   const box = document.getElementById('acBox'); if (!box || !_acState) return;
-  [...box.querySelectorAll('.ac-i')].forEach((r, i) => r.classList.toggle('on', i === _acState.hi));
+  [...box.querySelectorAll('.ac-i')].forEach((r, i) => { const on = i === _acState.hi; r.classList.toggle('on', on); r.setAttribute('aria-selected', on ? 'true' : 'false'); });
 }
 
 /* ── Print / Save as PDF a single note ─────────────────────── */
