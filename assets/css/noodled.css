@@ -1231,6 +1231,15 @@ mark.search-hl { background: rgba(245, 200, 66, 0.45); color: inherit; border-ra
 .mu-invite { display: flex; flex-direction: column; gap: 8px; }
 .mu-invite-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mu-status { font-size: 12px; color: var(--text-muted); }
+/* On phones, stack each person's info above their action buttons so the name,
+   email, PIN and the drop/PIN/remove controls never collide. */
+@media (max-width: 768px) {
+  .mu-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .mu-info { width: 100%; }
+  .mu-info b, .mu-info span { white-space: normal; word-break: break-word; }
+  .mu-actions { justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+  .mu-invite-row { gap: 8px; }
+}
 
 /* ── Save queue indicator ── */
 .save-queued { color: var(--yellow, #f59e0b) !important; }
@@ -1372,11 +1381,14 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 
 /* ── Responsive: mobile ── */
 @media (max-width: 768px) {
-  .main { flex-direction: column; position: relative; height: calc(100vh - 52px); }
+  /* Single source of truth for the fixed top-bar height, including the device's
+     top safe-area (status bar / notch) so nothing below it is overlapped. */
+  :root { --tbh: calc(52px + env(safe-area-inset-top, 0px)); }
+  .main { flex-direction: column; position: relative; height: calc(100vh - var(--tbh)); }
 
   /* Sidebar: slide-in drawer with overlay */
   .col-notebooks {
-    position: fixed; left: -260px; top: 52px; bottom: 0; z-index: 60;
+    position: fixed; left: -260px; top: var(--tbh); bottom: 0; z-index: 60;
     width: 260px; transition: left 0.25s ease;
     border-right: 1px solid var(--border);
     box-shadow: 4px 0 24px rgba(0,0,0,0.5);
@@ -1408,7 +1420,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 
   /* Content: full screen slide-in */
   .col-content {
-    position: fixed; top: 52px; left: 0; right: 0; bottom: 0; z-index: 40;
+    position: fixed; top: var(--tbh); left: 0; right: 0; bottom: 0; z-index: 40;
     background: var(--bg-content);
     flex-direction: column;
     transform: translateX(100%);
@@ -1431,12 +1443,13 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   /* Toolbar: fixed height so a taller control (e.g. the bigger hamburger) can't
      grow the bar past what the layout reserves below it. Keep clear of notches. */
   .toolbar {
-    height: 52px; box-sizing: border-box; align-items: center;
-    padding: 0 14px; gap: 8px; position: fixed; top: 0; left: 0; right: 0; z-index: 70;
+    height: var(--tbh); box-sizing: border-box; align-items: center;
+    padding: env(safe-area-inset-top, 0px) 14px 0; gap: 8px;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 70;
     padding-left: max(14px, env(safe-area-inset-left, 14px));
     padding-right: max(14px, env(safe-area-inset-right, 14px));
   }
-  .main { margin-top: 52px; }
+  .main { margin-top: var(--tbh); }
   .toolbar .logo { font-size: 16px; }
   .toolbar .hide-mobile { display: none; }
   .toolbar .spacer { flex: 1; }
@@ -1478,7 +1491,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   .fab { display: none; }
 
   /* Adjust for bottom nav */
-  .main { height: calc(100vh - 52px - 72px); } /* toolbar 52 + bottom-nav 72 */
+  .main { height: calc(100vh - var(--tbh) - 72px); } /* top bar + bottom-nav 72 */
   .col-notes { padding-bottom: 0; }
 
 

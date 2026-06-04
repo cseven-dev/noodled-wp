@@ -152,8 +152,8 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
     <span class="bottom-nav-label"><?php esc_html_e( 'Sync', 'noodled' ); ?></span>
   </button>
   <button class="bottom-nav-item" onclick="toggleSidebar()">
-    <span class="bottom-nav-icon" aria-hidden="true">&#9776;</span>
-    <span class="bottom-nav-label"><?php esc_html_e( 'Menu', 'noodled' ); ?></span>
+    <span class="bottom-nav-icon" aria-hidden="true">&#128193;</span>
+    <span class="bottom-nav-label"><?php esc_html_e( 'Folders', 'noodled' ); ?></span>
   </button>
 </nav>
 
