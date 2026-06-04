@@ -121,9 +121,10 @@ $metaFile = "$pluginDir\metadata.json"
 if (Test-Path $metaFile) {
     $metaRaw = Get-Content $metaFile -Raw
     $metaRaw = $metaRaw -replace '"version":\s*"[^"]*"', "`"version`": `"$version`""
-    # Keep the changelog's leading heading in step with the version so the WP
-    # "what's new" modal never shows a stale version number.
-    $metaRaw = $metaRaw -replace '<h4>[^<]*</h4>', "<h4>$version</h4>"
+    # Keep the changelog's LEADING heading in step with the version so the WP
+    # "what's new" modal never shows a stale version number. Only the first <h4>
+    # is rewritten (the current release); older version headings are left alone.
+    $metaRaw = ([regex]'<h4>[^<]*</h4>').Replace($metaRaw, "<h4>$version</h4>", 1)
     $metaRaw | Set-Content $metaFile
     Write-Host "Updated metadata.json to v$version" -ForegroundColor Green
 }

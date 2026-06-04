@@ -1522,6 +1522,35 @@ function handleContentKey(e) {
       schedSave();
       return;
     }
+    // Not already in a list: typing "N. text" then Enter auto-starts an ordered list.
+    if (!li) {
+      const ed = document.getElementById('noteBody');
+      let anchor = sel.anchorNode, lineText = '', replaceNode = null;
+      if (anchor && anchor.nodeType === 3) {
+        lineText = anchor.textContent || '';
+        const par = anchor.parentNode;
+        replaceNode = (par && par !== ed && (par.nodeName === 'DIV' || par.nodeName === 'P') && par.childNodes.length === 1) ? par : anchor;
+      } else if (anchor && anchor !== ed && anchor.nodeType === 1) {
+        lineText = anchor.textContent || '';
+        replaceNode = anchor;
+      }
+      const m = lineText.match(/^(\d+)\.\s+(.+)$/);
+      if (m && replaceNode) {
+        e.preventDefault();
+        const startNum = parseInt(m[1], 10) || 1;
+        const ol = document.createElement('ol');
+        if (startNum !== 1) ol.setAttribute('start', String(startNum));
+        const li1 = document.createElement('li'); li1.textContent = m[2];
+        const li2 = document.createElement('li'); li2.innerHTML = '<br>';
+        ol.appendChild(li1); ol.appendChild(li2);
+        replaceNode.replaceWith(ol);
+        const r2 = document.createRange();
+        r2.setStart(li2, 0); r2.collapse(true);
+        sel.removeAllRanges(); sel.addRange(r2);
+        schedSave();
+        return;
+      }
+    }
   }
 }
 
@@ -1535,6 +1564,22 @@ function insertBullet() {
   ul.appendChild(li);
   if (sel.rangeCount) { const range = sel.getRangeAt(0); range.collapse(false); range.insertNode(ul); }
   else el.appendChild(ul);
+  const r = document.createRange();
+  r.selectNodeContents(li);
+  sel.removeAllRanges(); sel.addRange(r);
+  schedSave();
+}
+
+function insertNumberedList() {
+  const el = document.getElementById('noteBody');
+  if (!el) return;
+  const li = document.createElement('li');
+  li.textContent = __( 'item', 'noodled' );
+  const sel = window.getSelection();
+  const ol = document.createElement('ol');
+  ol.appendChild(li);
+  if (sel.rangeCount) { const range = sel.getRangeAt(0); range.collapse(false); range.insertNode(ol); }
+  else el.appendChild(ol);
   const r = document.createRange();
   r.selectNodeContents(li);
   sel.removeAllRanges(); sel.addRange(r);
@@ -5366,6 +5411,7 @@ function openSlashMenu(x, y) {
     { label: __( 'Heading', 'noodled' ), icon: 'H', run: () => insertHeading() },
     { label: __( 'Checklist', 'noodled' ), icon: '☑', run: () => insertChecklistItem() },
     { label: __( 'Bullet list', 'noodled' ), icon: '•', run: () => insertBullet() },
+    { label: __( 'Numbered list', 'noodled' ), icon: '1.', run: () => insertNumberedList() },
     { label: __( 'Divider', 'noodled' ), icon: '―', run: () => appendBlock('---') },
     /* translators: %s is a column header placeholder for a new table */
     { label: __( 'Table', 'noodled' ), icon: '▦', run: () => appendBlock(`| ${__( 'Column', 'noodled' )} | ${__( 'Column', 'noodled' )} |\n| --- | --- |\n|  |  |`) },
