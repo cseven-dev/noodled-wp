@@ -615,49 +615,8 @@ function emptyListHtml(query) {
   </div>`;
 }
 
-// ── Swipe actions on note rows (mobile): right = pin, left = delete ──
-let _swipe = null;
-function setupNoteSwipe() {
-  const list = document.getElementById('noteList');
-  if (!list || list._swipeWired) return;
-  list._swipeWired = true;
-  list.addEventListener('touchstart', (e) => {
-    const row = e.target.closest('.note-item');
-    if (!row || bulkMode) { _swipe = null; return; }
-    const t = e.touches[0];
-    _swipe = { row, id: +row.dataset.noteId, x0: t.clientX, y0: t.clientY, dx: 0, active: false };
-  }, { passive: true });
-  list.addEventListener('touchmove', (e) => {
-    if (!_swipe) return;
-    const t = e.touches[0];
-    const dx = t.clientX - _swipe.x0, dy = t.clientY - _swipe.y0;
-    if (!_swipe.active) {
-      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { _swipe = null; return; } // vertical scroll wins
-      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) _swipe.active = true;
-      else return;
-    }
-    _swipe.dx = dx;
-    const clamped = Math.max(-110, Math.min(110, dx));
-    _swipe.row.style.transition = 'none';
-    _swipe.row.style.transform = `translateX(${clamped}px)`;
-    _swipe.row.classList.toggle('swipe-del', dx < -28);
-    _swipe.row.classList.toggle('swipe-pin', dx > 28);
-    e.preventDefault();
-  }, { passive: false });
-  const end = () => {
-    if (!_swipe) return;
-    const { row, id, dx, active } = _swipe;
-    _swipe = null;
-    row.style.transition = '';
-    row.style.transform = '';
-    row.classList.remove('swipe-del', 'swipe-pin');
-    if (!active) return;
-    if (dx <= -72) { haptic([10, 30, 10]); deleteNote(id); }
-    else if (dx >= 72) { togglePin(id); }
-  };
-  list.addEventListener('touchend', end);
-  list.addEventListener('touchcancel', end);
-}
+// Swipe actions on note rows (mobile) are implemented by setupNoteSwipe() lower
+// in this file (the version using swipeTrash/swipePin + _touchMoved).
 
 // Shimmer placeholder rows shown while a notebook's notes load.
 function renderNoteListSkeleton() {
