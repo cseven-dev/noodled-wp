@@ -1347,16 +1347,112 @@ function armDropdownMenu(menu) {
   setTimeout(() => { if (items[0]) items[0].focus(); }, 0);
 }
 
+// ── Branded menu dashboard (hamburger) ──
+// A full-screen (mobile) / centered (desktop) panel of every tool, grouped into
+// sections, styled in the noodled brand (Fraunces headings + accent), honouring
+// the app's current dark/light theme. Replaces the old ⋮ dropdown.
+function openMenuDashboard() {
+  const c = document.getElementById('menuDashboard');
+  if (!c || c.classList.contains('open')) return;
+  c.innerHTML = renderMenuDashboard();
+  c.classList.add('open');
+  document.body.classList.add('menu-dash-open');
+  document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', 'true');
+  document.addEventListener('keydown', menuDashEsc);
+  setTimeout(() => c.querySelector('.md-close')?.focus(), 30);
+}
+function closeMenuDashboard() {
+  const c = document.getElementById('menuDashboard');
+  if (!c || !c.classList.contains('open')) return;
+  c.classList.remove('open');
+  document.body.classList.remove('menu-dash-open');
+  document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', 'false');
+  document.removeEventListener('keydown', menuDashEsc);
+  setTimeout(() => { if (!c.classList.contains('open')) c.innerHTML = ''; }, 240);
+}
+function menuDashEsc(e) { if (e.key === 'Escape') closeMenuDashboard(); }
+// Back-compat: anything that still calls toggleAppMenu now toggles the dashboard.
 function toggleAppMenu() {
-  const menu = document.getElementById('appMenu');
-  if (menu) menu.classList.toggle('show');
-  const open = !!menu?.classList.contains('show');
-  document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', open ? 'true' : 'false');
-  // Close on next click
-  if (open) {
-    armDropdownMenu(menu);
-    setTimeout(() => document.addEventListener('click', () => { menu.classList.remove('show'); document.getElementById('appMenuBtn')?.setAttribute('aria-expanded', 'false'); }, { once: true }), 10);
-  }
+  const c = document.getElementById('menuDashboard');
+  if (c && c.classList.contains('open')) closeMenuDashboard(); else openMenuDashboard();
+}
+function menuDashPick(fn) {
+  closeMenuDashboard();
+  setTimeout(() => { try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {} }, 200);
+}
+
+function renderMenuDashboard() {
+  const isOwner = !!(typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.owner);
+  const userName = (typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.name) || '';
+  const sections = [
+    { title: __( 'Create', 'noodled' ), items: [
+      { icon: '📝', label: __( 'New note', 'noodled' ), fn: 'createNote' },
+      { icon: '🧩', label: __( 'New from template', 'noodled' ), fn: 'showTemplates' },
+      { icon: '📓', label: __( 'Daily journal', 'noodled' ), fn: 'openDailyJournal' },
+      { icon: '⚡', label: __( 'Quick capture', 'noodled' ), fn: 'toggleQuickCapture' },
+      { icon: '📎', label: __( 'Add files', 'noodled' ), fn: 'uploadFiles' },
+    ] },
+    { title: __( 'Organize', 'noodled' ), items: [
+      { icon: '🏷️', label: __( 'Browse tags', 'noodled' ), fn: 'showTagCloud' },
+      { icon: '🗂️', label: __( 'Manage tags', 'noodled' ), fn: 'manageTags' },
+      { icon: '🔗', label: __( 'Note links', 'noodled' ), fn: 'showLinkGraph' },
+      { icon: '📊', label: __( 'Statistics', 'noodled' ), fn: 'showStats' },
+    ] },
+    { title: __( 'Tools', 'noodled' ), items: [
+      { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), fn: 'showFocusOptions' },
+      { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), fn: 'showShortcutsHelp' },
+    ] },
+    { title: __( 'Data & sync', 'noodled' ), items: [
+      { icon: '🔄', label: __( 'Sync now', 'noodled' ), fn: 'syncPull' },
+      { icon: '📥', label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote' },
+      { icon: '💾', label: __( 'Export backup', 'noodled' ), fn: 'exportBackup' },
+      { icon: '📦', label: __( 'Import backup', 'noodled' ), fn: 'importBackup' },
+    ] },
+  ];
+  const accountItems = [];
+  if (isOwner) accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers' });
+  accountItems.push({ icon: '🚪', label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true });
+
+  const card = (it) => `<button class="md-card${it.danger ? ' md-danger' : ''}" onclick="menuDashPick('${it.fn}')"><span class="md-ic" aria-hidden="true">${it.icon}</span><span class="md-lbl">${esc(it.label)}</span></button>`;
+  const section = (s) => `<section class="md-sec"><h3 class="md-sec-t">${esc(s.title)}</h3><div class="md-grid">${s.items.map(card).join('')}</div></section>`;
+
+  const theme = config.theme || 'dark';
+  const modes = [ ['light', __( 'Light', 'noodled' )], ['dark', __( 'Dark', 'noodled' )], ['auto', __( 'Auto', 'noodled' )] ];
+  const themeSeg = modes.map(([m, lbl]) => `<button class="md-seg${theme === m ? ' on' : ''}" data-mode="${m}" onclick="setTheme('${m}')">${esc(lbl)}</button>`).join('');
+
+  return `
+    <div class="md-scrim" onclick="closeMenuDashboard()"></div>
+    <div class="md-panel" role="dialog" aria-modal="true" aria-label="${escAttr(__( 'Menu', 'noodled' ))}">
+      <div class="md-head">
+        <div class="md-brand">
+          <span class="md-logo">${esc((typeof noodledConfig !== 'undefined' && noodledConfig.brandName) || 'noodled')}</span>
+          <span class="md-tag">${esc(__( 'Use your noodle.', 'noodled' ))}</span>
+        </div>
+        <button class="md-close" onclick="closeMenuDashboard()" aria-label="${escAttr(__( 'Close menu', 'noodled' ))}"><span aria-hidden="true">&#10005;</span></button>
+      </div>
+      <div class="md-body">
+        ${sections.map(section).join('')}
+        <section class="md-sec">
+          <h3 class="md-sec-t">${esc(__( 'Appearance', 'noodled' ))}</h3>
+          <div class="md-theme">
+            <span class="md-theme-lbl">${esc(__( 'Theme', 'noodled' ))}</span>
+            <div class="md-seg-wrap" role="group" aria-label="${escAttr(__( 'Theme', 'noodled' ))}">${themeSeg}</div>
+          </div>
+        </section>
+        <section class="md-sec">
+          <h3 class="md-sec-t">${esc(__( 'Account', 'noodled' ))}</h3>
+          ${userName ? `<div class="md-user">${esc(userName)}</div>` : ''}
+          <div class="md-grid">${accountItems.map(card).join('')}</div>
+        </section>
+      </div>
+    </div>`;
+}
+
+// Set theme directly (dashboard segmented control) and persist it.
+async function setTheme(mode) {
+  applyTheme(mode);
+  document.querySelectorAll('.md-seg').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  try { await api.set_config('theme', mode); } catch (e) {}
 }
 
 function toggleEditorMenu() {

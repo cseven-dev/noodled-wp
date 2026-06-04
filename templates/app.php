@@ -27,6 +27,10 @@ $noodled_asset = function ( $rel ) {
 </script>
 <link rel="icon" type="image/png" sizes="32x32" href="<?php echo esc_url( NOODLED_URL . 'assets/icon-192.png' ); ?>">
 <link rel="manifest" href="<?php echo esc_url( NOODLED_URL . 'assets/manifest.json' ); ?>">
+<!-- Fraunces: noodled display serif, used in the branded menu dashboard -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,900;1,9..144,500&display=swap" rel="stylesheet">
 <link rel="apple-touch-icon" href="<?php echo esc_url( NOODLED_URL . 'assets/icon-192.png' ); ?>">
 <link rel="stylesheet" href="<?php echo esc_url( $noodled_asset( 'assets/css/noodled.css' ) ); ?>">
 <?php $accent = Noodled_Settings::get_accent_color(); if ( $accent && $accent !== '#0078d4' ) : ?>
@@ -72,34 +76,8 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
   <?php if ( Noodled_Plaud::is_configured() ) : ?>
   <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="<?php esc_attr_e( 'Import Plaud recordings', 'noodled' ); ?>"><?php esc_html_e( 'Plaud', 'noodled' ); ?></button>
   <?php endif; ?>
-  <div class="toolbar-menu-wrap">
-    <button class="btn-icon" onclick="toggleAppMenu()" title="<?php esc_attr_e( 'Menu', 'noodled' ); ?>" id="appMenuBtn" aria-label="<?php esc_attr_e( 'More actions', 'noodled' ); ?>" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8942;</span></button>
-    <div class="toolbar-dropdown" id="appMenu" role="menu" aria-labelledby="appMenuBtn">
-      <?php if ( ! empty( $config['user']['owner'] ) ) : ?>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageUsers()">&#128101; <?php esc_html_e( 'Manage people', 'noodled' ); ?></div>
-      <div class="dropdown-sep" role="separator"></div>
-      <?php endif; ?>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTemplates()"><?php esc_html_e( 'New from template', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openDailyJournal()"><?php esc_html_e( 'Daily journal', 'noodled' ); ?></div>
-      <div class="dropdown-sep" role="separator"></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showFocusOptions()"><?php esc_html_e( 'Focus timer', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTagCloud()"><?php esc_html_e( 'Browse tags', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="manageTags()"><?php esc_html_e( 'Manage tags', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showLinkGraph()"><?php esc_html_e( 'Note links', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showStats()"><?php esc_html_e( 'Statistics', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleQuickCapture()"><?php esc_html_e( 'Quick capture', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="uploadFiles()"><?php esc_html_e( 'Add files', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importEvernote()"><?php esc_html_e( 'Import from Evernote', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportBackup()"><?php esc_html_e( 'Export backup (.zip)', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="importBackup()"><?php esc_html_e( 'Import backup (.zip)', 'noodled' ); ?></div>
-      <div class="dropdown-sep" role="separator"></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showShortcutsHelp()"><?php esc_html_e( 'Keyboard shortcuts', 'noodled' ); ?></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleTheme()"><?php esc_html_e( 'Toggle theme', 'noodled' ); ?></div>
-      <div class="dropdown-sep" role="separator"></div>
-      <div class="dropdown-item" role="menuitem" tabindex="0" onclick="doLogout()"><?php esc_html_e( 'Logout', 'noodled' ); ?></div>
-    </div>
-  </div>
-  <button class="btn-icon" onclick="toggleTheme()" title="<?php esc_attr_e( 'Toggle theme', 'noodled' ); ?>" id="themeBtn" aria-label="<?php esc_attr_e( 'Toggle theme', 'noodled' ); ?>"><span aria-hidden="true">&#9680;</span></button>
+  <button class="btn-icon" onclick="openMenuDashboard()" title="<?php esc_attr_e( 'Menu', 'noodled' ); ?>" id="appMenuBtn" aria-label="<?php esc_attr_e( 'Open menu', 'noodled' ); ?>" aria-haspopup="dialog" aria-expanded="false"><span aria-hidden="true">&#9776;</span></button>
+  <button class="btn-icon hide-mobile" onclick="toggleTheme()" title="<?php esc_attr_e( 'Toggle theme', 'noodled' ); ?>" id="themeBtn" aria-label="<?php esc_attr_e( 'Toggle theme', 'noodled' ); ?>"><span aria-hidden="true">&#9680;</span></button>
 </header>
 
 <!-- Main 3-column layout -->
@@ -197,6 +175,9 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
 <!-- Quick-add speed dial (mobile + button) -->
 <input type="file" id="quickFilesInput" multiple style="display:none" onchange="quickHandleFiles(this)">
 <div id="quickAddContainer"></div>
+
+<!-- Branded menu dashboard (hamburger) -->
+<div id="menuDashboard"></div>
 
 <script>
 const noodledConfig = <?php echo wp_json_encode( $config ); ?>;
