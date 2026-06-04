@@ -45,7 +45,6 @@ const api = {
   create_notebook(name)                  { return this._fetch('/notebooks', { method: 'POST', body: JSON.stringify({ name }) }); },
   rename_notebook(oldName, newName)       { return this._fetch('/notebooks/rename', { method: 'POST', body: JSON.stringify({ old_name: oldName, new_name: newName }) }); },
   delete_notebook(name)                  { return this._fetch('/notebooks/delete', { method: 'POST', body: JSON.stringify({ name }) }); },
-  reorder_notebooks(names)               { return this._fetch('/notebooks/reorder', { method: 'POST', body: JSON.stringify({ names }) }); },
   set_notebook_color(name, color)        { return this._fetch('/notebooks/color', { method: 'POST', body: JSON.stringify({ name, color }) }); },
   get_notes(notebook)                    { return this._fetch('/notes' + (notebook ? '?notebook=' + encodeURIComponent(notebook) : '')); },
   get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId); },
@@ -223,12 +222,11 @@ function renderNotebooks() {
     const label = nb.label || nb.name;
     const active = activeNotebook === name ? ' active' : '';
     const color = nb.color ? (nb.color[0] === '#' ? nb.color : '#' + nb.color) : nbColors[i % nbColors.length];
-    const canDrag = nb.access === 'owner' ? `draggable="true" ondragstart="nbDragStart(event, '${esc(name)}')" ondragend="nbDragEnd()"` : '';
     const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">&#128279;</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
     /* translators: %s is the notebook name */
     const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
-    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" ${canDrag} onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="nbDropOn(event, '${esc(name)}')">
+    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
@@ -511,6 +509,20 @@ function sortFiltered() {
   });
 }
 
+// Quick list filters (chips): show only notes with attachments / with tasks.
+let listFilters = { att: false, tasks: false };
+function toggleListFilter(k) {
+  listFilters[k] = !listFilters[k];
+  const btn = document.getElementById(k === 'att' ? 'fcAtt' : 'fcTasks');
+  if (btn) { btn.classList.toggle('on', listFilters[k]); btn.setAttribute('aria-pressed', listFilters[k] ? 'true' : 'false'); }
+  filterNotes();
+}
+function applyListFilters(arr) {
+  if (listFilters.att) arr = arr.filter(n => (n.att || 0) > 0);
+  if (listFilters.tasks) arr = arr.filter(n => n.tasks && n.tasks.total > 0);
+  return arr;
+}
+
 let searchScope = 'notebook';
 function toggleSearchScope() {
   searchScope = searchScope === 'notebook' ? 'all' : 'notebook';
@@ -527,7 +539,7 @@ function filterNotes() {
   if (q && searchScope === 'all' && activeNotebook && !viewingTrash) {
     api.search(document.getElementById('searchInput').value.trim()).then(results => {
       if (searchQuery.trim() !== q) return; // a newer keystroke superseded this
-      filteredNotes = Array.isArray(results) ? results : [];
+      filteredNotes = applyListFilters(Array.isArray(results) ? results : []);
       sortFiltered(); renderNoteList();
     }).catch(() => {});
     return;
@@ -546,6 +558,7 @@ function filterNotes() {
   } else {
     filteredNotes = [...notes];
   }
+  filteredNotes = applyListFilters(filteredNotes);
   sortFiltered();
   renderNoteList();
 }
@@ -574,27 +587,6 @@ function noteDrop(e, notebookName) {
   _dragNoteId = 0;
   document.body.classList.remove('dragging-note');
   if (id && notebookName) moveNote(id, notebookName);
-}
-
-// Drag a notebook to reorder it; the same drop zone also accepts a dragged note.
-let _dragNbName = '';
-function nbDragStart(e, name) { _dragNbName = name; _dragNoteId = 0; if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'; e.currentTarget.classList.add('nb-dragging'); }
-function nbDragEnd() { _dragNbName = ''; document.querySelectorAll('.nb-item.nb-dragging, .nb-item.drop-target').forEach(el => el.classList.remove('nb-dragging', 'drop-target')); }
-function nbDropOn(e, targetName) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drop-target');
-  if (_dragNbName && _dragNbName !== targetName) { reorderNotebooks(_dragNbName, targetName); _dragNbName = ''; return; }
-  const id = _dragNoteId || +((e.dataTransfer && e.dataTransfer.getData('text/plain')) || 0);
-  _dragNoteId = 0; document.body.classList.remove('dragging-note');
-  if (id && targetName) moveNote(id, targetName);
-}
-function reorderNotebooks(fromName, toName) {
-  const fi = notebooks.findIndex(n => n.name === fromName), ti = notebooks.findIndex(n => n.name === toName);
-  if (fi < 0 || ti < 0) return;
-  const [moved] = notebooks.splice(fi, 1);
-  notebooks.splice(ti, 0, moved);
-  renderNotebooks();
-  api.reorder_notebooks(notebooks.map(n => n.name)).catch(() => {});
 }
 
 // Per-notebook accent color (owner only).

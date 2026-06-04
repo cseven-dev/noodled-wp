@@ -39,9 +39,6 @@ class Noodled_REST {
 		register_rest_route( $ns, '/notebooks/delete', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'delete_notebook' ], ] + $auth,
 		] );
-		register_rest_route( $ns, '/notebooks/reorder', [
-			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'reorder_notebooks' ], ] + $auth,
-		] );
 		register_rest_route( $ns, '/notebooks/color', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_notebook_color' ], ] + $auth,
 		] );
@@ -420,12 +417,6 @@ class Noodled_REST {
 		$new = $req->get_param( 'new_name' );
 		if ( ! $old || ! $new ) return new \WP_REST_Response( [ 'error' => __( 'Names required', 'noodled' ) ], 400 );
 		return new \WP_REST_Response( Noodled_Notebooks::rename( $old, $new, self::current_user_id() ) );
-	}
-
-	public static function reorder_notebooks( \WP_REST_Request $req ): \WP_REST_Response {
-		$names = (array) $req->get_param( 'names' );
-		Noodled_Notebooks::reorder( self::current_user_id(), array_map( 'strval', $names ) );
-		return new \WP_REST_Response( true );
 	}
 
 	public static function set_notebook_color( \WP_REST_Request $req ): \WP_REST_Response {

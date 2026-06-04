@@ -112,6 +112,10 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
       <button class="sort-btn search-scope" id="searchScopeBtn" onclick="toggleSearchScope()" title="<?php esc_attr_e( 'Search this notebook or everywhere', 'noodled' ); ?>"><?php esc_html_e( 'Here', 'noodled' ); ?></button>
       <button class="sort-btn" id="sortBtn" onclick="cycleSort()" title="<?php esc_attr_e( 'Change sort order', 'noodled' ); ?>"><?php esc_html_e( 'Modified', 'noodled' ); ?></button>
     </div>
+    <div class="list-filters" id="listFilters">
+      <button class="filter-chip" id="fcAtt" onclick="toggleListFilter('att')" aria-pressed="false"><span aria-hidden="true">&#128206;</span> <?php esc_html_e( 'Files', 'noodled' ); ?></button>
+      <button class="filter-chip" id="fcTasks" onclick="toggleListFilter('tasks')" aria-pressed="false"><span aria-hidden="true">&#9745;</span> <?php esc_html_e( 'Tasks', 'noodled' ); ?></button>
+    </div>
     <div class="pull-indicator" id="pullIndicator">&#8595; <?php esc_html_e( 'Pull to refresh', 'noodled' ); ?></div>
     <div class="note-list" id="noteList"></div>
     <div class="note-count" id="noteCount">
