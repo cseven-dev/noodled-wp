@@ -1670,6 +1670,13 @@ function toggleAppMenu() {
   const c = document.getElementById('menuDashboard');
   if (c && c.classList.contains('open')) closeMenuDashboard(); else openMenuDashboard();
 }
+// Admin-only: open the public marketing/landing page in preview mode. The preview
+// gets a "Back to app" button (injected server-side) to return here.
+function viewMarketingSite() {
+  const base = (typeof noodledConfig !== 'undefined' && noodledConfig.appUrl) || '/';
+  window.location.href = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'noodled_preview=landing';
+}
+
 function menuDashPick(fn) {
   // Close synchronously (no animation/timeout) so the action stays inside the
   // user gesture — required for the file picker (Photo or document) and the mic
@@ -1715,7 +1722,10 @@ function renderMenuDashboard() {
     ] },
   ];
   const accountItems = [];
-  if (isOwner) accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers', desc: __( 'Invite the family. Hand out PINs, not passwords.', 'noodled' ) });
+  if (isOwner) {
+    accountItems.push({ icon: '🌐', label: __( 'View marketing site', 'noodled' ), fn: 'viewMarketingSite', desc: __( 'Peek at your public landing page. A Back button brings you home.', 'noodled' ) });
+    accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers', desc: __( 'Invite the family. Hand out PINs, not passwords.', 'noodled' ) });
+  }
   accountItems.push({ icon: '🚪', label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true, desc: __( 'Lock it up behind you.', 'noodled' ) });
 
   const card = (it) => `<button class="md-card${it.danger ? ' md-danger' : ''}" onclick="menuDashPick('${it.fn}')"><span class="md-ic" aria-hidden="true">${it.icon}</span><span class="md-txt"><span class="md-lbl">${esc(it.label)}</span><span class="md-desc">${esc(it.desc || '')}</span></span></button>`;

@@ -105,7 +105,7 @@ class Noodled_App {
 			&& $current_user && ( $current_user['role'] ?? '' ) === 'admin' ) {
 			$landing_file = NOODLED_PATH . 'templates/landing.html';
 			$landing = file_exists( $landing_file ) ? file_get_contents( $landing_file ) : Noodled_Settings::get_landing_html();
-			if ( $landing ) { self::serve_landing( $landing ); exit; }
+			if ( $landing ) { self::serve_landing( $landing, true ); exit; }
 		}
 
 		if ( ! $current_user ) {
@@ -127,7 +127,7 @@ class Noodled_App {
 
 	/* ── Landing page with injected login modal ── */
 
-	private static function serve_landing( string $html ): void {
+	private static function serve_landing( string $html, bool $preview = false ): void {
 		$app_url     = self::get_app_url();
 		$login_api   = rest_url( 'noodled/v1/auth/login' );
 		$pin_api     = rest_url( 'noodled/v1/auth/pin' );
@@ -378,7 +378,21 @@ HTML;
 			$html
 		);
 
-		$html = str_ireplace( '</body>', $login_inject . $request_inject . "\n</body>", $html );
+		// Admin "view marketing site" preview: a floating Back-to-app button so the
+		// admin can pop out of the public landing page and return to the app.
+		$back_inject = '';
+		if ( $preview ) {
+			$app_back = esc_url( self::get_app_url() );
+			$back_lbl = esc_html__( 'Back to app', 'noodled' );
+			$close_lbl = esc_attr__( 'Close preview', 'noodled' );
+			$back_inject = '<a href="' . $app_back . '" aria-label="' . $close_lbl . '" '
+				. 'style="position:fixed;top:16px;right:16px;z-index:2147483000;display:inline-flex;align-items:center;gap:8px;'
+				. 'background:#1a1a1f;color:#fff;border:1px solid #33333f;border-radius:999px;padding:11px 18px;'
+				. 'font:600 14px/1 system-ui,-apple-system,sans-serif;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.45)">'
+				. '<span aria-hidden="true">&#10005;</span> ' . $back_lbl . '</a>';
+		}
+
+		$html = str_ireplace( '</body>', $login_inject . $request_inject . $back_inject . "\n</body>", $html );
 		echo $html;
 	}
 
