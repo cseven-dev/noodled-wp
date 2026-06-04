@@ -45,6 +45,8 @@ const api = {
   create_notebook(name)                  { return this._fetch('/notebooks', { method: 'POST', body: JSON.stringify({ name }) }); },
   rename_notebook(oldName, newName)       { return this._fetch('/notebooks/rename', { method: 'POST', body: JSON.stringify({ old_name: oldName, new_name: newName }) }); },
   delete_notebook(name)                  { return this._fetch('/notebooks/delete', { method: 'POST', body: JSON.stringify({ name }) }); },
+  reorder_notebooks(names)               { return this._fetch('/notebooks/reorder', { method: 'POST', body: JSON.stringify({ names }) }); },
+  set_notebook_color(name, color)        { return this._fetch('/notebooks/color', { method: 'POST', body: JSON.stringify({ name, color }) }); },
   get_notes(notebook)                    { return this._fetch('/notes' + (notebook ? '?notebook=' + encodeURIComponent(notebook) : '')); },
   get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId); },
   create_note(notebook, title, body)     { return this._fetch('/notes', { method: 'POST', body: JSON.stringify({ notebook, title, body: body || '' }) }); },
@@ -137,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   maybeWhatsNew();
   maybeSeedStarter();
+  handleLaunchParams();
 
   document.getElementById('splash')?.classList.add('hidden');
   document.addEventListener('keydown', handleGlobalKey);
@@ -219,12 +222,13 @@ function renderNotebooks() {
     // folder shows as "Shared with {Admin}" but is still addressed by name).
     const label = nb.label || nb.name;
     const active = activeNotebook === name ? ' active' : '';
-    const color = nbColors[i % nbColors.length];
+    const color = nb.color ? (nb.color[0] === '#' ? nb.color : '#' + nb.color) : nbColors[i % nbColors.length];
+    const canDrag = nb.access === 'owner' ? `draggable="true" ondragstart="nbDragStart(event, '${esc(name)}')" ondragend="nbDragEnd()"` : '';
     const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">&#128279;</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
     /* translators: %s is the notebook name */
     const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
-    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, '${esc(name)}')">
+    return `<div class="nb-item${active}" role="button" tabindex="0" aria-label="${nbAria}" ${canDrag} onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="nbDropOn(event, '${esc(name)}')">
       <span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
@@ -256,6 +260,7 @@ function showNbContext(event, name) {
   const nb = notebooks.find(n => n.name === name);
   const items = [
     { label: __( 'Rename', 'noodled' ), action: () => renameNotebook(name) },
+    { label: __( 'Notebook color', 'noodled' ), action: () => setNotebookColor(name) },
     { label: __( 'Set cover image', 'noodled' ), action: () => setNotebookCover(name) },
   ];
   if (nb && nb.access === 'owner') {
@@ -428,6 +433,34 @@ async function maybeSeedStarter() {
   } catch (e) {}
 }
 
+// Home-screen shortcuts (?noodled_do=…) and the PWA share target
+// (?noodled_share=1&title=&text=&url=) → run the matching action on launch.
+function handleLaunchParams() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const act = p.get('noodled_do');
+    if (act === 'new') createNote();
+    else if (act === 'journal') openDailyJournal();
+    else if (act === 'capture') toggleQuickCapture();
+    else if (p.get('noodled_share')) {
+      const body = [p.get('text') || '', p.get('url') || ''].filter(Boolean).join('\n\n');
+      const title = p.get('title') || '';
+      if (title || body) createNoteFromShared(title, body);
+    }
+    if (act || p.get('noodled_share')) history.replaceState(null, '', window.location.pathname);
+  } catch (e) {}
+}
+async function createNoteFromShared(title, body) {
+  await doSave();
+  const nb = activeNotebook || 'General';
+  const note = await api.create_note(nb, title || dateTimeTitle(), body || '');
+  if (!note || note.error) return;
+  activeNote = await api.get_note(null, note.id);
+  await loadNotebooks(); await loadNotes(); renderNoteList(); renderContent();
+  document.querySelector('.col-content')?.classList.add('open'); closeSidebar();
+  setTimeout(focusNoteBody, 120);
+}
+
 async function loadNotes() {
   _bodiesLoaded = false; // list responses are body-free; re-hydrate lazily on demand
   try {
@@ -541,6 +574,40 @@ function noteDrop(e, notebookName) {
   _dragNoteId = 0;
   document.body.classList.remove('dragging-note');
   if (id && notebookName) moveNote(id, notebookName);
+}
+
+// Drag a notebook to reorder it; the same drop zone also accepts a dragged note.
+let _dragNbName = '';
+function nbDragStart(e, name) { _dragNbName = name; _dragNoteId = 0; if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'; e.currentTarget.classList.add('nb-dragging'); }
+function nbDragEnd() { _dragNbName = ''; document.querySelectorAll('.nb-item.nb-dragging, .nb-item.drop-target').forEach(el => el.classList.remove('nb-dragging', 'drop-target')); }
+function nbDropOn(e, targetName) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drop-target');
+  if (_dragNbName && _dragNbName !== targetName) { reorderNotebooks(_dragNbName, targetName); _dragNbName = ''; return; }
+  const id = _dragNoteId || +((e.dataTransfer && e.dataTransfer.getData('text/plain')) || 0);
+  _dragNoteId = 0; document.body.classList.remove('dragging-note');
+  if (id && targetName) moveNote(id, targetName);
+}
+function reorderNotebooks(fromName, toName) {
+  const fi = notebooks.findIndex(n => n.name === fromName), ti = notebooks.findIndex(n => n.name === toName);
+  if (fi < 0 || ti < 0) return;
+  const [moved] = notebooks.splice(fi, 1);
+  notebooks.splice(ti, 0, moved);
+  renderNotebooks();
+  api.reorder_notebooks(notebooks.map(n => n.name)).catch(() => {});
+}
+
+// Per-notebook accent color (owner only).
+function setNotebookColor(name) {
+  const el = document.getElementById('modalContainer');
+  const sw = nbColors.concat(['#64748b']).map(c => `<button class="nbc-sw" style="background:${c}" onclick="applyNbColor('${esc(name)}','${c}')" aria-label="${escAttr(c)}"></button>`).join('');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Notebook color', 'noodled' ))}</h3><div class="nbc-grid">${sw}</div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="applyNbColor('${esc(name)}','')">${esc(__( 'Reset', 'noodled' ))}</button><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
+}
+function applyNbColor(name, color) {
+  const nb = notebooks.find(n => n.name === name); if (nb) nb.color = color;
+  api.set_notebook_color(name, color).catch(() => {});
+  document.getElementById('modalContainer').innerHTML = '';
+  renderNotebooks();
 }
 
 function cycleSort() {

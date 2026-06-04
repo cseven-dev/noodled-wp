@@ -11,12 +11,43 @@
     {
       "src": "/wp-content/plugins/noodled/assets/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/wp-content/plugins/noodled/assets/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "New note",
+      "short_name": "New note",
+      "url": "/?noodled_do=new",
+      "icons": [{ "src": "/wp-content/plugins/noodled/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Daily journal",
+      "short_name": "Journal",
+      "url": "/?noodled_do=journal",
+      "icons": [{ "src": "/wp-content/plugins/noodled/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Quick capture",
+      "short_name": "Capture",
+      "url": "/?noodled_do=capture",
+      "icons": [{ "src": "/wp-content/plugins/noodled/assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "/?noodled_share=1",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

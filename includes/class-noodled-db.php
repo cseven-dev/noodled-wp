@@ -14,6 +14,7 @@ CREATE TABLE {$wpdb->prefix}noodled_notebooks (
   owner_id bigint(20) unsigned NOT NULL DEFAULT 0,
   drop_to bigint(20) unsigned NOT NULL DEFAULT 0,
   sort_order int(11) NOT NULL DEFAULT 0,
+  color varchar(20) NOT NULL DEFAULT '',
   created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   modified_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

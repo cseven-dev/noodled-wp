@@ -39,6 +39,12 @@ class Noodled_REST {
 		register_rest_route( $ns, '/notebooks/delete', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'delete_notebook' ], ] + $auth,
 		] );
+		register_rest_route( $ns, '/notebooks/reorder', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'reorder_notebooks' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/notebooks/color', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_notebook_color' ], ] + $auth,
+		] );
 		// Notebook sharing (owner-initiated, user-to-user)
 		register_rest_route( $ns, '/notebooks/(?P<id>\d+)/shares', [
 			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'notebook_shares' ], ] + $auth,
@@ -414,6 +420,20 @@ class Noodled_REST {
 		$new = $req->get_param( 'new_name' );
 		if ( ! $old || ! $new ) return new \WP_REST_Response( [ 'error' => __( 'Names required', 'noodled' ) ], 400 );
 		return new \WP_REST_Response( Noodled_Notebooks::rename( $old, $new, self::current_user_id() ) );
+	}
+
+	public static function reorder_notebooks( \WP_REST_Request $req ): \WP_REST_Response {
+		$names = (array) $req->get_param( 'names' );
+		Noodled_Notebooks::reorder( self::current_user_id(), array_map( 'strval', $names ) );
+		return new \WP_REST_Response( true );
+	}
+
+	public static function set_notebook_color( \WP_REST_Request $req ): \WP_REST_Response {
+		$name  = (string) $req->get_param( 'name' );
+		$color = (string) $req->get_param( 'color' );
+		if ( ! $name ) return new \WP_REST_Response( [ 'error' => __( 'Name required', 'noodled' ) ], 400 );
+		Noodled_Notebooks::set_color( self::current_user_id(), $name, $color );
+		return new \WP_REST_Response( true );
 	}
 
 	public static function delete_notebook( \WP_REST_Request $req ): \WP_REST_Response {

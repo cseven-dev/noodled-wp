@@ -62,8 +62,28 @@ class Noodled_Notebooks {
 				'access' => $r['access'],
 				'owner'  => (int) $r['owner_id'],
 				'drop'   => $is_drop,
+				'color'  => $r['color'] ?? '',
 			];
 		}, $rows ?: [] );
+	}
+
+	/** Persist a new sidebar order for the user's own notebooks (by name). */
+	public static function reorder( int $user_id, array $names ): bool {
+		global $wpdb;
+		$i = 0;
+		foreach ( $names as $name ) {
+			$wpdb->update( self::table(), [ 'sort_order' => $i ], [ 'name' => (string) $name, 'owner_id' => $user_id ] );
+			$i++;
+		}
+		return true;
+	}
+
+	/** Set a notebook's accent color (owner only). Empty string clears it. */
+	public static function set_color( int $user_id, string $name, string $color ): bool {
+		global $wpdb;
+		$color = preg_match( '/^#?[0-9a-fA-F]{3,8}$/', $color ) ? $color : '';
+		$wpdb->update( self::table(), [ 'color' => $color ], [ 'name' => $name, 'owner_id' => $user_id ] );
+		return true;
 	}
 
 	/* ────────────────────────────────────────────────────────────

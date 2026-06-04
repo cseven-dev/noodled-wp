@@ -693,9 +693,14 @@ mark { background: var(--accent); color: #fff; padding: 1px 2px; border-radius: 
 .sort-btn:hover { color: var(--text); border-color: var(--text-muted); }
 .search-scope.on { color: var(--accent); border-color: var(--accent); }
 
-/* Drag a note onto a notebook to move it */
+/* Drag a note onto a notebook to move it; drag a notebook to reorder it */
 .nb-item.drop-target { background: var(--accent-glow, rgba(59,130,246,0.18)); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.nb-item.nb-dragging { opacity: 0.5; }
+.nb-item[draggable="true"] { cursor: grab; }
 body.dragging-note .note-item { cursor: grabbing; }
+.nbc-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.nbc-sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; transition: transform 0.1s ease; }
+.nbc-sw:hover { transform: scale(1.12); }
 
 /* ── Pull to refresh indicator ── */
 .pull-indicator {
@@ -1728,12 +1733,25 @@ body.editor-narrow .content-body { max-width: 720px; margin-left: auto; margin-r
   body * { visibility: hidden !important; }
   #printArea, #printArea * { visibility: visible !important; }
   #printArea {
-    display: block !important; position: absolute; inset: 0; padding: 24px;
-    color: #000; background: #fff; font-family: Georgia, 'Times New Roman', serif;
+    display: block !important; position: absolute; inset: 0; padding: 0;
+    color: #111; background: #fff; font-family: Georgia, 'Times New Roman', serif;
   }
-  #printArea .print-title { font-size: 26px; margin: 0 0 16px; }
-  #printArea .print-body { font-size: 14px; line-height: 1.6; }
+  #printArea .print-title {
+    font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 700;
+    margin: 0 0 16px; line-height: 1.2;
+  }
+  #printArea .print-body { font-size: 13.5px; line-height: 1.65; }
+  #printArea .print-body h1, #printArea .print-body h2, #printArea .print-body h3 {
+    font-family: 'Fraunces', Georgia, serif; break-after: avoid;
+  }
+  #printArea .print-body pre, #printArea .print-body blockquote,
+  #printArea .print-body table, #printArea img { break-inside: avoid; }
   #printArea img { max-width: 100%; }
+  /* Show link destinations on paper (skip in-app #/javascript anchors). */
+  #printArea a[href]:not([href="#"]):not([href^="javascript"])::after {
+    content: " (" attr(href) ")"; font-size: 10px; color: #555; word-break: break-all;
+  }
+  @page { margin: 18mm; }
 }
 
 /* ── Visible keyboard focus for custom controls (WCAG 2.4.7) ── */
