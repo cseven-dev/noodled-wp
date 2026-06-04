@@ -136,7 +136,12 @@ class Noodled_Attachments {
 
 	/** Access-checked proxy URL the browser loads instead of a public file URL. */
 	public static function proxy_url( int $id ): string {
-		return rest_url( 'noodled/v1/file/' . $id );
+		// An <img>/<a> request can't send the X-WP-Nonce header, so a logged-in WP
+		// admin would trip WordPress's REST cookie-nonce check and get a 401 (blank
+		// image). Bake the REST nonce into the URL as _wpnonce so the request
+		// authenticates. serve_file() still runs its own per-note access check, so
+		// this only satisfies the CSRF gate — it does not bypass access control.
+		return add_query_arg( '_wpnonce', wp_create_nonce( 'wp_rest' ), rest_url( 'noodled/v1/file/' . $id ) );
 	}
 
 	/** Row + absolute disk path for the file proxy, or null. */
