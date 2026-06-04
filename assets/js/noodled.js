@@ -133,6 +133,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadNotebooks().catch(e => console.error('Noodled: notebooks load failed', e.message));
   await Promise.allSettled([ notesP, trashP ]);
 
+  maybeWhatsNew();
+  maybeSeedStarter();
+
   document.getElementById('splash')?.classList.add('hidden');
   document.addEventListener('keydown', handleGlobalKey);
 
@@ -399,6 +402,30 @@ async function deleteNotebook(name) {
 }
 
 // ── Notes ──
+// One-time "what's new" toast when the app version changes (not on first run).
+function maybeWhatsNew() {
+  try {
+    const v = (typeof noodledConfig !== 'undefined' && noodledConfig.version) || '';
+    const seen = localStorage.getItem('noodled_seen_version');
+    /* translators: %s is the new version number */
+    if (seen && v && seen !== v) setTimeout(() => showToast(sprintf( __( '✨ Updated to v%s', 'noodled' ), v )), 1200);
+    if (v) localStorage.setItem('noodled_seen_version', v);
+  } catch (e) {}
+}
+
+// First run only (once per device): if a brand-new account has no notes, seed a
+// friendly starter note so they don't land on a blank app.
+async function maybeSeedStarter() {
+  try {
+    if (localStorage.getItem('noodled_seeded')) return;
+    localStorage.setItem('noodled_seeded', '1');
+    if (!Array.isArray(notes) || notes.length || viewingTrash) return;
+    const body = __( '# Welcome to noodled 🍜\n\nThis is your first note. A few things to try:\n\n- Type `#`, `*`, and `- [ ]` and watch it render live\n- Link notes with `[[double brackets]]`\n- Tap the **+** to add a photo, voice note, or location\n- Open the **menu** (top right) for everything else\n\nDelete this whenever you like. Use your noodle.\n', 'noodled' );
+    const note = await api.create_note(activeNotebook || 'General', __( 'Welcome to noodled', 'noodled' ), body);
+    if (note && !note.error) { await loadNotebooks(); await loadNotes(); }
+  } catch (e) {}
+}
+
 async function loadNotes() {
   _bodiesLoaded = false; // list responses are body-free; re-hydrate lazily on demand
   try {
@@ -439,9 +466,37 @@ async function ensureBodies() {
   return _bodiesPromise;
 }
 
+function sortFiltered() {
+  filteredNotes.sort((a, b) => {
+    if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
+    if (sortMode === 'alpha') return (a.title || '').localeCompare(b.title || '');
+    if (sortMode === 'created') return (b.created || '').localeCompare(a.created || '');
+    const cmp = (b.modified || '').localeCompare(a.modified || '');
+    return cmp !== 0 ? cmp : (b.created || '').localeCompare(a.created || '');
+  });
+}
+
+let searchScope = 'notebook';
+function toggleSearchScope() {
+  searchScope = searchScope === 'notebook' ? 'all' : 'notebook';
+  const btn = document.getElementById('searchScopeBtn');
+  if (btn) { btn.textContent = searchScope === 'all' ? __( 'All', 'noodled' ) : __( 'Here', 'noodled' ); btn.classList.toggle('on', searchScope === 'all'); }
+  filterNotes();
+}
+
 function filterNotes() {
   searchQuery = document.getElementById('searchInput').value.toLowerCase();
   const q = searchQuery.trim();
+  // "Everywhere" scope: search ALL accessible notebooks via the server (only
+  // meaningful when a single notebook is open; "All Notes" already loads them).
+  if (q && searchScope === 'all' && activeNotebook && !viewingTrash) {
+    api.search(document.getElementById('searchInput').value.trim()).then(results => {
+      if (searchQuery.trim() !== q) return; // a newer keystroke superseded this
+      filteredNotes = Array.isArray(results) ? results : [];
+      sortFiltered(); renderNoteList();
+    }).catch(() => {});
+    return;
+  }
   if (q) {
     // Full-body search needs the bodies hydrated; fetch them once, then re-filter.
     if (!_bodiesLoaded) ensureBodies().then(() => { if (searchQuery.trim()) filterNotes(); });
@@ -456,13 +511,7 @@ function filterNotes() {
   } else {
     filteredNotes = [...notes];
   }
-  filteredNotes.sort((a, b) => {
-    if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
-    if (sortMode === 'alpha') return (a.title || '').localeCompare(b.title || '');
-    if (sortMode === 'created') return (b.created || '').localeCompare(a.created || '');
-    const cmp = (b.modified || '').localeCompare(a.modified || '');
-    return cmp !== 0 ? cmp : (b.created || '').localeCompare(a.created || '');
-  });
+  sortFiltered();
   renderNoteList();
 }
 
@@ -1196,6 +1245,15 @@ async function saveTitleOnly() {
 function handleContentKey(e) {
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); document.execCommand('bold'); schedSave(); return; }
   if (e.ctrlKey && e.key === 'i') { e.preventDefault(); document.execCommand('italic'); schedSave(); return; }
+  // Ctrl/Cmd+Shift+X: strikethrough.
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'X' || e.key === 'x')) { e.preventDefault(); document.execCommand('strikeThrough'); schedSave(); return; }
+  // Ctrl/Cmd+Shift+C: wrap the selection (or insert) inline code.
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+    e.preventDefault();
+    const t = window.getSelection().toString();
+    document.execCommand('insertHTML', false, '<code>' + esc(t || 'code') + '</code>');
+    schedSave(); return;
+  }
 
   if (e.key === 'Enter') {
     const sel = window.getSelection();
