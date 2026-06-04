@@ -73,6 +73,12 @@ class Noodled_App {
 	/* ── Core request handler ── */
 
 	private static function serve_request(): void {
+		// Public legal pages (Privacy / Terms) — reachable by anyone, no session needed.
+		if ( isset( $_GET['noodled_legal'] ) ) {
+			self::serve_legal( sanitize_key( wp_unslash( $_GET['noodled_legal'] ) ) );
+			exit;
+		}
+
 		// One-click email magic link: verify the PIN, set the session, then
 		// bounce to the clean app URL so the address bar carries no secret.
 		if ( isset( $_GET['noodled_login'], $_GET['noodled_email'] ) ) {
@@ -179,7 +185,7 @@ class Noodled_App {
 .n-login-msg{margin-top:12px;font-size:13px;text-align:center;min-height:20px}
 .n-login-msg.error{color:#f87171}
 .n-login-msg.success{color:#34d399}
-.n-login-link{color:#9a9aa8;font-size:13.5px;text-decoration:none;display:block;text-align:center;margin-top:12px;background:none;border:none;cursor:pointer;font-family:inherit;width:100%}
+.n-login-link{color:#b9b9c6;font-size:13.5px;text-decoration:none;display:block;text-align:center;margin-top:12px;background:none;border:none;cursor:pointer;font-family:inherit;width:100%}
 .n-login-link:focus-visible{outline:2px solid {$accent};outline-offset:2px;border-radius:4px}
 .n-login-link:hover{color:#e8e8ef}
 .n-login-link.lg{font-size:15px;font-weight:600;color:{$accent};margin-top:18px}
@@ -354,7 +360,111 @@ HTML;
 		// Footer "Download" link → "Get a noodle"
 		$html = str_replace( '<a href="#get">Download</a>', '<a href="#get">Get a noodle</a>', $html );
 
+		// Footer Privacy / Terms links → real legal pages (were dead href="#")
+		$privacy_url = esc_url( add_query_arg( 'noodled_legal', 'privacy', self::get_app_url() ) );
+		$terms_url   = esc_url( add_query_arg( 'noodled_legal', 'terms', self::get_app_url() ) );
+		$html = str_replace(
+			[ '<a href="#">Privacy</a>', '<a href="#">Terms</a>' ],
+			[ '<a href="' . $privacy_url . '">Privacy</a>', '<a href="' . $terms_url . '">Terms</a>' ],
+			$html
+		);
+
 		$html = str_ireplace( '</body>', $login_inject . $request_inject . "\n</body>", $html );
 		echo $html;
+	}
+
+	/* ── Public legal pages (Privacy / Terms) ──
+	   Stub copy an admin can replace; reachable at ?noodled_legal=privacy|terms. */
+
+	private static function serve_legal( string $which ): void {
+		self::send_no_cache_headers();
+		$brand  = Noodled_Settings::get_brand_name();
+		$accent = Noodled_Settings::get_accent_color();
+		$home   = esc_url( self::get_app_url() );
+		$email  = sanitize_email( get_option( 'admin_email' ) );
+
+		if ( $which === 'terms' ) {
+			$h1    = __( 'Terms of Service', 'noodled' );
+			$intro = sprintf( __( 'By using %s you agree to these terms. Please read them carefully.', 'noodled' ), $brand );
+			$sections = [
+				[ __( 'Your account', 'noodled' ), __( 'You are responsible for keeping your sign-in details secure and for activity that happens under your account. Tell us right away if you think someone else has access to it.', 'noodled' ) ],
+				[ __( 'Acceptable use', 'noodled' ), __( 'Do not use the service to store or share unlawful content, to infringe anyone else\'s rights, or to disrupt the service for other people.', 'noodled' ) ],
+				[ __( 'Your content', 'noodled' ), __( 'Your notes, notebooks, and attachments stay yours. You grant us only the permission needed to store, process, and display that content back to you so the service can work.', 'noodled' ) ],
+				[ __( 'Availability', 'noodled' ), __( 'The service is provided "as is", without warranties of any kind. We may add, change, or remove features, and we cannot guarantee the service will always be available or error-free.', 'noodled' ) ],
+				[ __( 'Termination', 'noodled' ), __( 'You may stop using the service at any time. We may suspend or close accounts that break these terms.', 'noodled' ) ],
+			];
+		} else {
+			$which = 'privacy';
+			$h1    = __( 'Privacy Policy', 'noodled' );
+			$intro = sprintf( __( '%s is a private note-taking service. This policy explains what we store and how we use it.', 'noodled' ), $brand );
+			$sections = [
+				[ __( 'What we store', 'noodled' ), __( 'Your account email and the notes, notebooks, and attachments you create. That content is private to your account by default.', 'noodled' ) ],
+				[ __( 'How we use it', 'noodled' ), __( 'Only to provide the service to you. We do not sell your data or share it with third parties for advertising.', 'noodled' ) ],
+				[ __( 'Email', 'noodled' ), __( 'We email you sign-in PINs and any notifications you choose to receive, such as when a notebook is shared with you.', 'noodled' ) ],
+				[ __( 'Security', 'noodled' ), __( 'Notes are visible only to your account and the people you share them with. Attachments are served only to sessions allowed to read the note they belong to.', 'noodled' ) ],
+				[ __( 'Your control', 'noodled' ), __( 'You can edit or delete your notes at any time, and you can ask us to remove your account and its data.', 'noodled' ) ],
+			];
+		}
+
+		$title    = esc_html( sprintf( __( '%1$s — %2$s', 'noodled' ), $h1, $brand ) );
+		$h1_esc   = esc_html( $h1 );
+		$intro_esc = esc_html( $intro );
+		$back     = esc_html( sprintf( __( 'Back to %s', 'noodled' ), $brand ) );
+		$copy     = esc_html( sprintf( __( '© %1$s %2$s', 'noodled' ), date_i18n( 'Y' ), $brand ) );
+		$lang     = esc_attr( get_bloginfo( 'language' ) );
+		$accent_a = esc_attr( $accent );
+
+		$body = '';
+		foreach ( $sections as $s ) {
+			$body .= '<h2>' . esc_html( $s[0] ) . "</h2>\n<p>" . esc_html( $s[1] ) . "</p>\n";
+		}
+
+		$contact_block = '';
+		if ( $email ) {
+			$link = '<a style="color:' . $accent_a . '" href="mailto:' . esc_attr( $email ) . '">' . esc_html( $email ) . '</a>';
+			/* translators: %s: contact email address (rendered as a mailto link) */
+			$contact_block = '<p>' . wp_kses(
+				sprintf( __( 'Questions about this policy? Contact us at %s.', 'noodled' ), $link ),
+				[ 'a' => [ 'href' => [], 'style' => [] ] ]
+			) . '</p>';
+		}
+
+		header( 'Content-Type: text/html; charset=utf-8' );
+		echo <<<HTML
+<!doctype html>
+<html lang="$lang">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title</title>
+<style>
+:root{--accent:$accent_a}
+*{box-sizing:border-box}
+body{margin:0;background:#15151a;color:#d6d6e0;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:680px;margin:0 auto;padding:56px 22px 80px}
+a.back{display:inline-block;margin-bottom:28px;color:var(--accent);text-decoration:none;font-size:14px}
+a.back:hover,a.back:focus-visible{text-decoration:underline}
+h1{color:#fff;font-size:30px;margin:0 0 6px;font-family:Fraunces,Georgia,serif}
+.intro{color:#a9a9b8;margin:0 0 32px}
+h2{color:#fff;font-size:18px;margin:30px 0 6px}
+p{margin:0 0 14px}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid #2a2a35;color:#8a8a99;font-size:13.5px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="$home">&larr; $back</a>
+<h1>$h1_esc</h1>
+<p class="intro">$intro_esc</p>
+$body
+<footer>
+$contact_block
+<p>$copy</p>
+</footer>
+</main>
+</body>
+</html>
+HTML;
 	}
 }

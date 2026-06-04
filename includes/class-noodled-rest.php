@@ -67,6 +67,17 @@ class Noodled_REST {
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/pin', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'pin_note' ], ] + $auth,
 		] );
+		// Reminders (note-attached, per-user)
+		register_rest_route( $ns, '/reminders', [
+			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'get_reminders' ], ] + $auth,
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'create_reminder' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/reminders/(?P<id>\d+)', [
+			[ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'delete_reminder' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/reminders/(?P<id>\d+)/sent', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'mark_reminder_sent' ], ] + $auth,
+		] );
 		// Note sharing (owner-initiated, user-to-user)
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/shares', [
 			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'note_shares' ], ] + $auth,
@@ -659,6 +670,74 @@ class Noodled_REST {
 		return new \WP_REST_Response( $result );
 	}
 
+	/* ── Reminders (per-user, note-attached) ── */
+
+	public static function get_reminders( \WP_REST_Request $req ): \WP_REST_Response {
+		global $wpdb;
+		$uid = self::current_user_id();
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT r.id, r.note_id, r.remind_at, r.label, r.sent, n.title
+			   FROM {$wpdb->prefix}noodled_reminders r
+			   JOIN {$wpdb->prefix}noodled_notes n ON n.id = r.note_id
+			  WHERE r.user_id = %d AND n.deleted_at IS NULL
+			    AND ( r.sent = 0 OR r.remind_at >= ( UTC_TIMESTAMP() - INTERVAL 1 DAY ) )
+			  ORDER BY r.remind_at ASC",
+			$uid
+		), ARRAY_A );
+		$out = array_map( function ( $r ) {
+			return [
+				'id'      => (int) $r['id'],
+				'note_id' => (int) $r['note_id'],
+				'at'      => strtotime( $r['remind_at'] . ' UTC' ) * 1000,
+				'label'   => $r['label'],
+				'sent'    => (int) $r['sent'],
+				'title'   => $r['title'],
+			];
+		}, $rows ?: [] );
+		return new \WP_REST_Response( $out );
+	}
+
+	public static function create_reminder( \WP_REST_Request $req ): \WP_REST_Response {
+		$note_id = (int) $req->get_param( 'note_id' );
+		// Only let a user attach a reminder to a note they can read.
+		if ( ! self::verify_note_access( $note_id ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
+		}
+		$at_ms = (float) $req->get_param( 'at' );
+		if ( $at_ms <= 0 ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Invalid reminder time', 'noodled' ) ], 400 );
+		}
+		global $wpdb;
+		$wpdb->insert( "{$wpdb->prefix}noodled_reminders", [
+			'note_id'    => $note_id,
+			'user_id'    => self::current_user_id(),
+			'remind_at'  => gmdate( 'Y-m-d H:i:s', (int) ( $at_ms / 1000 ) ),
+			'label'      => sanitize_text_field( (string) $req->get_param( 'label' ) ),
+			'sent'       => 0,
+			'created_at' => current_time( 'mysql', true ),
+		] );
+		return new \WP_REST_Response( [ 'id' => (int) $wpdb->insert_id ] );
+	}
+
+	public static function delete_reminder( \WP_REST_Request $req ): \WP_REST_Response {
+		global $wpdb;
+		$wpdb->delete( "{$wpdb->prefix}noodled_reminders", [
+			'id'      => (int) $req['id'],
+			'user_id' => self::current_user_id(),
+		] );
+		return new \WP_REST_Response( [ 'ok' => true ] );
+	}
+
+	public static function mark_reminder_sent( \WP_REST_Request $req ): \WP_REST_Response {
+		global $wpdb;
+		$wpdb->update(
+			"{$wpdb->prefix}noodled_reminders",
+			[ 'sent' => 1 ],
+			[ 'id' => (int) $req['id'], 'user_id' => self::current_user_id() ]
+		);
+		return new \WP_REST_Response( [ 'ok' => true ] );
+	}
+
 	public static function delete_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
@@ -866,7 +945,12 @@ class Noodled_REST {
 		if ( ! Noodled_GitHub::is_configured() ) {
 			$cfg = Noodled_Settings::get();
 			return new \WP_REST_Response( [
-				'error' => 'GitHub not configured. Owner: ' . ( $cfg['github_owner'] ?? 'empty' ) . ', Token: ' . ( empty( $cfg['github_token'] ) ? 'missing' : 'set' ),
+				/* translators: 1: configured GitHub owner/org, or "empty"; 2: token state, "missing" or "set" */
+				'error' => sprintf(
+					__( 'GitHub not configured. Owner: %1$s, Token: %2$s', 'noodled' ),
+					$cfg['github_owner'] ?? 'empty',
+					empty( $cfg['github_token'] ) ? 'missing' : 'set'
+				),
 			] );
 		}
 		$result = Noodled_Sync::full_import();

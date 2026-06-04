@@ -774,6 +774,34 @@ body.reading-mode .rendered-content { cursor: default; }
 .rendered-content th { background: var(--bg-input); color: var(--text-bright); font-weight: 600; }
 .rendered-content tr:hover td { background: var(--bg-item-hover); }
 
+/* ── Table editing toolbar (floats above the focused table) ── */
+.table-tools {
+  position: absolute; z-index: 11000; display: none; gap: 4px;
+  background: var(--bg-card, var(--bg-input)); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+}
+.table-tools button {
+  font: inherit; font-size: 12px; line-height: 1; cursor: pointer;
+  background: var(--bg-input); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 8px; white-space: nowrap;
+}
+.table-tools button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.table-tools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ── Version-history diff view ── */
+.diff-view {
+  max-height: 340px; overflow: auto; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-input); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.5; padding: 6px 0;
+}
+.diff-line { display: flex; gap: 8px; padding: 0 10px; white-space: pre-wrap; word-break: break-word; }
+.diff-sym { flex: 0 0 1ch; opacity: 0.7; user-select: none; }
+.diff-add { background: rgba(52,211,153,0.16); color: var(--text-bright); }
+.diff-del { background: rgba(248,113,113,0.16); color: var(--text-bright); }
+.diff-add .diff-sym { color: #34d399; }
+.diff-del .diff-sym { color: #f87171; }
+.diff-ctx { color: var(--text-muted); }
+
 /* ── Tags ── */
 .tag {
   color: var(--accent); cursor: pointer; font-size: 0.9em;

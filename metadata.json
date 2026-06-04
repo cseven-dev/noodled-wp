@@ -1,7 +1,7 @@
 {
   "name": "Noodled",
   "slug": "noodled",
-  "version": "1.1.127",
+  "version": "1.1.128",
   "download_url": "https://c7.ca/noodled/noodled.zip",
   "author": "Simon",
   "author_homepage": "https://cseven.ca",
@@ -11,9 +11,10 @@
   "requires_php": "8.0",
   "sections": {
     "description": "A full web version of the noodled note-taking app. Markdown notes with rich editing, family sharing, PIN login, GitHub sync, Plaud voice import, and 50+ power tools. Install on any WordPress site.",
-    "changelog": "<h4>1.1.127</h4><ul><li>Security: hardened note rendering against stored XSS in markdown links/images</li><li>Security: attachment uploads now use a strict type allowlist with real content verification (blocks disguised scripts and .htaccess uploads)</li><li>Security: private file proxy sends safer headers and downloads unknown types</li><li>Security: landing-page upload now CSRF-protected</li><li>Fix: attachment gallery no longer disappears after editing actions</li><li>Fix: shared drop folders reuse the same notebook instead of duplicating</li><li>Fix: permanent delete and empty-trash now clean up attachment files</li><li>Fix: dictation no longer errors when a note closes mid-recording</li><li>Accessibility and mobile polish across the app, admin, and landing page</li></ul>"
+    "changelog": "<h4>1.1.128</h4><ul><li>New: note reminders — set a date and time on any note (Note menu → Remind me) and get a notification when it is due</li><li>New: table editing — add or remove rows and columns from a toolbar, and a fix so editing a note that contains a table no longer loses the table</li><li>New: version history now shows a visual diff of what changed since an earlier version, with one-click restore</li><li>New: sync conflicts now offer Keep both, so neither version is ever lost</li><li>New: Privacy and Terms pages now open from the landing-page footer</li><li>Accessibility: better login-screen contrast and screen-reader roles on the slash menu</li><li>Offline edits keep queueing and sync on reconnect</li></ul><h4>1.1.127</h4><ul><li>Security: hardened note rendering against stored XSS in markdown links/images</li><li>Security: attachment uploads now use a strict type allowlist with real content verification (blocks disguised scripts and .htaccess uploads)</li><li>Security: private file proxy sends safer headers and downloads unknown types</li><li>Security: landing-page upload now CSRF-protected</li><li>Fix: attachment gallery no longer disappears after editing actions</li><li>Fix: shared drop folders reuse the same notebook instead of duplicating</li><li>Fix: permanent delete and empty-trash now clean up attachment files</li><li>Fix: dictation no longer errors when a note closes mid-recording</li><li>Accessibility and mobile polish across the app, admin, and landing page</li></ul>"
   }
 }
+
 
 
 

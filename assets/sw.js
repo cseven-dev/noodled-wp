@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noodled-v6';
+const CACHE_NAME = 'noodled-v7';
 // Filenames the fetch handler stale-while-revalidates (both source + minified
 // builds, so it matches whichever the page actually loads).
 const STATIC_ASSETS = [
@@ -62,4 +62,40 @@ self.addEventListener('fetch', event => {
       )
     );
   }
+});
+
+// ── Reminders / notifications ──
+// Tapping a reminder focuses an open noodled tab (and tells it which note to
+// open) or opens a fresh one deep-linked to the note.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const noteId = event.notification.data && event.notification.data.noteId;
+  event.waitUntil((async () => {
+    const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) {
+      if ('focus' in c) {
+        await c.focus();
+        if (noteId) c.postMessage({ type: 'noodled-open-note', noteId });
+        return;
+      }
+    }
+    if (clients.openWindow) {
+      await clients.openWindow(noteId ? ('/?noodled_note=' + noteId) : '/');
+    }
+  })());
+});
+
+// Server-initiated web push (future: needs VAPID keys + a wp-cron sender). The
+// client-side scheduler already fires due reminders while the app is open; this
+// handler lets a real push service deliver them when it is closed.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'noodled', {
+      body: data.body || '',
+      tag: data.tag || 'noodled-reminder',
+      data: { noteId: data.noteId || 0 },
+    })
+  );
 });

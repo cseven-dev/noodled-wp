@@ -85,6 +85,11 @@ const api = {
   note_shares(noteId)                    { return this._fetch('/notes/' + noteId + '/shares'); },
   note_share(noteId, email, canWrite)    { return this._fetch('/notes/' + noteId + '/shares', { method: 'POST', body: JSON.stringify({ email, access: canWrite ? 'write' : 'read' }) }); },
   note_unshare(noteId, email)            { return this._fetch('/notes/' + noteId + '/unshare', { method: 'POST', body: JSON.stringify({ email }) }); },
+  // Reminders (note-attached, per-user). `at` is epoch milliseconds.
+  get_reminders()                        { return this._fetch('/reminders'); },
+  create_reminder(noteId, at, label)     { return this._fetch('/reminders', { method: 'POST', body: JSON.stringify({ note_id: noteId, at, label }) }); },
+  delete_reminder(id)                    { return this._fetch('/reminders/' + id, { method: 'DELETE' }); },
+  mark_reminder_sent(id)                 { return this._fetch('/reminders/' + id + '/sent', { method: 'POST' }); },
 };
 
 // ── State ──
@@ -143,8 +148,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('splash')?.classList.add('hidden');
   document.addEventListener('keydown', handleGlobalKey);
 
-  // Restore last note
-  restoreLastNote();
+  // Reminders, table editing, and notification-click routing
+  loadReminders();
+  setupTableEditing();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', onSwMessage);
+
+  // Restore last note (or open one a reminder/notification deep-linked to)
+  const _openId = new URLSearchParams(location.search).get('noodled_note');
+  if (_openId) selectNote(+_openId); else restoreLastNote();
 
   // Auto-sync every 5 minutes
   startAutoSync(5);
@@ -1203,6 +1214,7 @@ function renderContent() {
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleZenMode()">${esc(__( 'Zen mode', 'noodled' ))}</div>
             <div class="dropdown-sep"></div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showHistory()">${esc(__( 'Version history', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openReminderModal()">${esc(__( 'Remind me…', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="setWordGoal()">${esc(__( 'Word count goal', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="saveAsTemplate()">${esc(__( 'Save as template', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showReadingPrefs()">${esc(__( 'Reading preferences', 'noodled' ))}</div>
@@ -1746,7 +1758,19 @@ function htmlToMarkdown(el) {
     }
     if (tag === 'P') { lines.push(inlineHtmlToMd(node)); return; }
     if (tag === 'IMG') { lines.push(`![${node.getAttribute('alt') || ''}](${node.getAttribute('src') || ''})`); return; }
+    if (tag === 'TABLE') { tableToMd(node); return; }
     for (const child of node.childNodes) walk(child);
+  }
+  // Serialize a rendered <table> back to a GFM markdown table. Without this,
+  // editing any note that contains a table silently destroyed it on save.
+  function tableToMd(table) {
+    const rows = [...table.querySelectorAll('tr')];
+    if (!rows.length) return;
+    const cell = c => inlineHtmlToMd(c).replace(/\n/g, ' ').replace(/\|/g, '\\|').trim();
+    const row = tr => '| ' + [...tr.children].map(cell).join(' | ') + ' |';
+    lines.push(row(rows[0]));
+    lines.push('| ' + Array(rows[0].children.length || 1).fill('---').join(' | ') + ' |');
+    for (let r = 1; r < rows.length; r++) lines.push(row(rows[r]));
   }
   function inlineHtmlToMd(node) {
     let result = '';
@@ -2662,8 +2686,8 @@ function showHistory() {
     <div class="modal" style="max-width:500px">
       <h3>${esc(__( 'Note History', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
-        ${history.map((h, i) => `<div class="history-item" role="button" tabindex="0" onclick="restoreHistory(${i})" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
-          <div style="font-size:12px;color:var(--text-muted)">${relativeTime(h.time)} — ${h.title}</div>
+        ${history.map((h, i) => `<div class="history-item" role="button" tabindex="0" onclick="showHistoryDiff(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHistoryDiff(${i});}" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--text-muted)">${relativeTime(h.time)} — ${esc(h.title || '')} <span style="float:right;color:var(--accent)">${esc(__( 'View changes', 'noodled' ))} &rsaquo;</span></div>
           <div style="font-size:11px;color:var(--text);margin-top:4px">${esc((h.body || '').substring(0, 100))}...</div>
         </div>`).join('')}
       </div>
@@ -2684,6 +2708,205 @@ function restoreHistory(index) {
   renderContent();
   doSave();
   showToast(__( 'Restored from history', 'noodled' ));
+}
+
+// ── Line-level diff (LCS) between a historical version and the current note ──
+function lineDiff(oldStr, newStr) {
+  const a = (oldStr || '').split('\n'), b = (newStr || '').split('\n');
+  const n = a.length, m = b.length;
+  // Guard the O(n*m) table for very large notes.
+  if (n > 600 || m > 600) {
+    const out = [];
+    a.forEach(l => { if (!b.includes(l)) out.push(['del', l]); });
+    b.forEach(l => out.push([a.includes(l) ? 'ctx' : 'add', l]));
+    return out;
+  }
+  const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const rows = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { rows.push(['ctx', a[i]]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { rows.push(['del', a[i]]); i++; }
+    else { rows.push(['add', b[j]]); j++; }
+  }
+  while (i < n) rows.push(['del', a[i++]]);
+  while (j < m) rows.push(['add', b[j++]]);
+  return rows;
+}
+
+function showHistoryDiff(index) {
+  if (!activeNote) return;
+  const h = (activeNote._history || [])[index];
+  if (!h) return;
+  const rows = lineDiff(h.body, activeNote.body);
+  const adds = rows.filter(r => r[0] === 'add').length;
+  const dels = rows.filter(r => r[0] === 'del').length;
+  const sym = t => t === 'add' ? '+' : t === 'del' ? '−' : ' ';
+  const diffHtml = rows.length
+    ? rows.map(([t, txt]) => `<div class="diff-line diff-${t}"><span class="diff-sym" aria-hidden="true">${sym(t)}</span>${esc(txt) || '&nbsp;'}</div>`).join('')
+    : `<div class="diff-line diff-ctx">${esc(__( 'No differences.', 'noodled' ))}</div>`;
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal" style="max-width:560px">
+      <h3>${esc(__( 'Changes since this version', 'noodled' ))}</h3>
+      <div style="font-size:12px;color:var(--text-muted);margin:-4px 0 10px">${relativeTime(h.time)} &middot; <span style="color:var(--green,#34d399)">+${adds}</span> / <span style="color:var(--red,#f87171)">&minus;${dels}</span></div>
+      <div class="diff-view">${diffHtml}</div>
+      <div class="modal-buttons" style="margin-top:12px">
+        <button class="btn btn-sm" onclick="showHistory()">${esc(__( 'Back', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" onclick="restoreHistory(${index})">${esc(__( 'Restore this version', 'noodled' ))}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Lightweight table editor (operates on the rendered contenteditable table) ──
+let _tblCell = null;
+function setupTableEditing() {
+  if (window._tblBound) return; window._tblBound = true;
+  document.addEventListener('click', e => {
+    const cell = e.target.closest('#noteBody td, #noteBody th');
+    if (cell) { _tblCell = cell; showTableTools(cell); }
+    else if (!e.target.closest('#tableTools')) hideTableTools();
+  });
+  window.addEventListener('scroll', hideTableTools, true);
+}
+function showTableTools(cell) {
+  const table = cell.closest('table'); if (!table) return;
+  let bar = document.getElementById('tableTools');
+  if (!bar) {
+    bar = document.createElement('div'); bar.id = 'tableTools'; bar.className = 'table-tools';
+    bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', __( 'Table editing', 'noodled' ));
+    bar.innerHTML =
+      `<button type="button" data-act="row+" aria-label="${escAttr(__( 'Add row', 'noodled' ))}">+ ${esc(__( 'Row', 'noodled' ))}</button>` +
+      `<button type="button" data-act="col+" aria-label="${escAttr(__( 'Add column', 'noodled' ))}">+ ${esc(__( 'Col', 'noodled' ))}</button>` +
+      `<button type="button" data-act="row-" aria-label="${escAttr(__( 'Delete row', 'noodled' ))}">&minus; ${esc(__( 'Row', 'noodled' ))}</button>` +
+      `<button type="button" data-act="col-" aria-label="${escAttr(__( 'Delete column', 'noodled' ))}">&minus; ${esc(__( 'Col', 'noodled' ))}</button>`;
+    bar.addEventListener('mousedown', e => e.preventDefault()); // keep the caret in the cell
+    bar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) tableAct(b.dataset.act); });
+    document.body.appendChild(bar);
+  }
+  const r = table.getBoundingClientRect();
+  bar.style.display = 'flex';
+  bar.style.left = Math.round(r.left + window.scrollX) + 'px';
+  bar.style.top = Math.round(r.top + window.scrollY - 40) + 'px';
+}
+function hideTableTools() { const b = document.getElementById('tableTools'); if (b) b.style.display = 'none'; }
+function tableAct(act) {
+  const ed = document.getElementById('noteBody');
+  if (!_tblCell || !ed || !ed.contains(_tblCell)) { hideTableTools(); return; }
+  const cell = _tblCell, tr = cell.parentElement, table = cell.closest('table');
+  const colIdx = [...tr.children].indexOf(cell);
+  const allRows = [...table.querySelectorAll('tr')];
+  if (act === 'row+') {
+    const nr = document.createElement('tr');
+    for (let i = 0; i < tr.children.length; i++) { const td = document.createElement('td'); td.innerHTML = '<br>'; nr.appendChild(td); }
+    let tbody = table.tBodies[0]; if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
+    if (tr.parentElement === tbody) tr.after(nr); else tbody.insertBefore(nr, tbody.firstChild);
+  } else if (act === 'col+') {
+    allRows.forEach(row => {
+      const head = row.parentElement.tagName === 'THEAD';
+      const c = document.createElement(head ? 'th' : 'td');
+      if (head) { c.setAttribute('scope', 'col'); c.textContent = __( 'Column', 'noodled' ); } else c.innerHTML = '<br>';
+      const ref = row.children[colIdx];
+      if (ref) ref.after(c); else row.appendChild(c);
+    });
+  } else if (act === 'row-') {
+    if (tr.parentElement.tagName === 'THEAD') { showToast(__( 'Keep the header row', 'noodled' )); return; }
+    if (allRows.length <= 2) { showToast(__( 'A table needs at least one body row', 'noodled' )); return; }
+    tr.remove();
+  } else if (act === 'col-') {
+    if (tr.children.length <= 1) { showToast(__( 'A table needs at least one column', 'noodled' )); return; }
+    allRows.forEach(row => { if (row.children[colIdx]) row.children[colIdx].remove(); });
+  }
+  hideTableTools();
+  schedSave();
+}
+
+// ── Reminders + notifications ──────────────────────────────
+let reminders = [];
+let _reminderFired = {};
+let _reminderTimer = null;
+async function loadReminders() {
+  try { reminders = await api.get_reminders(); } catch (e) { reminders = []; }
+  if (!Array.isArray(reminders)) reminders = [];
+  if (!_reminderTimer) _reminderTimer = setInterval(checkReminders, 30000);
+  checkReminders();
+}
+function checkReminders() {
+  const now = Date.now();
+  reminders.forEach(r => {
+    if (r.sent || _reminderFired[r.id]) return;
+    if (r.at && r.at <= now) { _reminderFired[r.id] = true; fireReminder(r); }
+  });
+}
+function fireReminder(r) {
+  const title = r.title || __( 'Note reminder', 'noodled' );
+  const opts = { body: r.label || __( 'You asked to be reminded about this note.', 'noodled' ), tag: 'noodled-reminder-' + r.id, data: { noteId: r.note_id } };
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opts)).catch(() => { try { new Notification(title, opts); } catch (e) {} });
+      } else { new Notification(title, opts); }
+    }
+  } catch (e) {}
+  showToast('⏰ ' + title);
+  api.mark_reminder_sent(r.id).catch(() => {});
+  r.sent = 1;
+}
+function openReminderModal() {
+  if (!activeNote) return;
+  const d = new Date(Date.now() + 3600000); d.setSeconds(0, 0);
+  const pad = n => String(n).padStart(2, '0');
+  const localVal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const inStyle = 'width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;box-sizing:border-box';
+  const mine = reminders.filter(r => r.note_id === activeNote.id && !r.sent);
+  const list = mine.length ? mine.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">${esc(new Date(r.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }))}${r.label ? ' — ' + esc(r.label) : ''}</span>
+      <button class="btn btn-sm" onclick="removeReminder(${r.id})" aria-label="${escAttr(__( 'Delete reminder', 'noodled' ))}">&times;</button>
+    </div>`).join('') : `<div style="font-size:12px;color:var(--text-muted)">${esc(__( 'No reminders on this note yet.', 'noodled' ))}</div>`;
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal" style="max-width:420px">
+      <h3>${esc(__( 'Remind me', 'noodled' ))}</h3>
+      <label for="remWhen" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'When', 'noodled' ))}</label>
+      <input type="datetime-local" id="remWhen" value="${esc(localVal)}" style="${inStyle};margin-bottom:10px">
+      <label for="remLabel" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'Note to self (optional)', 'noodled' ))}</label>
+      <input type="text" id="remLabel" placeholder="${escAttr(__( 'e.g. Follow up on this', 'noodled' ))}" style="${inStyle};margin-bottom:12px">
+      <div style="margin-bottom:6px">${list}</div>
+      <div class="modal-buttons">
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" onclick="saveReminder()">${esc(__( 'Set reminder', 'noodled' ))}</button>
+      </div>
+    </div></div>`;
+}
+async function saveReminder() {
+  if (!activeNote) return;
+  const whenEl = document.getElementById('remWhen');
+  const label = (document.getElementById('remLabel')?.value || '').trim();
+  if (!whenEl || !whenEl.value) { showToast(__( 'Pick a time', 'noodled' )); return; }
+  const at = new Date(whenEl.value).getTime();
+  if (!at || at < Date.now() - 60000) { showToast(__( 'Pick a time in the future', 'noodled' )); return; }
+  if ('Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
+  const r = await api.create_reminder(activeNote.id, at, label);
+  if (r && r.id) {
+    reminders.push({ id: r.id, note_id: activeNote.id, at, label, sent: 0, title: activeNote.title });
+    document.getElementById('modalContainer').innerHTML = '';
+    showToast(__( 'Reminder set', 'noodled' ));
+    if ('Notification' in window && Notification.permission !== 'granted') showToast(__( 'Allow notifications to be alerted', 'noodled' ));
+  } else { showToast((r && r.error) || __( 'Could not set reminder', 'noodled' )); }
+}
+async function removeReminder(id) {
+  await api.delete_reminder(id).catch(() => {});
+  reminders = reminders.filter(r => r.id !== id);
+  openReminderModal();
+}
+function onSwMessage(e) {
+  if (e.data && e.data.type === 'noodled-open-note' && e.data.noteId) openNoteFromNotification(+e.data.noteId);
+}
+async function openNoteFromNotification(id) {
+  try { if (!notes.find(n => n.id === id)) await loadNotes(); selectNote(id); } catch (e) {}
 }
 
 // ── Bulk select mode ──
@@ -4000,8 +4223,9 @@ function showConflict(server, mine) {
   el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:460px">
     <h3>${esc(__( 'This note changed elsewhere', 'noodled' ))}</h3>
     <p style="font-size:13px;color:var(--text-muted);line-height:1.5">${sprintf( /* translators: %s is the note title */ __( 'Another device or tab saved "%s" after you opened it. Which version do you want to keep?', 'noodled' ), '<b>' + esc(server.title || '') + '</b>' )}</p>
-    <div class="modal-buttons">
+    <div class="modal-buttons" style="flex-wrap:wrap">
       <button class="btn btn-sm" id="cfTheirs">${esc(__( 'Load theirs', 'noodled' ))}</button>
+      <button class="btn btn-sm" id="cfBoth">${esc(__( 'Keep both', 'noodled' ))}</button>
       <button class="btn btn-sm btn-accent" id="cfMine">${esc(__( 'Keep mine', 'noodled' ))}</button>
     </div></div></div>`;
   el.querySelector('#cfMine').onclick = async () => {
@@ -4013,6 +4237,15 @@ function showConflict(server, mine) {
     el.innerHTML = ''; _conflictOpen = false;
     try { activeNote = await api.get_note(null, server.id); } catch (e) {}
     await loadNotes(); renderContent(); showToast(__( 'Loaded the other version', 'noodled' ));
+  };
+  // Keep both: save my version as a new note so nothing is lost, then load theirs.
+  el.querySelector('#cfBoth').onclick = async () => {
+    el.innerHTML = ''; _conflictOpen = false;
+    /* translators: appended to a note title when both conflicting versions are kept */
+    const copyTitle = (mine.title || __( 'Untitled', 'noodled' )) + ' ' + __( '(conflict copy)', 'noodled' );
+    try { await api.create_note(activeNote.notebook, copyTitle, mine.body); } catch (e) {}
+    try { activeNote = await api.get_note(null, server.id); } catch (e) {}
+    await loadNotes(); renderContent(); showToast(__( 'Saved both versions', 'noodled' ));
   };
 }
 
@@ -4542,14 +4775,16 @@ function openSlashMenu(x, y) {
   if (menu) menu.remove();
   menu = document.createElement('div');
   menu.id = 'slashMenu'; menu.className = 'slash-menu';
-  menu.innerHTML = opts.map((o, i) => `<div class="slash-i ${i === 0 ? 'on' : ''}" data-i="${i}"><span class="slash-ic">${o.icon}</span>${o.label}</div>`).join('');
+  menu.setAttribute('role', 'listbox');
+  menu.setAttribute('aria-label', __( 'Slash commands', 'noodled' ));
+  menu.innerHTML = opts.map((o, i) => `<div class="slash-i ${i === 0 ? 'on' : ''}" data-i="${i}" id="slash-opt-${i}" role="option" aria-selected="${i === 0 ? 'true' : 'false'}"><span class="slash-ic" aria-hidden="true">${o.icon}</span>${o.label}</div>`).join('');
   document.body.appendChild(menu);
   const vw = window.innerWidth, vh = window.innerHeight;
   menu.style.left = Math.min(x, vw - menu.offsetWidth - 12) + 'px';
   menu.style.top = Math.min(y + 6, vh - menu.offsetHeight - 12) + 'px';
   let hi = 0;
   const rows = [...menu.querySelectorAll('.slash-i')];
-  const paint = () => rows.forEach((r, i) => r.classList.toggle('on', i === hi));
+  const paint = () => rows.forEach((r, i) => { const on = i === hi; r.classList.toggle('on', on); r.setAttribute('aria-selected', on ? 'true' : 'false'); });
   const close = () => { menu.remove(); document.removeEventListener('keydown', onKey, true); };
   const pick = i => { close(); opts[i] && opts[i].run(); };
   const onKey = e => {

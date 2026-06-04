@@ -96,6 +96,19 @@ CREATE TABLE {$wpdb->prefix}noodled_attachments (
   PRIMARY KEY (id),
   KEY idx_note (note_id)
 ) $charset;
+
+CREATE TABLE {$wpdb->prefix}noodled_reminders (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  note_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  remind_at datetime NOT NULL,
+  label varchar(255) NOT NULL DEFAULT '',
+  sent tinyint(1) NOT NULL DEFAULT 0,
+  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_user_due (user_id, sent, remind_at),
+  KEY idx_note (note_id)
+) $charset;
 ";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
