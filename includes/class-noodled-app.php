@@ -369,6 +369,15 @@ HTML;
 			$html
 		);
 
+		// The demo note-editor mockup uses a second <h1> (.ed-title) for its fake
+		// note title. Two <h1>s hurt SEO/structure, so demote it to a styled
+		// heading-role div (keeps the look, fixes the duplicate top-level heading).
+		$html = preg_replace(
+			'#<h1(\s+class="ed-title"[^>]*)>(.*?)</h1>#s',
+			'<div$1 role="heading" aria-level="2">$2</div>',
+			$html
+		);
+
 		$html = str_ireplace( '</body>', $login_inject . $request_inject . "\n</body>", $html );
 		echo $html;
 	}

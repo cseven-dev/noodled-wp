@@ -146,6 +146,11 @@ class Noodled_Notes {
 	public static function update( int $id, array $data ): array {
 		global $wpdb;
 
+		// Snapshot the pre-edit state into version history before overwriting it.
+		if ( isset( $data['title'] ) || isset( $data['body'] ) ) {
+			self::save_revision( $id );
+		}
+
 		$update = [ 'modified_at' => current_time( 'mysql', true ) ];
 		if ( isset( $data['title'] ) ) $update['title'] = sanitize_text_field( $data['title'] );
 		if ( isset( $data['body'] ) )  $update['body']  = $data['body'];
@@ -167,6 +172,54 @@ class Noodled_Notes {
 
 		$wpdb->update( self::table(), $update, [ 'id' => $id ] );
 		return self::get_one( $id ) ?? [ 'error' => __( 'Note not found', 'noodled' ) ];
+	}
+
+	/* ── Version history (durable, server-side) ── */
+
+	// Snapshot the note's CURRENT stored title/body as a revision. Deduped against
+	// the latest revision and pruned to the most recent 15 so history stays bounded.
+	public static function save_revision( int $id ): void {
+		global $wpdb;
+		$cur = $wpdb->get_row( $wpdb->prepare(
+			"SELECT title, body FROM " . self::table() . " WHERE id = %d", $id
+		), ARRAY_A );
+		if ( ! $cur ) return;
+		$rev = $wpdb->prefix . 'noodled_revisions';
+		$last = $wpdb->get_row( $wpdb->prepare(
+			"SELECT title, body FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 1", $id
+		), ARRAY_A );
+		if ( $last && $last['title'] === (string) $cur['title'] && $last['body'] === (string) $cur['body'] ) {
+			return; // no change since the last snapshot
+		}
+		$wpdb->insert( $rev, [
+			'note_id'    => $id,
+			'title'      => $cur['title'],
+			'body'       => $cur['body'],
+			'created_at' => current_time( 'mysql', true ),
+		] );
+		$stale = $wpdb->get_col( $wpdb->prepare(
+			"SELECT id FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 50 OFFSET 15", $id
+		) );
+		if ( $stale ) {
+			$wpdb->query( "DELETE FROM $rev WHERE id IN (" . implode( ',', array_map( 'intval', $stale ) ) . ")" );
+		}
+	}
+
+	public static function get_revisions( int $id ): array {
+		global $wpdb;
+		$rev = $wpdb->prefix . 'noodled_revisions';
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, title, body, created_at FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 15", $id
+		), ARRAY_A );
+		return array_map( function ( $r ) {
+			return [
+				'id'    => (int) $r['id'],
+				'title' => $r['title'],
+				'body'  => (string) $r['body'],
+				// ISO-8601 UTC so the client can render a local relative time.
+				'time'  => $r['created_at'] ? ( str_replace( ' ', 'T', substr( $r['created_at'], 0, 19 ) ) . 'Z' ) : '',
+			];
+		}, $rows ?: [] );
 	}
 
 	public static function soft_delete( int $id ): bool {

@@ -211,7 +211,7 @@ if ( file_exists( $noodled_json ) ) {
 	}
 }
 ?>
-<script src="<?php echo esc_url( $noodled_asset( 'assets/js/noodled.js' ) ); ?>"></script>
+<script defer src="<?php echo esc_url( $noodled_asset( 'assets/js/noodled.js' ) ); ?>"></script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('<?php echo esc_url( NOODLED_URL . 'assets/sw.js' ); ?>');

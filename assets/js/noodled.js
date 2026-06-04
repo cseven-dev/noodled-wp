@@ -85,6 +85,7 @@ const api = {
   note_shares(noteId)                    { return this._fetch('/notes/' + noteId + '/shares'); },
   note_share(noteId, email, canWrite)    { return this._fetch('/notes/' + noteId + '/shares', { method: 'POST', body: JSON.stringify({ email, access: canWrite ? 'write' : 'read' }) }); },
   note_unshare(noteId, email)            { return this._fetch('/notes/' + noteId + '/unshare', { method: 'POST', body: JSON.stringify({ email }) }); },
+  get_revisions(noteId)                  { return this._fetch('/notes/' + noteId + '/revisions'); },
   // Reminders (note-attached, per-user). `at` is epoch milliseconds.
   get_reminders()                        { return this._fetch('/reminders'); },
   create_reminder(noteId, at, label)     { return this._fetch('/reminders', { method: 'POST', body: JSON.stringify({ note_id: noteId, at, label }) }); },
@@ -1692,7 +1693,7 @@ function schedSave() {
 
 async function doSave() {
   if (!activeNote || viewingTrash || _conflictOpen) return;
-  saveHistory(activeNote);
+  // Version history is snapshotted server-side on each content-changing save.
   const title = document.getElementById('titleInput')?.value || activeNote.title;
   let body;
   if (showRawMarkdown) {
@@ -2668,19 +2669,14 @@ document.addEventListener('paste', e => {
   }
 });
 
-// ── Note history (stored in meta_json) ──
-function saveHistory(note) {
-  if (!note || !note.body) return;
-  const history = note._history || [];
-  history.unshift({ body: note.body, title: note.title, time: new Date().toISOString() });
-  if (history.length > 5) history.length = 5;
-  note._history = history;
-}
-
-function showHistory() {
+// ── Note version history (durable, server-side revisions) ──
+async function showHistory() {
   if (!activeNote) return;
-  const history = activeNote._history || [];
-  if (!history.length) { showToast(__( 'No history yet', 'noodled' )); return; }
+  let history = [];
+  try { history = await api.get_revisions(activeNote.id); } catch (e) {}
+  if (!Array.isArray(history)) history = [];
+  activeNote._history = history;
+  if (!history.length) { showToast(__( 'No earlier versions yet', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal" style="max-width:500px">
@@ -2770,6 +2766,21 @@ function setupTableEditing() {
     if (cell) { _tblCell = cell; showTableTools(cell); }
     else if (!e.target.closest('#tableTools')) hideTableTools();
   });
+  // Keyboard path (the floating toolbar is mouse-only): Alt+Shift+Arrows operate
+  // on the table cell holding the caret, so keyboard users can edit tables too.
+  document.addEventListener('keydown', e => {
+    if (!e.altKey || !e.shiftKey) return;
+    const act = { ArrowDown: 'row+', ArrowRight: 'col+', ArrowUp: 'row-', ArrowLeft: 'col-' }[e.key];
+    if (!act) return;
+    const sel = window.getSelection();
+    const anchor = sel && sel.anchorNode;
+    const node = anchor ? (anchor.nodeType === 1 ? anchor : anchor.parentElement) : null;
+    const cell = node && node.closest ? node.closest('#noteBody td, #noteBody th') : null;
+    if (!cell) return;
+    e.preventDefault();
+    _tblCell = cell;
+    tableAct(act);
+  });
   window.addEventListener('scroll', hideTableTools, true);
 }
 function showTableTools(cell) {
@@ -2779,10 +2790,10 @@ function showTableTools(cell) {
     bar = document.createElement('div'); bar.id = 'tableTools'; bar.className = 'table-tools';
     bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', __( 'Table editing', 'noodled' ));
     bar.innerHTML =
-      `<button type="button" data-act="row+" aria-label="${escAttr(__( 'Add row', 'noodled' ))}">+ ${esc(__( 'Row', 'noodled' ))}</button>` +
-      `<button type="button" data-act="col+" aria-label="${escAttr(__( 'Add column', 'noodled' ))}">+ ${esc(__( 'Col', 'noodled' ))}</button>` +
-      `<button type="button" data-act="row-" aria-label="${escAttr(__( 'Delete row', 'noodled' ))}">&minus; ${esc(__( 'Row', 'noodled' ))}</button>` +
-      `<button type="button" data-act="col-" aria-label="${escAttr(__( 'Delete column', 'noodled' ))}">&minus; ${esc(__( 'Col', 'noodled' ))}</button>`;
+      `<button type="button" data-act="row+" title="${escAttr(__( 'Add row (Alt+Shift+Down)', 'noodled' ))}" aria-label="${escAttr(__( 'Add row', 'noodled' ))}">+ ${esc(__( 'Row', 'noodled' ))}</button>` +
+      `<button type="button" data-act="col+" title="${escAttr(__( 'Add column (Alt+Shift+Right)', 'noodled' ))}" aria-label="${escAttr(__( 'Add column', 'noodled' ))}">+ ${esc(__( 'Col', 'noodled' ))}</button>` +
+      `<button type="button" data-act="row-" title="${escAttr(__( 'Delete row (Alt+Shift+Up)', 'noodled' ))}" aria-label="${escAttr(__( 'Delete row', 'noodled' ))}">&minus; ${esc(__( 'Row', 'noodled' ))}</button>` +
+      `<button type="button" data-act="col-" title="${escAttr(__( 'Delete column (Alt+Shift+Left)', 'noodled' ))}" aria-label="${escAttr(__( 'Delete column', 'noodled' ))}">&minus; ${esc(__( 'Col', 'noodled' ))}</button>`;
     bar.addEventListener('mousedown', e => e.preventDefault()); // keep the caret in the cell
     bar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) tableAct(b.dataset.act); });
     document.body.appendChild(bar);

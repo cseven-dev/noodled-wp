@@ -67,6 +67,9 @@ class Noodled_REST {
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/pin', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'pin_note' ], ] + $auth,
 		] );
+		register_rest_route( $ns, '/notes/(?P<id>\d+)/revisions', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'note_revisions' ], ] + $auth,
+		] );
 		// Reminders (note-attached, per-user)
 		register_rest_route( $ns, '/reminders', [
 			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'get_reminders' ], ] + $auth,
@@ -670,6 +673,14 @@ class Noodled_REST {
 		return new \WP_REST_Response( $result );
 	}
 
+	public static function note_revisions( \WP_REST_Request $req ): \WP_REST_Response {
+		$id = (int) $req['id'];
+		if ( ! self::verify_note_access( $id ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
+		}
+		return new \WP_REST_Response( Noodled_Notes::get_revisions( $id ) );
+	}
+
 	/* ── Reminders (per-user, note-attached) ── */
 
 	public static function get_reminders( \WP_REST_Request $req ): \WP_REST_Response {
@@ -908,16 +919,21 @@ class Noodled_REST {
 	// ── Sync ──
 
 	public static function sync_status(): \WP_REST_Response {
-		$configured = Noodled_GitHub::is_configured();
-		$cfg = Noodled_Settings::get();
-		return new \WP_REST_Response( [
-			'initialized' => $configured,
+		// This route is readable by any authenticated member, so expose only the
+		// non-sensitive state to non-admins. The GitHub owner/repo/branch and
+		// token-present flag are admin-only config and must not leak.
+		$out = [
+			'initialized' => Noodled_GitHub::is_configured(),
 			'time'        => get_option( 'noodled_last_sync' ),
-			'owner'       => $cfg['github_owner'] ?? '(empty)',
-			'repo'        => $cfg['github_repo'] ?? '(empty)',
-			'branch'      => $cfg['github_branch'] ?? '(empty)',
-			'has_token'   => ! empty( $cfg['github_token'] ),
-		] );
+		];
+		if ( current_user_can( 'manage_options' ) ) {
+			$cfg = Noodled_Settings::get();
+			$out['owner']     = $cfg['github_owner'] ?? '(empty)';
+			$out['repo']      = $cfg['github_repo'] ?? '(empty)';
+			$out['branch']    = $cfg['github_branch'] ?? '(empty)';
+			$out['has_token'] = ! empty( $cfg['github_token'] );
+		}
+		return new \WP_REST_Response( $out );
 	}
 
 	public static function sync_push(): \WP_REST_Response {

@@ -9,43 +9,43 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Domain: noodled\n"
 
-#: assets/js/noodled.js:3050
+#: assets/js/noodled.js:3061
 msgid "\n\n### Gratitude\n- \n\n### Today\n\n\n### Reflection\n"
 msgstr ""
 
-#: assets/js/noodled.js:3271
+#: assets/js/noodled.js:3282
 msgid "\n\n### Today\n\n\n### Notes\n\n"
 msgstr ""
 
-#: assets/js/noodled.js:2041
+#: assets/js/noodled.js:2042
 msgid " PIN %s"
 msgstr ""
 
-#: assets/js/noodled.js:439
+#: assets/js/noodled.js:440
 msgid "# Welcome to noodled 🍜\n\nThis is your first note. A few things to try:\n\n- Type `#`, `*`, and `- [ ]` and watch it render live\n- Link notes with `[[double brackets]]`\n- Tap the **+** to add a photo, voice note, or location\n- Open the **menu** (top right) for everything else\n\nDelete this whenever you like. Use your noodle.\n"
 msgstr ""
 
-#: assets/js/noodled.js:3052
+#: assets/js/noodled.js:3063
 msgid "## List\n\n- [ ] \n- [ ] \n- [ ] \n"
 msgstr ""
 
-#: assets/js/noodled.js:3049
+#: assets/js/noodled.js:3060
 msgid "## Meeting Notes\n\n**Date:** \n**Attendees:** \n\n### Agenda\n- \n\n### Action Items\n- [ ] \n\n### Notes\n"
 msgstr ""
 
-#: assets/js/noodled.js:3051
+#: assets/js/noodled.js:3062
 msgid "## Project: \n\n### Goal\n\n\n### Tasks\n- [ ] \n- [ ] \n- [ ] \n\n### Timeline\n\n| Phase | Start | End |\n|-------|-------|-----|\n| Planning | | |\n| Execution | | |\n| Review | | |\n\n### Notes\n"
 msgstr ""
 
-#: assets/js/noodled.js:807
+#: assets/js/noodled.js:808
 msgid "%1$d of %2$d tasks done"
 msgstr ""
 
-#: assets/js/noodled.js:1302
+#: assets/js/noodled.js:1303
 msgid "%1$d words \\u00b7 %2$d chars \\u00b7 %3$d min read"
 msgstr ""
 
-#: assets/js/noodled.js:1289
+#: assets/js/noodled.js:1290
 msgid "%1$d%% of %2$d goal"
 msgstr ""
 
@@ -59,76 +59,76 @@ msgid_plural "%1$s · %2$d notes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/class-noodled-app.php:409
+#: includes/class-noodled-app.php:418
 msgid "%1$s — %2$s"
 msgstr ""
 
-#: assets/js/noodled.js:3623
+#: assets/js/noodled.js:3634
 msgid "%1$s: %2$d note"
 msgid_plural "%1$s: %2$d notes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:802
+#: assets/js/noodled.js:803
 msgid "%d attachment"
 msgid_plural "%d attachments"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:2409
+#: assets/js/noodled.js:2410
 msgid "%d change waiting to sync…"
 msgid_plural "%d changes waiting to sync…"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:1886 assets/js/noodled.js:1924
+#: assets/js/noodled.js:1887 assets/js/noodled.js:1925
 msgid "%d file added"
 msgid_plural "%d files added"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:4050
+#: assets/js/noodled.js:4061
 msgid "%d match"
 msgid_plural "%d matches"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:3125 assets/js/noodled.js:3126
-#: assets/js/noodled.js:3127 assets/js/noodled.js:3128
+#: assets/js/noodled.js:3136 assets/js/noodled.js:3137
+#: assets/js/noodled.js:3138 assets/js/noodled.js:3139
 msgid "%d min"
 msgstr ""
 
-#: assets/js/noodled.js:710
+#: assets/js/noodled.js:711
 msgid "%d note"
 msgid_plural "%d notes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:709
+#: assets/js/noodled.js:710
 msgid "%d result"
 msgid_plural "%d results"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:3185
+#: assets/js/noodled.js:3196
 msgid "%d unlinked note"
 msgid_plural "%d unlinked notes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:2284
+#: assets/js/noodled.js:2285
 msgid "%dd ago"
 msgstr ""
 
-#: assets/js/noodled.js:2281
+#: assets/js/noodled.js:2282
 msgid "%dh ago"
 msgstr ""
 
-#: assets/js/noodled.js:2279
+#: assets/js/noodled.js:2280
 msgid "%dm ago"
 msgstr ""
 
-#: assets/js/noodled.js:2601
+#: assets/js/noodled.js:2602
 msgid "%s (copy)"
 msgstr ""
 
@@ -136,7 +136,7 @@ msgstr ""
 msgid "%s dashboard"
 msgstr ""
 
-#: includes/class-noodled-app.php:399
+#: includes/class-noodled-app.php:408
 msgid "%s is a private note-taking service. This policy explains what we store and how we use it."
 msgstr ""
 
@@ -148,15 +148,15 @@ msgstr ""
 msgid "%s's noodle"
 msgstr ""
 
-#: assets/js/noodled.js:4245
+#: assets/js/noodled.js:4256
 msgid "(conflict copy)"
 msgstr ""
 
-#: assets/js/noodled.js:237
+#: assets/js/noodled.js:238
 msgid "(read only)"
 msgstr ""
 
-#: assets/js/noodled.js:236
+#: assets/js/noodled.js:237
 msgid "(shared with you)"
 msgstr ""
 
@@ -168,7 +168,7 @@ msgstr ""
 msgid "+ New Note"
 msgstr ""
 
-#: assets/js/noodled.js:756
+#: assets/js/noodled.js:757
 msgid "+ New note"
 msgstr ""
 
@@ -184,11 +184,11 @@ msgstr ""
 msgid "A %1$s was shared with you on %2$s"
 msgstr ""
 
-#: assets/js/noodled.js:1582
+#: assets/js/noodled.js:1583
 msgid "A Pomodoro nudge for the days your brain wanders."
 msgstr ""
 
-#: assets/js/noodled.js:1565
+#: assets/js/noodled.js:1566
 msgid "A blank page with today's date already on it. No staring required."
 msgstr ""
 
@@ -196,19 +196,19 @@ msgstr ""
 msgid "A login modal is automatically injected."
 msgstr ""
 
-#: assets/js/noodled.js:2817
+#: assets/js/noodled.js:2828
 msgid "A table needs at least one body row"
 msgstr ""
 
-#: assets/js/noodled.js:2820
+#: assets/js/noodled.js:2831
 msgid "A table needs at least one column"
 msgstr ""
 
-#: assets/js/noodled.js:1573
+#: assets/js/noodled.js:1574
 msgid "A thought, before it wanders off. In and out in two seconds."
 msgstr ""
 
-#: assets/js/noodled.js:618
+#: assets/js/noodled.js:619
 msgid "A-Z"
 msgstr ""
 
@@ -221,7 +221,7 @@ msgstr ""
 msgid "Accent Color"
 msgstr ""
 
-#: includes/class-noodled-app.php:391
+#: includes/class-noodled-app.php:400
 msgid "Acceptable use"
 msgstr ""
 
@@ -229,15 +229,15 @@ msgstr ""
 msgid "Access Token"
 msgstr ""
 
-#: includes/class-noodled-rest.php:649 includes/class-noodled-rest.php:743
-#: includes/class-noodled-rest.php:764 includes/class-noodled-rest.php:773
-#: includes/class-noodled-rest.php:798 includes/class-noodled-rest.php:805
-#: includes/class-noodled-rest.php:850 includes/class-noodled-rest.php:862
-#: includes/class-noodled-rest.php:872 includes/class-noodled-rest.php:882
+#: includes/class-noodled-rest.php:652 includes/class-noodled-rest.php:754
+#: includes/class-noodled-rest.php:775 includes/class-noodled-rest.php:784
+#: includes/class-noodled-rest.php:809 includes/class-noodled-rest.php:816
+#: includes/class-noodled-rest.php:861 includes/class-noodled-rest.php:873
+#: includes/class-noodled-rest.php:883 includes/class-noodled-rest.php:893
 msgid "Access denied"
 msgstr ""
 
-#: assets/js/noodled.js:1626
+#: assets/js/noodled.js:1627
 msgid "Account"
 msgstr ""
 
@@ -258,19 +258,23 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: assets/js/noodled.js:3638
+#: assets/js/noodled.js:3649
 msgid "Activity (14 days)"
 msgstr ""
 
-#: assets/js/noodled.js:918 templates/app.php:152
+#: assets/js/noodled.js:919 templates/app.php:152
 msgid "Add"
 msgstr ""
 
-#: assets/js/noodled.js:2783
+#: assets/js/noodled.js:2794
 msgid "Add column"
 msgstr ""
 
-#: assets/js/noodled.js:1199 assets/js/noodled.js:4164
+#: assets/js/noodled.js:2794
+msgid "Add column (Alt+Shift+Right)"
+msgstr ""
+
+#: assets/js/noodled.js:1200 assets/js/noodled.js:4175
 msgid "Add files"
 msgstr ""
 
@@ -278,8 +282,12 @@ msgstr ""
 msgid "Add files to this note (or a new one)"
 msgstr ""
 
-#: assets/js/noodled.js:2782
+#: assets/js/noodled.js:2793
 msgid "Add row"
+msgstr ""
+
+#: assets/js/noodled.js:2793
+msgid "Add row (Alt+Shift+Down)"
 msgstr ""
 
 #: includes/class-noodled-settings.php:698
@@ -291,7 +299,7 @@ msgstr ""
 msgid "Admin"
 msgstr ""
 
-#: assets/js/noodled.js:3662 assets/js/noodled.js:541
+#: assets/js/noodled.js:3673 assets/js/noodled.js:542
 msgid "All"
 msgstr ""
 
@@ -303,7 +311,7 @@ msgstr ""
 msgid "All notes"
 msgstr ""
 
-#: assets/js/noodled.js:2897
+#: assets/js/noodled.js:2908
 msgid "Allow notifications to be alerted"
 msgstr ""
 
@@ -328,7 +336,7 @@ msgstr ""
 msgid "Also use as site homepage"
 msgstr ""
 
-#: assets/js/noodled.js:4225
+#: assets/js/noodled.js:4236
 msgid "Another device or tab saved \"%s\" after you opened it. Which version do you want to keep?"
 msgstr ""
 
@@ -342,15 +350,15 @@ msgstr ""
 msgid "App URL Path"
 msgstr ""
 
-#: assets/js/noodled.js:1619
+#: assets/js/noodled.js:1620
 msgid "Appearance"
 msgstr ""
 
-#: assets/js/noodled.js:3554
+#: assets/js/noodled.js:3565
 msgid "Apple Maps"
 msgstr ""
 
-#: assets/js/noodled.js:2010 includes/class-noodled-settings.php:474
+#: assets/js/noodled.js:2011 includes/class-noodled-settings.php:474
 msgid "Approve"
 msgstr ""
 
@@ -362,11 +370,11 @@ msgstr ""
 msgid "At a glance"
 msgstr ""
 
-#: assets/js/noodled.js:1852
+#: assets/js/noodled.js:1853
 msgid "Attached: %s"
 msgstr ""
 
-#: assets/js/noodled.js:3866
+#: assets/js/noodled.js:3877
 msgid "Attachment image"
 msgstr ""
 
@@ -374,7 +382,7 @@ msgstr ""
 msgid "Attachments"
 msgstr ""
 
-#: assets/js/noodled.js:1600
+#: assets/js/noodled.js:1601
 msgid "Auto"
 msgstr ""
 
@@ -382,15 +390,15 @@ msgstr ""
 msgid "Auto-empty Trash"
 msgstr ""
 
-#: includes/class-noodled-app.php:393
+#: includes/class-noodled-app.php:402
 msgid "Availability"
 msgstr ""
 
-#: assets/js/noodled.js:2757 templates/app.php:61
+#: assets/js/noodled.js:2753 templates/app.php:61
 msgid "Back"
 msgstr ""
 
-#: includes/class-noodled-app.php:412
+#: includes/class-noodled-app.php:421
 msgid "Back to %s"
 msgstr ""
 
@@ -398,15 +406,15 @@ msgstr ""
 msgid "Back to notes"
 msgstr ""
 
-#: assets/js/noodled.js:910
+#: assets/js/noodled.js:911
 msgid "Blank note"
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "Blue"
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "Bold"
 msgstr ""
 
@@ -419,38 +427,38 @@ msgstr ""
 msgid "Branding"
 msgstr ""
 
-#: assets/js/noodled.js:1587
+#: assets/js/noodled.js:1588
 msgid "Bring the old shoebox over. We'll unpack the .enex."
 msgstr ""
 
-#: assets/js/noodled.js:1576
+#: assets/js/noodled.js:1577
 msgid "Browse tags"
 msgstr ""
 
-#: assets/js/noodled.js:1194 assets/js/noodled.js:4768
+#: assets/js/noodled.js:1195 assets/js/noodled.js:4779
 msgid "Bullet list"
 msgstr ""
 
-#: includes/class-noodled-app.php:388
+#: includes/class-noodled-app.php:397
 msgid "By using %s you agree to these terms. Please read them carefully."
 msgstr ""
 
-#: assets/js/noodled.js:292 assets/js/noodled.js:355
+#: assets/js/noodled.js:293 assets/js/noodled.js:356
 msgid "Can edit"
 msgstr ""
 
-#: assets/js/noodled.js:2320 assets/js/noodled.js:2337
-#: assets/js/noodled.js:295 assets/js/noodled.js:3064
-#: assets/js/noodled.js:3131 assets/js/noodled.js:3206
-#: assets/js/noodled.js:3559 templates/app.php:128
+#: assets/js/noodled.js:2321 assets/js/noodled.js:2338
+#: assets/js/noodled.js:296 assets/js/noodled.js:3075
+#: assets/js/noodled.js:3142 assets/js/noodled.js:3217
+#: assets/js/noodled.js:3570 templates/app.php:128
 msgid "Cancel"
 msgstr ""
 
-#: assets/js/noodled.js:1570
+#: assets/js/noodled.js:1571
 msgid "Capture"
 msgstr ""
 
-#: assets/js/noodled.js:3158
+#: assets/js/noodled.js:3169
 msgid "Captured!"
 msgstr ""
 
@@ -458,7 +466,7 @@ msgstr ""
 msgid "Change sort order"
 msgstr ""
 
-#: assets/js/noodled.js:2753
+#: assets/js/noodled.js:2749
 msgid "Changes since this version"
 msgstr ""
 
@@ -470,11 +478,11 @@ msgstr ""
 msgid "Check your email for a login PIN."
 msgstr ""
 
-#: assets/js/noodled.js:1195 assets/js/noodled.js:4767
+#: assets/js/noodled.js:1196 assets/js/noodled.js:4778
 msgid "Checklist"
 msgstr ""
 
-#: assets/js/noodled.js:2210
+#: assets/js/noodled.js:2211
 msgid "Checklist item"
 msgstr ""
 
@@ -482,25 +490,25 @@ msgstr ""
 msgid "Choose Evernote .enex file to import"
 msgstr ""
 
-#: assets/js/noodled.js:742 templates/app.php:110
+#: assets/js/noodled.js:743 templates/app.php:110
 msgid "Clear search"
 msgstr ""
 
-#: assets/js/noodled.js:1991 assets/js/noodled.js:2146
-#: assets/js/noodled.js:2695 assets/js/noodled.js:2879
-#: assets/js/noodled.js:3041 assets/js/noodled.js:3188
-#: assets/js/noodled.js:3244 assets/js/noodled.js:3460
-#: assets/js/noodled.js:361 assets/js/noodled.js:3641
-#: assets/js/noodled.js:3663 assets/js/noodled.js:3846
-#: assets/js/noodled.js:4618 assets/js/noodled.js:607
+#: assets/js/noodled.js:1992 assets/js/noodled.js:2147
+#: assets/js/noodled.js:2691 assets/js/noodled.js:2890
+#: assets/js/noodled.js:3052 assets/js/noodled.js:3199
+#: assets/js/noodled.js:3255 assets/js/noodled.js:3471
+#: assets/js/noodled.js:362 assets/js/noodled.js:3652
+#: assets/js/noodled.js:3674 assets/js/noodled.js:3857
+#: assets/js/noodled.js:4629 assets/js/noodled.js:608
 msgid "Close"
 msgstr ""
 
-#: assets/js/noodled.js:3663
+#: assets/js/noodled.js:3674
 msgid "Close find and replace"
 msgstr ""
 
-#: assets/js/noodled.js:1611
+#: assets/js/noodled.js:1612
 msgid "Close menu"
 msgstr ""
 
@@ -512,19 +520,19 @@ msgstr ""
 msgid "Close quick capture"
 msgstr ""
 
-#: assets/js/noodled.js:2783 assets/js/noodled.js:2785
+#: assets/js/noodled.js:2794 assets/js/noodled.js:2796
 msgid "Col"
 msgstr ""
 
-#: assets/js/noodled.js:1068
+#: assets/js/noodled.js:1069
 msgid "Color"
 msgstr ""
 
-#: assets/js/noodled.js:2811 assets/js/noodled.js:4771
+#: assets/js/noodled.js:2822 assets/js/noodled.js:4782
 msgid "Column"
 msgstr ""
 
-#: assets/js/noodled.js:4178
+#: assets/js/noodled.js:4189
 msgid "Command palette"
 msgstr ""
 
@@ -537,32 +545,32 @@ msgstr ""
 msgid "Continue"
 msgstr ""
 
-#: assets/js/noodled.js:4544
+#: assets/js/noodled.js:4555
 msgid "Copied"
 msgstr ""
 
-#: assets/js/noodled.js:1098 assets/js/noodled.js:2095
+#: assets/js/noodled.js:1099 assets/js/noodled.js:2096
 msgid "Copied to clipboard"
 msgstr ""
 
-#: assets/js/noodled.js:1198 assets/js/noodled.js:4520
-#: assets/js/noodled.js:4544
+#: assets/js/noodled.js:1199 assets/js/noodled.js:4531
+#: assets/js/noodled.js:4555
 msgid "Copy"
 msgstr ""
 
-#: assets/js/noodled.js:2096 assets/js/noodled.js:4545
+#: assets/js/noodled.js:2097 assets/js/noodled.js:4556
 msgid "Copy failed"
 msgstr ""
 
-#: assets/js/noodled.js:1198
+#: assets/js/noodled.js:1199
 msgid "Copy note"
 msgstr ""
 
-#: assets/js/noodled.js:1071
+#: assets/js/noodled.js:1072
 msgid "Copy text"
 msgstr ""
 
-#: includes/class-noodled-rest.php:520
+#: includes/class-noodled-rest.php:523
 msgid "Could not build archive."
 msgstr ""
 
@@ -570,8 +578,8 @@ msgstr ""
 msgid "Could not create Plaud Transcripts notebook"
 msgstr ""
 
-#: assets/js/noodled.js:1032 assets/js/noodled.js:1910
-#: assets/js/noodled.js:971
+#: assets/js/noodled.js:1033 assets/js/noodled.js:1911
+#: assets/js/noodled.js:972
 msgid "Could not create note"
 msgstr ""
 
@@ -579,27 +587,27 @@ msgstr ""
 msgid "Could not create notebook"
 msgstr ""
 
-#: assets/js/noodled.js:999
+#: assets/js/noodled.js:1000
 msgid "Could not get your location"
 msgstr ""
 
-#: assets/js/noodled.js:2001
+#: assets/js/noodled.js:2002
 msgid "Could not load people."
 msgstr ""
 
-#: assets/js/noodled.js:1136
+#: assets/js/noodled.js:1137
 msgid "Could not move note"
 msgstr ""
 
-#: assets/js/noodled.js:2898
+#: assets/js/noodled.js:2909
 msgid "Could not set reminder"
 msgstr ""
 
-#: assets/js/noodled.js:3431
+#: assets/js/noodled.js:3442
 msgid "Could not start dictation"
 msgstr ""
 
-#: assets/js/noodled.js:1091
+#: assets/js/noodled.js:1092
 msgid "Could not update pin"
 msgstr ""
 
@@ -607,15 +615,15 @@ msgstr ""
 msgid "Create account"
 msgstr ""
 
-#: assets/js/noodled.js:3061
+#: assets/js/noodled.js:3072
 msgid "Create note from %s template"
 msgstr ""
 
-#: assets/js/noodled.js:755
+#: assets/js/noodled.js:756
 msgid "Create your first note to get started."
 msgstr ""
 
-#: assets/js/noodled.js:618
+#: assets/js/noodled.js:619
 msgid "Created"
 msgstr ""
 
@@ -627,15 +635,15 @@ msgstr ""
 msgid "Customize the name and look. Change anytime in Noodled > Branding."
 msgstr ""
 
-#: assets/js/noodled.js:1572 assets/js/noodled.js:4166
+#: assets/js/noodled.js:1573 assets/js/noodled.js:4177
 msgid "Daily journal"
 msgstr ""
 
-#: assets/js/noodled.js:1600 includes/class-noodled-settings.php:211
+#: assets/js/noodled.js:1601 includes/class-noodled-settings.php:211
 msgid "Dark"
 msgstr ""
 
-#: assets/js/noodled.js:1585
+#: assets/js/noodled.js:1586
 msgid "Data & sync"
 msgstr ""
 
@@ -643,79 +651,87 @@ msgstr ""
 msgid "Default: %s"
 msgstr ""
 
-#: assets/js/noodled.js:1077 assets/js/noodled.js:1657
-#: assets/js/noodled.js:1929 assets/js/noodled.js:279
-#: assets/js/noodled.js:2933 assets/js/noodled.js:3808
-#: assets/js/noodled.js:3848 assets/js/noodled.js:3919
-#: assets/js/noodled.js:411 assets/js/noodled.js:4616 templates/app.php:127
+#: assets/js/noodled.js:1078 assets/js/noodled.js:1658
+#: assets/js/noodled.js:1930 assets/js/noodled.js:280
+#: assets/js/noodled.js:2944 assets/js/noodled.js:3819
+#: assets/js/noodled.js:3859 assets/js/noodled.js:3930
+#: assets/js/noodled.js:412 assets/js/noodled.js:4627 templates/app.php:127
 msgid "Delete"
 msgstr ""
 
-#: assets/js/noodled.js:1657
+#: assets/js/noodled.js:1658
 msgid "Delete \"%s\"?"
 msgstr ""
 
-#: assets/js/noodled.js:2933
+#: assets/js/noodled.js:2944
 msgid "Delete %d note?"
 msgid_plural "Delete %d notes?"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:3808
+#: assets/js/noodled.js:3819
 msgid "Delete attachment"
 msgstr ""
 
-#: assets/js/noodled.js:2785
+#: assets/js/noodled.js:2796
 msgid "Delete column"
 msgstr ""
 
-#: assets/js/noodled.js:1931 assets/js/noodled.js:3921
-#: assets/js/noodled.js:4321
+#: assets/js/noodled.js:2796
+msgid "Delete column (Alt+Shift+Left)"
+msgstr ""
+
+#: assets/js/noodled.js:1932 assets/js/noodled.js:3932
+#: assets/js/noodled.js:4332
 msgid "Delete failed"
 msgstr ""
 
-#: assets/js/noodled.js:1222
+#: assets/js/noodled.js:1223
 msgid "Delete note"
 msgstr ""
 
-#: assets/js/noodled.js:411
+#: assets/js/noodled.js:412
 msgid "Delete notebook \"%s\" and all its notes?"
 msgstr ""
 
-#: assets/js/noodled.js:1048 assets/js/noodled.js:1164
+#: assets/js/noodled.js:1049 assets/js/noodled.js:1165
 msgid "Delete permanently"
 msgstr ""
 
-#: assets/js/noodled.js:2867
+#: assets/js/noodled.js:2878
 msgid "Delete reminder"
 msgstr ""
 
-#: assets/js/noodled.js:2784
+#: assets/js/noodled.js:2795
 msgid "Delete row"
 msgstr ""
 
-#: assets/js/noodled.js:3061
+#: assets/js/noodled.js:2795
+msgid "Delete row (Alt+Shift+Up)"
+msgstr ""
+
+#: assets/js/noodled.js:3072
 msgid "Delete template"
 msgstr ""
 
-#: assets/js/noodled.js:1929
+#: assets/js/noodled.js:1930
 msgid "Delete this attachment?"
 msgstr ""
 
-#: assets/js/noodled.js:3919
+#: assets/js/noodled.js:3930
 msgid "Delete this image?"
 msgstr ""
 
-#: assets/js/noodled.js:1935 assets/js/noodled.js:2943
-#: assets/js/noodled.js:3925 assets/js/noodled.js:3928
+#: assets/js/noodled.js:1936 assets/js/noodled.js:2954
+#: assets/js/noodled.js:3936 assets/js/noodled.js:3939
 msgid "Deleted"
 msgstr ""
 
-#: assets/js/noodled.js:746
+#: assets/js/noodled.js:747
 msgid "Deleted notes show up here."
 msgstr ""
 
-#: assets/js/noodled.js:2010 includes/class-noodled-settings.php:475
+#: assets/js/noodled.js:2011 includes/class-noodled-settings.php:475
 msgid "Deny"
 msgstr ""
 
@@ -723,35 +739,35 @@ msgstr ""
 msgid "Deny and remove this request?"
 msgstr ""
 
-#: assets/js/noodled.js:3868
+#: assets/js/noodled.js:3879
 msgid "Describe this image (alt text)…"
 msgstr ""
 
-#: assets/js/noodled.js:1200
+#: assets/js/noodled.js:1201
 msgid "Dictate"
 msgstr ""
 
-#: assets/js/noodled.js:912
+#: assets/js/noodled.js:913
 msgid "Dictate to text"
 msgstr ""
 
-#: assets/js/noodled.js:3410
+#: assets/js/noodled.js:3421
 msgid "Dictation error: %s"
 msgstr ""
 
-#: assets/js/noodled.js:3381
+#: assets/js/noodled.js:3392
 msgid "Dictation is not supported in this browser"
 msgstr ""
 
-#: assets/js/noodled.js:3522
+#: assets/js/noodled.js:3533
 msgid "Directions"
 msgstr ""
 
-#: assets/js/noodled.js:4769
+#: assets/js/noodled.js:4780
 msgid "Divider"
 msgstr ""
 
-#: includes/class-noodled-app.php:391
+#: includes/class-noodled-app.php:400
 msgid "Do not use the service to store or share unlawful content, to infringe anyone else's rights, or to disrupt the service for other people."
 msgstr ""
 
@@ -759,19 +775,19 @@ msgstr ""
 msgid "Don't have an account? Create one"
 msgstr ""
 
-#: assets/js/noodled.js:4589
+#: assets/js/noodled.js:4600
 msgid "Done"
 msgstr ""
 
-#: assets/js/noodled.js:3847
+#: assets/js/noodled.js:3858
 msgid "Download"
 msgstr ""
 
-#: assets/js/noodled.js:1209
+#: assets/js/noodled.js:1210
 msgid "Download as Markdown"
 msgstr ""
 
-#: assets/js/noodled.js:1568
+#: assets/js/noodled.js:1569
 msgid "Drop a pin where you stand. Future-you will want to know."
 msgstr ""
 
@@ -785,15 +801,15 @@ msgstr ""
 msgid "Drop folders"
 msgstr ""
 
-#: assets/js/noodled.js:1566
+#: assets/js/noodled.js:1567
 msgid "Drop in a photo, a PDF, or fifty. We'll start the note for you."
 msgstr ""
 
-#: assets/js/noodled.js:1069
+#: assets/js/noodled.js:1070
 msgid "Duplicate"
 msgstr ""
 
-#: assets/js/noodled.js:2606
+#: assets/js/noodled.js:2607
 msgid "Duplicated"
 msgstr ""
 
@@ -801,25 +817,25 @@ msgstr ""
 msgid "Each new member gets their own private %s notebook. Notes are private by default; users share their own notebooks/notes from inside the app. Admins do not have a god-view of members' notes."
 msgstr ""
 
-#: assets/js/noodled.js:686 assets/js/noodled.js:688
-#: assets/js/noodled.js:697
+#: assets/js/noodled.js:687 assets/js/noodled.js:689
+#: assets/js/noodled.js:698
 msgid "Earlier"
 msgstr ""
 
-#: includes/class-noodled-app.php:403
+#: includes/class-noodled-app.php:412
 #: includes/class-noodled-settings.php:466
 #: includes/class-noodled-settings.php:485
 #: includes/class-noodled-settings.php:515
 msgid "Email"
 msgstr ""
 
-#: assets/js/noodled.js:290 assets/js/noodled.js:354
+#: assets/js/noodled.js:291 assets/js/noodled.js:355
 #: includes/class-noodled-app.php:154 templates/login.php:232
 #: templates/login.php:267
 msgid "Email address"
 msgstr ""
 
-#: assets/js/noodled.js:290 assets/js/noodled.js:354
+#: assets/js/noodled.js:291 assets/js/noodled.js:355
 msgid "Email address to share with"
 msgstr ""
 
@@ -831,17 +847,17 @@ msgstr ""
 msgid "Email not found. Ask the admin to invite you."
 msgstr ""
 
-#: assets/js/noodled.js:311 assets/js/noodled.js:385
+#: assets/js/noodled.js:312 assets/js/noodled.js:386
 #: includes/class-noodled-auth.php:511 includes/class-noodled-auth.php:641
 #: includes/class-noodled-settings.php:538
 msgid "Email required"
 msgstr ""
 
-#: assets/js/noodled.js:3504
+#: assets/js/noodled.js:3515
 msgid "Embedded Vimeo video"
 msgstr ""
 
-#: assets/js/noodled.js:3501
+#: assets/js/noodled.js:3512
 msgid "Embedded YouTube video"
 msgstr ""
 
@@ -849,7 +865,7 @@ msgstr ""
 msgid "Enter PIN"
 msgstr ""
 
-#: assets/js/noodled.js:289
+#: assets/js/noodled.js:290
 msgid "Enter their email to grant access"
 msgstr ""
 
@@ -865,15 +881,15 @@ msgstr ""
 msgid "Error:"
 msgstr ""
 
-#: assets/js/noodled.js:1576
+#: assets/js/noodled.js:1577
 msgid "Every #hashtag you've ever scribbled, gathered in one spot."
 msgstr ""
 
-#: assets/js/noodled.js:1208
+#: assets/js/noodled.js:1209
 msgid "Export as HTML"
 msgstr ""
 
-#: assets/js/noodled.js:1588 assets/js/noodled.js:4171
+#: assets/js/noodled.js:1589 assets/js/noodled.js:4182
 msgid "Export backup"
 msgstr ""
 
@@ -881,12 +897,12 @@ msgstr ""
 msgid "Export your notes from Evernote desktop as an %s file, then upload it here. Members can also import their own from inside the app (toolbar → Import)."
 msgstr ""
 
-#: assets/js/noodled.js:2626
+#: assets/js/noodled.js:2627
 msgid "Exported"
 msgstr ""
 
-#: assets/js/noodled.js:2035 assets/js/noodled.js:2036
-#: assets/js/noodled.js:2037
+#: assets/js/noodled.js:2036 assets/js/noodled.js:2037
+#: assets/js/noodled.js:2038
 msgid "Failed"
 msgstr ""
 
@@ -894,7 +910,7 @@ msgstr ""
 msgid "Failed to create note"
 msgstr ""
 
-#: includes/class-noodled-notes.php:224
+#: includes/class-noodled-notes.php:277
 msgid "Failed to restore"
 msgstr ""
 
@@ -906,7 +922,7 @@ msgstr ""
 msgid "Failed:"
 msgstr ""
 
-#: assets/js/noodled.js:322 assets/js/noodled.js:392
+#: assets/js/noodled.js:323 assets/js/noodled.js:393
 msgid "Failed: %s"
 msgstr ""
 
@@ -927,27 +943,27 @@ msgstr ""
 msgid "Files"
 msgstr ""
 
-#: assets/js/noodled.js:2184 assets/js/noodled.js:3038
+#: assets/js/noodled.js:2185 assets/js/noodled.js:3049
 msgid "Filter by tag %s"
 msgstr ""
 
-#: assets/js/noodled.js:1615
+#: assets/js/noodled.js:1616
 msgid "Filter menu"
 msgstr ""
 
-#: assets/js/noodled.js:1615
+#: assets/js/noodled.js:1616
 msgid "Filter…"
 msgstr ""
 
-#: assets/js/noodled.js:1206
+#: assets/js/noodled.js:1207
 msgid "Find & replace"
 msgstr ""
 
-#: assets/js/noodled.js:3659
+#: assets/js/noodled.js:3670
 msgid "Find text"
 msgstr ""
 
-#: assets/js/noodled.js:3659
+#: assets/js/noodled.js:3670
 msgid "Find..."
 msgstr ""
 
@@ -955,19 +971,19 @@ msgstr ""
 msgid "Finish Setup"
 msgstr ""
 
-#: assets/js/noodled.js:3123
+#: assets/js/noodled.js:3134
 msgid "Focus Timer"
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "Focus search"
 msgstr ""
 
-#: assets/js/noodled.js:3098
+#: assets/js/noodled.js:3109
 msgid "Focus session complete!"
 msgstr ""
 
-#: assets/js/noodled.js:1582 assets/js/noodled.js:4168
+#: assets/js/noodled.js:1583 assets/js/noodled.js:4179
 msgid "Focus timer"
 msgstr ""
 
@@ -975,11 +991,11 @@ msgstr ""
 msgid "Folders"
 msgstr ""
 
-#: assets/js/noodled.js:4583 assets/js/noodled.js:4584
+#: assets/js/noodled.js:4594 assets/js/noodled.js:4595
 msgid "Font size"
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "Force save"
 msgstr ""
 
@@ -996,7 +1012,7 @@ msgstr ""
 msgid "Get a noodle"
 msgstr ""
 
-#: assets/js/noodled.js:990
+#: assets/js/noodled.js:991
 msgid "Getting your location…"
 msgstr ""
 
@@ -1004,20 +1020,20 @@ msgstr ""
 msgid "GitHub"
 msgstr ""
 
-#: includes/class-noodled-rest.php:925 includes/class-noodled-rest.php:965
+#: includes/class-noodled-rest.php:941 includes/class-noodled-rest.php:981
 #: includes/class-noodled-sync.php:25 includes/class-noodled-sync.php:94
 msgid "GitHub not configured"
 msgstr ""
 
-#: includes/class-noodled-rest.php:950
+#: includes/class-noodled-rest.php:966
 msgid "GitHub not configured. Owner: %1$s, Token: %2$s"
 msgstr ""
 
-#: assets/js/noodled.js:352
+#: assets/js/noodled.js:353
 msgid "Give another noodled user access to just this note."
 msgstr ""
 
-#: assets/js/noodled.js:3555 includes/class-noodled-settings.php:376
+#: assets/js/noodled.js:3566 includes/class-noodled-settings.php:376
 msgid "Google Maps"
 msgstr ""
 
@@ -1025,7 +1041,7 @@ msgstr ""
 msgid "Google Maps API Key"
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "Green"
 msgstr ""
 
@@ -1033,11 +1049,11 @@ msgstr ""
 msgid "Happy noodling u{2014} delete this note whenever you're ready.\n"
 msgstr ""
 
-#: assets/js/noodled.js:1196 assets/js/noodled.js:4766
+#: assets/js/noodled.js:1197 assets/js/noodled.js:4777
 msgid "Heading"
 msgstr ""
 
-#: assets/js/noodled.js:541 templates/app.php:112
+#: assets/js/noodled.js:542 templates/app.php:112
 msgid "Here"
 msgstr ""
 
@@ -1049,15 +1065,15 @@ msgstr ""
 msgid "Homepage Mode"
 msgstr ""
 
-#: includes/class-noodled-app.php:402
+#: includes/class-noodled-app.php:411
 msgid "How we use it"
 msgstr ""
 
-#: assets/js/noodled.js:3742
+#: assets/js/noodled.js:3753
 msgid "Image URL:"
 msgstr ""
 
-#: assets/js/noodled.js:3868
+#: assets/js/noodled.js:3879
 msgid "Image alt text"
 msgstr ""
 
@@ -1070,19 +1086,19 @@ msgstr ""
 msgid "Import Plaud recordings"
 msgstr ""
 
-#: assets/js/noodled.js:1589 assets/js/noodled.js:4172
+#: assets/js/noodled.js:1590 assets/js/noodled.js:4183
 msgid "Import backup"
 msgstr ""
 
-#: assets/js/noodled.js:1979 assets/js/noodled.js:4475
+#: assets/js/noodled.js:1980 assets/js/noodled.js:4486
 msgid "Import failed"
 msgstr ""
 
-#: assets/js/noodled.js:1966 assets/js/noodled.js:4470
+#: assets/js/noodled.js:1967 assets/js/noodled.js:4481
 msgid "Import failed: %s"
 msgstr ""
 
-#: assets/js/noodled.js:1587
+#: assets/js/noodled.js:1588
 msgid "Import from Evernote"
 msgstr ""
 
@@ -1090,7 +1106,7 @@ msgstr ""
 msgid "Import from GitHub"
 msgstr ""
 
-#: assets/js/noodled.js:1973
+#: assets/js/noodled.js:1974
 msgid "Imported %1$d notes, %2$d skipped"
 msgstr ""
 
@@ -1102,17 +1118,17 @@ msgstr ""
 msgid "Imported %1$s notebooks, %2$s notes"
 msgstr ""
 
-#: assets/js/noodled.js:1976 assets/js/noodled.js:4474
+#: assets/js/noodled.js:1977 assets/js/noodled.js:4485
 msgid "Imported %d note"
 msgid_plural "Imported %d notes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:4465
+#: assets/js/noodled.js:4476
 msgid "Importing backup…"
 msgstr ""
 
-#: assets/js/noodled.js:1960
+#: assets/js/noodled.js:1961
 msgid "Importing from Evernote…"
 msgstr ""
 
@@ -1124,11 +1140,11 @@ msgstr ""
 msgid "In Trash"
 msgstr ""
 
-#: assets/js/noodled.js:4687
+#: assets/js/noodled.js:4698
 msgid "Install"
 msgstr ""
 
-#: assets/js/noodled.js:4686
+#: assets/js/noodled.js:4697
 msgid "Install %s for quick access & offline notes"
 msgstr ""
 
@@ -1152,7 +1168,7 @@ msgstr ""
 msgid "Invalid or expired PIN"
 msgstr ""
 
-#: includes/class-noodled-rest.php:708
+#: includes/class-noodled-rest.php:719
 msgid "Invalid reminder time"
 msgstr ""
 
@@ -1160,7 +1176,7 @@ msgstr ""
 msgid "Invalid user"
 msgstr ""
 
-#: assets/js/noodled.js:2028 includes/class-noodled-settings.php:513
+#: assets/js/noodled.js:2029 includes/class-noodled-settings.php:513
 #: includes/class-noodled-settings.php:519
 msgid "Invite"
 msgstr ""
@@ -1177,11 +1193,11 @@ msgstr ""
 msgid "Invite role"
 msgstr ""
 
-#: assets/js/noodled.js:2022
+#: assets/js/noodled.js:2023
 msgid "Invite someone"
 msgstr ""
 
-#: assets/js/noodled.js:1593
+#: assets/js/noodled.js:1594
 msgid "Invite the family. Hand out PINs, not passwords."
 msgstr ""
 
@@ -1189,35 +1205,35 @@ msgstr ""
 msgid "Invited!"
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "Italic"
 msgstr ""
 
-#: assets/js/noodled.js:3050
+#: assets/js/noodled.js:3061
 msgid "Journal Entry"
 msgstr ""
 
-#: assets/js/noodled.js:4228
+#: assets/js/noodled.js:4239
 msgid "Keep both"
 msgstr ""
 
-#: assets/js/noodled.js:4229
+#: assets/js/noodled.js:4240
 msgid "Keep mine"
 msgstr ""
 
-#: assets/js/noodled.js:2816
+#: assets/js/noodled.js:2827
 msgid "Keep the header row"
 msgstr ""
 
-#: assets/js/noodled.js:4234
+#: assets/js/noodled.js:4245
 msgid "Kept your version"
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: assets/js/noodled.js:1583 assets/js/noodled.js:4173
+#: assets/js/noodled.js:1584 assets/js/noodled.js:4184
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -1249,31 +1265,31 @@ msgstr ""
 msgid "Let's get your note-taking app set up."
 msgstr ""
 
-#: assets/js/noodled.js:1600 includes/class-noodled-settings.php:211
+#: assets/js/noodled.js:1601 includes/class-noodled-settings.php:211
 msgid "Light"
 msgstr ""
 
-#: assets/js/noodled.js:4585 assets/js/noodled.js:4586
+#: assets/js/noodled.js:4596 assets/js/noodled.js:4597
 msgid "Line height"
 msgstr ""
 
-#: assets/js/noodled.js:3736
+#: assets/js/noodled.js:3747
 msgid "Linked from: %s"
 msgstr ""
 
-#: assets/js/noodled.js:3304 assets/js/noodled.js:3428
+#: assets/js/noodled.js:3315 assets/js/noodled.js:3439
 msgid "Listening…"
 msgstr ""
 
-#: assets/js/noodled.js:4227
+#: assets/js/noodled.js:4238
 msgid "Load theirs"
 msgstr ""
 
-#: assets/js/noodled.js:4239
+#: assets/js/noodled.js:4250
 msgid "Loaded the other version"
 msgstr ""
 
-#: assets/js/noodled.js:1989
+#: assets/js/noodled.js:1990
 msgid "Loading…"
 msgstr ""
 
@@ -1281,19 +1297,19 @@ msgstr ""
 msgid "Location Note Map"
 msgstr ""
 
-#: assets/js/noodled.js:998
+#: assets/js/noodled.js:999
 msgid "Location access denied"
 msgstr ""
 
-#: assets/js/noodled.js:989
+#: assets/js/noodled.js:990
 msgid "Location is not available on this device"
 msgstr ""
 
-#: assets/js/noodled.js:1568 assets/js/noodled.js:913
+#: assets/js/noodled.js:1569 assets/js/noodled.js:914
 msgid "Location note"
 msgstr ""
 
-#: assets/js/noodled.js:1594
+#: assets/js/noodled.js:1595
 msgid "Lock it up behind you."
 msgstr ""
 
@@ -1301,7 +1317,7 @@ msgstr ""
 msgid "Log in"
 msgstr ""
 
-#: assets/js/noodled.js:1594
+#: assets/js/noodled.js:1595
 msgid "Logout"
 msgstr ""
 
@@ -1309,15 +1325,15 @@ msgstr ""
 msgid "Make it yours"
 msgstr ""
 
-#: assets/js/noodled.js:1593 assets/js/noodled.js:4175
+#: assets/js/noodled.js:1594 assets/js/noodled.js:4186
 msgid "Manage people"
 msgstr ""
 
-#: assets/js/noodled.js:1577 assets/js/noodled.js:4611
+#: assets/js/noodled.js:1578 assets/js/noodled.js:4622
 msgid "Manage tags"
 msgstr ""
 
-#: assets/js/noodled.js:3523
+#: assets/js/noodled.js:3534
 msgid "Map location"
 msgstr ""
 
@@ -1333,7 +1349,7 @@ msgstr ""
 msgid "Markdown notes with rich editing"
 msgstr ""
 
-#: assets/js/noodled.js:3049
+#: assets/js/noodled.js:3060
 msgid "Meeting Notes"
 msgstr ""
 
@@ -1341,11 +1357,11 @@ msgstr ""
 msgid "Member"
 msgstr ""
 
-#: assets/js/noodled.js:2024
+#: assets/js/noodled.js:2025
 msgid "Member email"
 msgstr ""
 
-#: assets/js/noodled.js:2025
+#: assets/js/noodled.js:2026
 msgid "Member name (optional)"
 msgstr ""
 
@@ -1353,27 +1369,27 @@ msgstr ""
 msgid "Member not found"
 msgstr ""
 
-#: assets/js/noodled.js:2013 includes/class-noodled-settings.php:483
+#: assets/js/noodled.js:2014 includes/class-noodled-settings.php:483
 msgid "Members"
 msgstr ""
 
-#: assets/js/noodled.js:1605 templates/app.php:60 templates/app.php:79
+#: assets/js/noodled.js:1606 templates/app.php:60 templates/app.php:79
 msgid "Menu"
 msgstr ""
 
-#: assets/js/noodled.js:3407
+#: assets/js/noodled.js:3418
 msgid "Microphone access denied"
 msgstr ""
 
-#: includes/class-noodled-rest.php:847
+#: includes/class-noodled-rest.php:858
 msgid "Missing parameters"
 msgstr ""
 
-#: assets/js/noodled.js:618 templates/app.php:113
+#: assets/js/noodled.js:619 templates/app.php:113
 msgid "Modified"
 msgstr ""
 
-#: assets/js/noodled.js:1203
+#: assets/js/noodled.js:1204
 msgid "More tools"
 msgstr ""
 
@@ -1381,19 +1397,19 @@ msgstr ""
 msgid "Move"
 msgstr ""
 
-#: assets/js/noodled.js:2948
+#: assets/js/noodled.js:2959
 msgid "Move Notes"
 msgstr ""
 
-#: assets/js/noodled.js:1060
+#: assets/js/noodled.js:1061
 msgid "Move to %s"
 msgstr ""
 
-#: assets/js/noodled.js:2948
+#: assets/js/noodled.js:2959
 msgid "Move to notebook:"
 msgstr ""
 
-#: assets/js/noodled.js:1133 assets/js/noodled.js:2959
+#: assets/js/noodled.js:1134 assets/js/noodled.js:2970
 msgid "Moved to %s"
 msgstr ""
 
@@ -1414,16 +1430,16 @@ msgstr ""
 msgid "Name already taken"
 msgstr ""
 
-#: includes/class-noodled-rest.php:422 includes/class-noodled-rest.php:436
-#: includes/class-noodled-rest.php:443
+#: includes/class-noodled-rest.php:425 includes/class-noodled-rest.php:439
+#: includes/class-noodled-rest.php:446
 msgid "Name required"
 msgstr ""
 
-#: includes/class-noodled-rest.php:429
+#: includes/class-noodled-rest.php:432
 msgid "Names required"
 msgstr ""
 
-#: assets/js/noodled.js:4588
+#: assets/js/noodled.js:4599
 msgid "Narrow reading column"
 msgstr ""
 
@@ -1436,28 +1452,28 @@ msgstr ""
 msgid "Never"
 msgstr ""
 
-#: assets/js/noodled.js:261
+#: assets/js/noodled.js:262
 msgid "New Notebook"
 msgstr ""
 
-#: assets/js/noodled.js:3059
+#: assets/js/noodled.js:3070
 msgid "New from Template"
 msgstr ""
 
-#: assets/js/noodled.js:1571 assets/js/noodled.js:4163
+#: assets/js/noodled.js:1572 assets/js/noodled.js:4174
 msgid "New from template"
 msgstr ""
 
-#: assets/js/noodled.js:4638
+#: assets/js/noodled.js:4649
 msgid "New name for #%s"
 msgstr ""
 
-#: assets/js/noodled.js:401
+#: assets/js/noodled.js:402
 msgid "New name:"
 msgstr ""
 
-#: assets/js/noodled.js:1565 assets/js/noodled.js:2146
-#: assets/js/noodled.js:4162 assets/js/noodled.js:910 templates/app.php:64
+#: assets/js/noodled.js:1566 assets/js/noodled.js:2147
+#: assets/js/noodled.js:4173 assets/js/noodled.js:911 templates/app.php:64
 msgid "New note"
 msgstr ""
 
@@ -1465,7 +1481,7 @@ msgstr ""
 msgid "New notebook"
 msgstr ""
 
-#: assets/js/noodled.js:3851
+#: assets/js/noodled.js:3862
 msgid "Next"
 msgstr ""
 
@@ -1473,35 +1489,35 @@ msgstr ""
 msgid "No Plaud token configured. Add it in Settings → Noodled."
 msgstr ""
 
-#: assets/js/noodled.js:2749
+#: assets/js/noodled.js:2745
 msgid "No differences."
 msgstr ""
 
-#: includes/class-noodled-rest.php:501 includes/class-noodled-rest.php:560
+#: assets/js/noodled.js:2679
+msgid "No earlier versions yet"
+msgstr ""
+
+#: includes/class-noodled-rest.php:504 includes/class-noodled-rest.php:563
 msgid "No file uploaded"
 msgstr ""
 
-#: assets/js/noodled.js:3452
+#: assets/js/noodled.js:3463
 msgid "No headings found"
 msgstr ""
 
-#: assets/js/noodled.js:2683
-msgid "No history yet"
-msgstr ""
-
-#: assets/js/noodled.js:2129 assets/js/noodled.js:4199
+#: assets/js/noodled.js:2130 assets/js/noodled.js:4210
 msgid "No matches"
 msgstr ""
 
-#: assets/js/noodled.js:740
+#: assets/js/noodled.js:741
 msgid "No matching notes"
 msgstr ""
 
-#: includes/class-noodled-rest.php:319 includes/class-noodled-rest.php:358
+#: includes/class-noodled-rest.php:322 includes/class-noodled-rest.php:361
 msgid "No noodled user with that email — they need an account first."
 msgstr ""
 
-#: assets/js/noodled.js:2173
+#: assets/js/noodled.js:2174
 msgid "No note named \"%s\" yet"
 msgstr ""
 
@@ -1509,39 +1525,39 @@ msgstr ""
 msgid "No note selected"
 msgstr ""
 
-#: assets/js/noodled.js:750
+#: assets/js/noodled.js:751
 msgid "No notes in %s yet"
 msgstr ""
 
-#: assets/js/noodled.js:4624
+#: assets/js/noodled.js:4635
 msgid "No notes use that tag"
 msgstr ""
 
-#: assets/js/noodled.js:751
+#: assets/js/noodled.js:752
 msgid "No notes yet"
 msgstr ""
 
-#: assets/js/noodled.js:4723
+#: assets/js/noodled.js:4734
 msgid "No recent notes yet"
 msgstr ""
 
-#: assets/js/noodled.js:2868
+#: assets/js/noodled.js:2879
 msgid "No reminders on this note yet."
 msgstr ""
 
-#: assets/js/noodled.js:3033
+#: assets/js/noodled.js:3044
 msgid "No tags found"
 msgstr ""
 
-#: assets/js/noodled.js:4617
+#: assets/js/noodled.js:4628
 msgid "No tags yet."
 msgstr ""
 
-#: assets/js/noodled.js:3184
+#: assets/js/noodled.js:3195
 msgid "No wiki-links found. Use [[Note Title]] to link notes."
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "None"
 msgstr ""
 
@@ -1554,7 +1570,7 @@ msgstr ""
 msgid "Noodled sections"
 msgstr ""
 
-#: includes/class-noodled-rest.php:564
+#: includes/class-noodled-rest.php:567
 msgid "Not a valid zip"
 msgstr ""
 
@@ -1562,71 +1578,72 @@ msgstr ""
 msgid "Not authenticated"
 msgstr ""
 
-#: assets/js/noodled.js:4688
+#: assets/js/noodled.js:4699
 msgid "Not now"
 msgstr ""
 
-#: assets/js/noodled.js:330 assets/js/noodled.js:373
+#: assets/js/noodled.js:331 assets/js/noodled.js:374
 msgid "Not shared with anyone yet."
 msgstr ""
 
-#: assets/js/noodled.js:3201
+#: assets/js/noodled.js:3212
 msgid "Note Color"
 msgstr ""
 
-#: assets/js/noodled.js:2687
+#: assets/js/noodled.js:2683
 msgid "Note History"
 msgstr ""
 
-#: assets/js/noodled.js:3177
+#: assets/js/noodled.js:3188
 msgid "Note Links"
 msgstr ""
 
-#: assets/js/noodled.js:1231
+#: assets/js/noodled.js:1232
 msgid "Note body"
 msgstr ""
 
-#: assets/js/noodled.js:1578
+#: assets/js/noodled.js:1579
 msgid "Note links"
 msgstr ""
 
-#: assets/js/noodled.js:1113 assets/js/noodled.js:1666
-#: assets/js/noodled.js:4324
+#: assets/js/noodled.js:1114 assets/js/noodled.js:1667
+#: assets/js/noodled.js:4335
 msgid "Note moved to trash"
 msgstr ""
 
-#: includes/class-noodled-notes.php:169 includes/class-noodled-notes.php:259
-#: includes/class-noodled-notes.php:265 includes/class-noodled-notes.php:271
-#: includes/class-noodled-rest.php:491 includes/class-noodled-rest.php:704
-#: includes/class-noodled-rest.php:980 includes/class-noodled-sync.php:33
+#: includes/class-noodled-notes.php:174 includes/class-noodled-notes.php:312
+#: includes/class-noodled-notes.php:318 includes/class-noodled-notes.php:324
+#: includes/class-noodled-rest.php:494 includes/class-noodled-rest.php:679
+#: includes/class-noodled-rest.php:715 includes/class-noodled-rest.php:996
+#: includes/class-noodled-sync.php:33
 msgid "Note not found"
 msgstr ""
 
-#: includes/class-noodled-notes.php:207
+#: includes/class-noodled-notes.php:260
 msgid "Note not found in trash"
 msgstr ""
 
-#: includes/class-noodled-rest.php:1008
+#: includes/class-noodled-rest.php:1024
 msgid "Note not found or link expired"
 msgstr ""
 
-#: assets/js/noodled.js:2845
+#: assets/js/noodled.js:2856
 msgid "Note reminder"
 msgstr ""
 
-#: assets/js/noodled.js:1191
+#: assets/js/noodled.js:1192
 msgid "Note title"
 msgstr ""
 
-#: assets/js/noodled.js:2875
+#: assets/js/noodled.js:2886
 msgid "Note to self (optional)"
 msgstr ""
 
-#: assets/js/noodled.js:239
+#: assets/js/noodled.js:240
 msgid "Notebook %s"
 msgstr ""
 
-#: assets/js/noodled.js:3742
+#: assets/js/noodled.js:3753
 msgid "Notebook Cover"
 msgstr ""
 
@@ -1634,11 +1651,11 @@ msgstr ""
 msgid "Notebook already exists"
 msgstr ""
 
-#: assets/js/noodled.js:272 assets/js/noodled.js:607
+#: assets/js/noodled.js:273 assets/js/noodled.js:608
 msgid "Notebook color"
 msgstr ""
 
-#: assets/js/noodled.js:261
+#: assets/js/noodled.js:262
 msgid "Notebook name:"
 msgstr ""
 
@@ -1647,12 +1664,12 @@ msgstr ""
 msgid "Notebook not found"
 msgstr ""
 
-#: assets/js/noodled.js:3633 includes/class-noodled-settings.php:267
+#: assets/js/noodled.js:3644 includes/class-noodled-settings.php:267
 #: templates/app.php:87 templates/app.php:89
 msgid "Notebooks"
 msgstr ""
 
-#: assets/js/noodled.js:3631 includes/class-noodled-settings.php:266
+#: assets/js/noodled.js:3642 includes/class-noodled-settings.php:266
 #: templates/app.php:146
 msgid "Notes"
 msgstr ""
@@ -1665,7 +1682,7 @@ msgstr ""
 msgid "Notes are private per user. Members share their own notebooks and notes from inside the app. %s is the one exception: enabling it gives the member a folder whose contents are shared read/write with you, shown in your account under their name."
 msgstr ""
 
-#: includes/class-noodled-app.php:404
+#: includes/class-noodled-app.php:413
 msgid "Notes are visible only to your account and the people you share them with. Attachments are served only to sessions allowed to read the note they belong to."
 msgstr ""
 
@@ -1673,27 +1690,27 @@ msgstr ""
 msgid "Notes created"
 msgstr ""
 
-#: assets/js/noodled.js:3636
+#: assets/js/noodled.js:3647
 msgid "Notes per notebook"
 msgstr ""
 
-#: assets/js/noodled.js:741
+#: assets/js/noodled.js:742
 msgid "Nothing matches \"%s\"."
 msgstr ""
 
-#: assets/js/noodled.js:2320 assets/js/noodled.js:2336
+#: assets/js/noodled.js:2321 assets/js/noodled.js:2337
 msgid "OK"
 msgstr ""
 
-#: assets/js/noodled.js:2426
+#: assets/js/noodled.js:2427
 msgid "Offline"
 msgstr ""
 
-#: assets/js/noodled.js:849
+#: assets/js/noodled.js:850
 msgid "Offline — showing cached note"
 msgstr ""
 
-#: assets/js/noodled.js:483
+#: assets/js/noodled.js:484
 msgid "Offline — showing cached notes"
 msgstr ""
 
@@ -1705,23 +1722,23 @@ msgstr ""
 msgid "Only needed when Map is set to Mapbox."
 msgstr ""
 
-#: includes/class-noodled-rest.php:977
+#: includes/class-noodled-rest.php:993
 msgid "Only the owner can create a public link"
 msgstr ""
 
-#: includes/class-noodled-rest.php:335 includes/class-noodled-rest.php:374
+#: includes/class-noodled-rest.php:338 includes/class-noodled-rest.php:377
 msgid "Only the owner can manage sharing"
 msgstr ""
 
-#: includes/class-noodled-rest.php:354
+#: includes/class-noodled-rest.php:357
 msgid "Only the owner can share this note"
 msgstr ""
 
-#: includes/class-noodled-rest.php:315
+#: includes/class-noodled-rest.php:318
 msgid "Only the owner can share this notebook"
 msgstr ""
 
-#: includes/class-noodled-app.php:402
+#: includes/class-noodled-app.php:411
 msgid "Only to provide the service to you. We do not sell your data or share it with third parties for advertising."
 msgstr ""
 
@@ -1741,16 +1758,16 @@ msgstr ""
 msgid "Open Homepage"
 msgstr ""
 
-#: assets/js/noodled.js:4653 assets/js/noodled.js:4870
-#: assets/js/noodled.js:4879
+#: assets/js/noodled.js:4664 assets/js/noodled.js:4881
+#: assets/js/noodled.js:4890
 msgid "Open a note first"
 msgstr ""
 
-#: assets/js/noodled.js:1070
+#: assets/js/noodled.js:1071
 msgid "Open in split"
 msgstr ""
 
-#: assets/js/noodled.js:3552
+#: assets/js/noodled.js:3563
 msgid "Open in…"
 msgstr ""
 
@@ -1758,7 +1775,7 @@ msgstr ""
 msgid "Open menu"
 msgstr ""
 
-#: assets/js/noodled.js:817
+#: assets/js/noodled.js:818
 msgid "Open note: %s"
 msgstr ""
 
@@ -1766,12 +1783,12 @@ msgstr ""
 msgid "OpenStreetMap (no key required)"
 msgstr ""
 
-#: assets/js/noodled.js:2175 assets/js/noodled.js:2177
-#: assets/js/noodled.js:2650
+#: assets/js/noodled.js:2176 assets/js/noodled.js:2178
+#: assets/js/noodled.js:2651
 msgid "Opens in a new tab"
 msgstr ""
 
-#: assets/js/noodled.js:1575
+#: assets/js/noodled.js:1576
 msgid "Organize"
 msgstr ""
 
@@ -1779,7 +1796,7 @@ msgstr ""
 msgid "Overview"
 msgstr ""
 
-#: assets/js/noodled.js:2020 includes/class-noodled-settings.php:604
+#: assets/js/noodled.js:2021 includes/class-noodled-settings.php:604
 msgid "PIN"
 msgstr ""
 
@@ -1791,15 +1808,15 @@ msgstr ""
 msgid "Pending"
 msgstr ""
 
-#: assets/js/noodled.js:2007 includes/class-noodled-settings.php:464
+#: assets/js/noodled.js:2008 includes/class-noodled-settings.php:464
 msgid "Pending requests"
 msgstr ""
 
-#: assets/js/noodled.js:1988
+#: assets/js/noodled.js:1989
 msgid "People"
 msgstr ""
 
-#: assets/js/noodled.js:1164
+#: assets/js/noodled.js:1165
 msgid "Permanently delete this note? This cannot be undone."
 msgstr ""
 
@@ -1811,7 +1828,7 @@ msgstr ""
 msgid "Personal Access Token"
 msgstr ""
 
-#: assets/js/noodled.js:1566 assets/js/noodled.js:911
+#: assets/js/noodled.js:1567 assets/js/noodled.js:912
 msgid "Photo or document"
 msgstr ""
 
@@ -1819,11 +1836,11 @@ msgstr ""
 msgid "Pick a note from the list or create a new one"
 msgstr ""
 
-#: assets/js/noodled.js:2888
+#: assets/js/noodled.js:2899
 msgid "Pick a time"
 msgstr ""
 
-#: assets/js/noodled.js:2890
+#: assets/js/noodled.js:2901
 msgid "Pick a time in the future"
 msgstr ""
 
@@ -1831,24 +1848,24 @@ msgstr ""
 msgid "Pick the URL and decide who can sign up."
 msgstr ""
 
-#: assets/js/noodled.js:1054
+#: assets/js/noodled.js:1055
 msgid "Pin to top"
 msgstr ""
 
-#: assets/js/noodled.js:913
+#: assets/js/noodled.js:914
 msgid "Pin where you are"
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "Pink"
 msgstr ""
 
-#: assets/js/noodled.js:4329 assets/js/noodled.js:726
-#: assets/js/noodled.js:798
+#: assets/js/noodled.js:4340 assets/js/noodled.js:727
+#: assets/js/noodled.js:799
 msgid "Pinned"
 msgstr ""
 
-#: assets/js/noodled.js:2493 includes/class-noodled-settings.php:702
+#: assets/js/noodled.js:2494 includes/class-noodled-settings.php:702
 #: templates/app.php:77
 msgid "Plaud"
 msgstr ""
@@ -1861,11 +1878,11 @@ msgstr ""
 msgid "Plaud connection failed: %s"
 msgstr ""
 
-#: assets/js/noodled.js:2491
+#: assets/js/noodled.js:2492
 msgid "Plaud sync failed"
 msgstr ""
 
-#: assets/js/noodled.js:2481
+#: assets/js/noodled.js:2482
 msgid "Plaud sync failed: %s"
 msgstr ""
 
@@ -1873,13 +1890,13 @@ msgstr ""
 msgid "Plaud token detected from %s file. Voice recordings will sync via the app toolbar."
 msgstr ""
 
-#: assets/js/noodled.js:2484
+#: assets/js/noodled.js:2485
 msgid "Plaud: %d new recording imported"
 msgid_plural "Plaud: %d new recordings imported"
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/class-noodled-rest.php:504
+#: includes/class-noodled-rest.php:507
 msgid "Please choose an Evernote .enex export file."
 msgstr ""
 
@@ -1891,7 +1908,7 @@ msgstr ""
 msgid "Please enter your email."
 msgstr ""
 
-#: assets/js/noodled.js:4450
+#: assets/js/noodled.js:4461
 msgid "Preparing your backup…"
 msgstr ""
 
@@ -1900,19 +1917,19 @@ msgstr ""
 msgid "Preview Landing Page"
 msgstr ""
 
-#: assets/js/noodled.js:1205
+#: assets/js/noodled.js:1206
 msgid "Preview mode"
 msgstr ""
 
-#: assets/js/noodled.js:3849
+#: assets/js/noodled.js:3860
 msgid "Previous"
 msgstr ""
 
-#: assets/js/noodled.js:1210
+#: assets/js/noodled.js:1211
 msgid "Print / Save as PDF"
 msgstr ""
 
-#: includes/class-noodled-app.php:398
+#: includes/class-noodled-app.php:407
 msgid "Privacy Policy"
 msgstr ""
 
@@ -1920,19 +1937,19 @@ msgstr ""
 msgid "Private notebooks with sharing"
 msgstr ""
 
-#: assets/js/noodled.js:3051
+#: assets/js/noodled.js:3062
 msgid "Project Plan"
 msgstr ""
 
-#: assets/js/noodled.js:1579
+#: assets/js/noodled.js:1580
 msgid "Proof you've been busy. Or proof you haven't."
 msgstr ""
 
-#: assets/js/noodled.js:1073
+#: assets/js/noodled.js:1074
 msgid "Public link"
 msgstr ""
 
-#: assets/js/noodled.js:3491
+#: assets/js/noodled.js:3502
 msgid "Public link copied!"
 msgstr ""
 
@@ -1940,35 +1957,35 @@ msgstr ""
 msgid "Pull all notes from your connected GitHub repository."
 msgstr ""
 
-#: assets/js/noodled.js:4294 assets/js/noodled.js:4301 templates/app.php:119
+#: assets/js/noodled.js:4305 assets/js/noodled.js:4312 templates/app.php:119
 msgid "Pull to refresh"
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "Purple"
 msgstr ""
 
-#: assets/js/noodled.js:1586
+#: assets/js/noodled.js:1587
 msgid "Push and pull with GitHub now. Don't wait for the clock."
 msgstr ""
 
-#: assets/js/noodled.js:1589
+#: assets/js/noodled.js:1590
 msgid "Put a backup back. No questions asked."
 msgstr ""
 
-#: includes/class-noodled-app.php:427
+#: includes/class-noodled-app.php:436
 msgid "Questions about this policy? Contact us at %s."
 msgstr ""
 
-#: assets/js/noodled.js:3052
+#: assets/js/noodled.js:3063
 msgid "Quick List"
 msgstr ""
 
-#: assets/js/noodled.js:2120
+#: assets/js/noodled.js:2121
 msgid "Quick Open"
 msgstr ""
 
-#: assets/js/noodled.js:1573 assets/js/noodled.js:4167 templates/app.php:170
+#: assets/js/noodled.js:1574 assets/js/noodled.js:4178 templates/app.php:170
 msgid "Quick capture"
 msgstr ""
 
@@ -1976,7 +1993,7 @@ msgstr ""
 msgid "Quick links"
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "Quick open"
 msgstr ""
 
@@ -1984,35 +2001,35 @@ msgstr ""
 msgid "Quick thought..."
 msgstr ""
 
-#: assets/js/noodled.js:237
+#: assets/js/noodled.js:238
 msgid "Read only"
 msgstr ""
 
-#: assets/js/noodled.js:1212
+#: assets/js/noodled.js:1213
 msgid "Reading mode"
 msgstr ""
 
-#: assets/js/noodled.js:1220 assets/js/noodled.js:4582
+#: assets/js/noodled.js:1221 assets/js/noodled.js:4593
 msgid "Reading preferences"
 msgstr ""
 
-#: assets/js/noodled.js:4725
+#: assets/js/noodled.js:4736
 msgid "Recent notes"
 msgstr ""
 
-#: assets/js/noodled.js:4431
+#: assets/js/noodled.js:4442
 msgid "Recent searches"
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "Red"
 msgstr ""
 
-#: assets/js/noodled.js:2527
+#: assets/js/noodled.js:2528
 msgid "Refreshed"
 msgstr ""
 
-#: assets/js/noodled.js:4310
+#: assets/js/noodled.js:4321
 msgid "Refreshing…"
 msgstr ""
 
@@ -2024,34 +2041,34 @@ msgstr ""
 msgid "Registration is not enabled"
 msgstr ""
 
-#: assets/js/noodled.js:4301
+#: assets/js/noodled.js:4312
 msgid "Release to refresh"
 msgstr ""
 
-#: assets/js/noodled.js:2872
+#: assets/js/noodled.js:2883
 msgid "Remind me"
 msgstr ""
 
-#: assets/js/noodled.js:1217
+#: assets/js/noodled.js:1218
 msgid "Remind me…"
 msgstr ""
 
-#: assets/js/noodled.js:2896
+#: assets/js/noodled.js:2907
 msgid "Reminder set"
 msgstr ""
 
-#: assets/js/noodled.js:2036 assets/js/noodled.js:334
-#: assets/js/noodled.js:377 assets/js/noodled.js:4646
+#: assets/js/noodled.js:2037 assets/js/noodled.js:335
+#: assets/js/noodled.js:378 assets/js/noodled.js:4657
 #: includes/class-noodled-settings.php:439
 #: includes/class-noodled-settings.php:506
 msgid "Remove"
 msgstr ""
 
-#: assets/js/noodled.js:4646
+#: assets/js/noodled.js:4657
 msgid "Remove #%s from all notes? (The notes stay; only the tag is removed.)"
 msgstr ""
 
-#: assets/js/noodled.js:2018
+#: assets/js/noodled.js:2019
 msgid "Remove %s"
 msgstr ""
 
@@ -2059,7 +2076,7 @@ msgstr ""
 msgid "Remove landing page?"
 msgstr ""
 
-#: assets/js/noodled.js:2036
+#: assets/js/noodled.js:2037
 msgid "Remove this person? Their notes stay but they lose access."
 msgstr ""
 
@@ -2067,43 +2084,43 @@ msgstr ""
 msgid "Remove this user?"
 msgstr ""
 
-#: assets/js/noodled.js:4648
+#: assets/js/noodled.js:4659
 msgid "Removed #%s"
 msgstr ""
 
-#: assets/js/noodled.js:271 assets/js/noodled.js:4615
+#: assets/js/noodled.js:272 assets/js/noodled.js:4626
 msgid "Rename"
 msgstr ""
 
-#: assets/js/noodled.js:401
+#: assets/js/noodled.js:402
 msgid "Rename Notebook"
 msgstr ""
 
-#: assets/js/noodled.js:4638
+#: assets/js/noodled.js:4649
 msgid "Rename tag"
 msgstr ""
 
-#: assets/js/noodled.js:1577
+#: assets/js/noodled.js:1578
 msgid "Rename the typos. Retire the ones from 2019."
 msgstr ""
 
-#: assets/js/noodled.js:4642
+#: assets/js/noodled.js:4653
 msgid "Renamed #%1$s → #%2$s"
 msgstr ""
 
-#: assets/js/noodled.js:3661
+#: assets/js/noodled.js:3672
 msgid "Replace"
 msgstr ""
 
-#: assets/js/noodled.js:3660
+#: assets/js/noodled.js:3671
 msgid "Replace with"
 msgstr ""
 
-#: assets/js/noodled.js:3660
+#: assets/js/noodled.js:3671
 msgid "Replace..."
 msgstr ""
 
-#: assets/js/noodled.js:3684
+#: assets/js/noodled.js:3695
 msgid "Replaced"
 msgstr ""
 
@@ -2146,27 +2163,27 @@ msgstr ""
 msgid "Require admin approval"
 msgstr ""
 
-#: assets/js/noodled.js:607
+#: assets/js/noodled.js:608
 msgid "Reset"
 msgstr ""
 
-#: assets/js/noodled.js:1046
+#: assets/js/noodled.js:1047
 msgid "Restore"
 msgstr ""
 
-#: assets/js/noodled.js:2758
+#: assets/js/noodled.js:2754
 msgid "Restore this version"
 msgstr ""
 
-#: assets/js/noodled.js:1160 assets/js/noodled.js:4716
+#: assets/js/noodled.js:1161 assets/js/noodled.js:4727
 msgid "Restored"
 msgstr ""
 
-#: assets/js/noodled.js:2710
+#: assets/js/noodled.js:2706
 msgid "Restored from history"
 msgstr ""
 
-#: assets/js/noodled.js:4179
+#: assets/js/noodled.js:4190
 msgid "Results"
 msgstr ""
 
@@ -2174,7 +2191,7 @@ msgstr ""
 msgid "Role"
 msgstr ""
 
-#: assets/js/noodled.js:2782 assets/js/noodled.js:2784
+#: assets/js/noodled.js:2793 assets/js/noodled.js:2795
 msgid "Row"
 msgstr ""
 
@@ -2186,23 +2203,23 @@ msgstr ""
 msgid "Save Sync Settings"
 msgstr ""
 
-#: assets/js/noodled.js:1219 assets/js/noodled.js:4654
+#: assets/js/noodled.js:1220 assets/js/noodled.js:4665
 msgid "Save as template"
 msgstr ""
 
-#: assets/js/noodled.js:2104 assets/js/noodled.js:2431
+#: assets/js/noodled.js:2105 assets/js/noodled.js:2432
 msgid "Saved"
 msgstr ""
 
-#: assets/js/noodled.js:2431
+#: assets/js/noodled.js:2432
 msgid "Saved %s"
 msgstr ""
 
-#: assets/js/noodled.js:4248
+#: assets/js/noodled.js:4259
 msgid "Saved both versions"
 msgstr ""
 
-#: assets/js/noodled.js:2427
+#: assets/js/noodled.js:2428
 msgid "Saving…"
 msgstr ""
 
@@ -2210,11 +2227,11 @@ msgstr ""
 msgid "Search"
 msgstr ""
 
-#: assets/js/noodled.js:4165 templates/app.php:109
+#: assets/js/noodled.js:4176 templates/app.php:109
 msgid "Search notes"
 msgstr ""
 
-#: assets/js/noodled.js:2120
+#: assets/js/noodled.js:2121
 msgid "Search notes to open"
 msgstr ""
 
@@ -2226,19 +2243,19 @@ msgstr ""
 msgid "Search this notebook or everywhere"
 msgstr ""
 
-#: includes/class-noodled-app.php:404
+#: includes/class-noodled-app.php:413
 msgid "Security"
 msgstr ""
 
-#: assets/js/noodled.js:1578
+#: assets/js/noodled.js:1579
 msgid "See the whole tangle. Your notes were never a list."
 msgstr ""
 
-#: assets/js/noodled.js:3378
+#: assets/js/noodled.js:3389
 msgid "Select a note first"
 msgstr ""
 
-#: assets/js/noodled.js:1183
+#: assets/js/noodled.js:1184
 msgid "Select a note or create a new one"
 msgstr ""
 
@@ -2250,7 +2267,7 @@ msgstr ""
 msgid "Select multiple notes"
 msgstr ""
 
-#: assets/js/noodled.js:811
+#: assets/js/noodled.js:812
 msgid "Select note: %s"
 msgstr ""
 
@@ -2270,15 +2287,15 @@ msgstr ""
 msgid "Sent by %s"
 msgstr ""
 
-#: assets/js/noodled.js:4587
+#: assets/js/noodled.js:4598
 msgid "Serif body font"
 msgstr ""
 
-#: assets/js/noodled.js:273
+#: assets/js/noodled.js:274
 msgid "Set cover image"
 msgstr ""
 
-#: assets/js/noodled.js:2880
+#: assets/js/noodled.js:2891
 msgid "Set reminder"
 msgstr ""
 
@@ -2290,24 +2307,24 @@ msgstr ""
 msgid "Setup"
 msgstr ""
 
-#: assets/js/noodled.js:296 assets/js/noodled.js:356
+#: assets/js/noodled.js:297 assets/js/noodled.js:357
 #: includes/class-noodled-settings.php:498
 msgid "Share"
 msgstr ""
 
-#: assets/js/noodled.js:288 assets/js/noodled.js:351
+#: assets/js/noodled.js:289 assets/js/noodled.js:352
 msgid "Share \"%s\""
 msgstr ""
 
-#: assets/js/noodled.js:3493
+#: assets/js/noodled.js:3504
 msgid "Share failed"
 msgstr ""
 
-#: assets/js/noodled.js:1072
+#: assets/js/noodled.js:1073
 msgid "Share with people…"
 msgstr ""
 
-#: assets/js/noodled.js:276
+#: assets/js/noodled.js:277
 msgid "Share..."
 msgstr ""
 
@@ -2319,15 +2336,15 @@ msgstr ""
 msgid "Shared noodle"
 msgstr ""
 
-#: assets/js/noodled.js:331 assets/js/noodled.js:374
+#: assets/js/noodled.js:332 assets/js/noodled.js:375
 msgid "Shared with"
 msgstr ""
 
-#: assets/js/noodled.js:236 assets/js/noodled.js:800
+#: assets/js/noodled.js:237 assets/js/noodled.js:801
 msgid "Shared with you"
 msgstr ""
 
-#: assets/js/noodled.js:319 assets/js/noodled.js:389
+#: assets/js/noodled.js:320 assets/js/noodled.js:390
 msgid "Shared!"
 msgstr ""
 
@@ -2348,7 +2365,7 @@ msgstr ""
 msgid "Skip to content"
 msgstr ""
 
-#: assets/js/noodled.js:4779
+#: assets/js/noodled.js:4790
 msgid "Slash commands"
 msgstr ""
 
@@ -2360,15 +2377,15 @@ msgstr ""
 msgid "Something went wrong. Try again."
 msgstr ""
 
-#: assets/js/noodled.js:1205
+#: assets/js/noodled.js:1206
 msgid "Source mode"
 msgstr ""
 
-#: assets/js/noodled.js:1064
+#: assets/js/noodled.js:1065
 msgid "Star"
 msgstr ""
 
-#: assets/js/noodled.js:799 templates/app.php:96
+#: assets/js/noodled.js:800 templates/app.php:96
 msgid "Starred"
 msgstr ""
 
@@ -2376,15 +2393,15 @@ msgstr ""
 msgid "Starred notes"
 msgstr ""
 
-#: assets/js/noodled.js:1564
+#: assets/js/noodled.js:1565
 msgid "Start a note"
 msgstr ""
 
-#: assets/js/noodled.js:1571
+#: assets/js/noodled.js:1572
 msgid "Start from a shape, not a blank stare."
 msgstr ""
 
-#: assets/js/noodled.js:1579 assets/js/noodled.js:3629
+#: assets/js/noodled.js:1580 assets/js/noodled.js:3640
 msgid "Statistics"
 msgstr ""
 
@@ -2400,7 +2417,7 @@ msgstr ""
 msgid "Step 3 — GitHub Sync (optional)"
 msgstr ""
 
-#: assets/js/noodled.js:3285 assets/js/noodled.js:3306
+#: assets/js/noodled.js:3296 assets/js/noodled.js:3317
 msgid "Stop"
 msgstr ""
 
@@ -2412,16 +2429,16 @@ msgstr ""
 msgid "Storage"
 msgstr ""
 
-#: assets/js/noodled.js:2470 includes/class-noodled-settings.php:73
+#: assets/js/noodled.js:2471 includes/class-noodled-settings.php:73
 #: templates/app.php:157 templates/app.php:75
 msgid "Sync"
 msgstr ""
 
-#: assets/js/noodled.js:2467
+#: assets/js/noodled.js:2468
 msgid "Sync failed"
 msgstr ""
 
-#: assets/js/noodled.js:2458
+#: assets/js/noodled.js:2459
 msgid "Sync failed: %s"
 msgstr ""
 
@@ -2429,7 +2446,7 @@ msgstr ""
 msgid "Sync notes with a GitHub repo. Skip this and set it up later in Noodled > Sync."
 msgstr ""
 
-#: assets/js/noodled.js:1586 assets/js/noodled.js:4169
+#: assets/js/noodled.js:1587 assets/js/noodled.js:4180
 msgid "Sync now"
 msgstr ""
 
@@ -2437,21 +2454,21 @@ msgstr ""
 msgid "Sync with GitHub"
 msgstr ""
 
-#: assets/js/noodled.js:4014
+#: assets/js/noodled.js:4025
 msgid "Synced pending changes"
 msgstr ""
 
-#: assets/js/noodled.js:2461
+#: assets/js/noodled.js:2462
 msgid "Synced: %d note"
 msgid_plural "Synced: %d notes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: assets/js/noodled.js:2476
+#: assets/js/noodled.js:2477
 msgid "Syncing Plaud..."
 msgstr ""
 
-#: assets/js/noodled.js:2453 assets/js/noodled.js:2523
+#: assets/js/noodled.js:2454 assets/js/noodled.js:2524
 msgid "Syncing..."
 msgstr ""
 
@@ -2459,19 +2476,19 @@ msgstr ""
 msgid "Syncs with desktop app"
 msgstr ""
 
-#: assets/js/noodled.js:4771
+#: assets/js/noodled.js:4782
 msgid "Table"
 msgstr ""
 
-#: assets/js/noodled.js:2780
+#: assets/js/noodled.js:2791
 msgid "Table editing"
 msgstr ""
 
-#: assets/js/noodled.js:3455
+#: assets/js/noodled.js:3466
 msgid "Table of Contents"
 msgstr ""
 
-#: assets/js/noodled.js:1207
+#: assets/js/noodled.js:1208
 msgid "Table of contents"
 msgstr ""
 
@@ -2480,11 +2497,11 @@ msgstr ""
 msgid "Tagline"
 msgstr ""
 
-#: assets/js/noodled.js:3036 assets/js/noodled.js:3634
+#: assets/js/noodled.js:3047 assets/js/noodled.js:3645
 msgid "Tags"
 msgstr ""
 
-#: assets/js/noodled.js:1567
+#: assets/js/noodled.js:1568
 msgid "Talk, don't type. The mic's already listening."
 msgstr ""
 
@@ -2492,11 +2509,11 @@ msgstr ""
 msgid "Tap the button to sign in instantly, or enter this PIN on the login screen:"
 msgstr ""
 
-#: includes/class-noodled-rest.php:767
+#: includes/class-noodled-rest.php:778
 msgid "Target notebook required"
 msgstr ""
 
-#: assets/js/noodled.js:3005
+#: assets/js/noodled.js:3016
 msgid "Target words:"
 msgstr ""
 
@@ -2504,19 +2521,19 @@ msgstr ""
 msgid "Tasks"
 msgstr ""
 
-#: assets/js/noodled.js:4654
+#: assets/js/noodled.js:4665
 msgid "Template name:"
 msgstr ""
 
-#: assets/js/noodled.js:4660
+#: assets/js/noodled.js:4671
 msgid "Template saved"
 msgstr ""
 
-#: includes/class-noodled-app.php:394
+#: includes/class-noodled-app.php:403
 msgid "Termination"
 msgstr ""
 
-#: includes/class-noodled-app.php:387
+#: includes/class-noodled-app.php:396
 msgid "Terms of Service"
 msgstr ""
 
@@ -2528,7 +2545,7 @@ msgstr ""
 msgid "That sign-in link expired, tap Continue to get a fresh PIN."
 msgstr ""
 
-#: includes/class-noodled-rest.php:322 includes/class-noodled-rest.php:361
+#: includes/class-noodled-rest.php:325 includes/class-noodled-rest.php:364
 msgid "That's your own account."
 msgstr ""
 
@@ -2544,7 +2561,7 @@ msgstr ""
 msgid "The 6-digit code from your noodle email"
 msgstr ""
 
-#: assets/js/noodled.js:1583
+#: assets/js/noodled.js:1584
 msgid "The fast way to do everything. Cheat sheet included."
 msgstr ""
 
@@ -2556,23 +2573,23 @@ msgstr ""
 msgid "The landing page's %s button always queues requests for your approval, regardless of these options."
 msgstr ""
 
-#: includes/class-noodled-app.php:393
+#: includes/class-noodled-app.php:402
 msgid "The service is provided \"as is\", without warranties of any kind. We may add, change, or remove features, and we cannot guarantee the service will always be available or error-free."
 msgstr ""
 
-#: assets/js/noodled.js:1621 assets/js/noodled.js:1622
+#: assets/js/noodled.js:1622 assets/js/noodled.js:1623
 msgid "Theme"
 msgstr ""
 
-#: assets/js/noodled.js:203
+#: assets/js/noodled.js:204
 msgid "Theme: %s"
 msgstr ""
 
-#: assets/js/noodled.js:180
+#: assets/js/noodled.js:181
 msgid "Theme: %s (click to change)"
 msgstr ""
 
-#: assets/js/noodled.js:182
+#: assets/js/noodled.js:183
 msgid "Theme: %s. Click to change."
 msgstr ""
 
@@ -2580,35 +2597,35 @@ msgstr ""
 msgid "This PIN expires in 15 minutes. If you didn't request it, you can ignore this email."
 msgstr ""
 
-#: assets/js/noodled.js:2146
+#: assets/js/noodled.js:2147
 msgid "This help"
 msgstr ""
 
-#: assets/js/noodled.js:696
+#: assets/js/noodled.js:697
 msgid "This month"
 msgstr ""
 
-#: assets/js/noodled.js:4224
+#: assets/js/noodled.js:4235
 msgid "This note changed elsewhere"
 msgstr ""
 
-#: assets/js/noodled.js:695
+#: assets/js/noodled.js:696
 msgid "This week"
 msgstr ""
 
-#: assets/js/noodled.js:693
+#: assets/js/noodled.js:694
 msgid "Today"
 msgstr ""
 
-#: assets/js/noodled.js:4772
+#: assets/js/noodled.js:4783
 msgid "Today's date"
 msgstr ""
 
-#: assets/js/noodled.js:1572
+#: assets/js/noodled.js:1573
 msgid "Today's page, ready and waiting. Brain-dump and go."
 msgstr ""
 
-#: assets/js/noodled.js:4170 templates/app.php:80
+#: assets/js/noodled.js:4181 templates/app.php:80
 msgid "Toggle theme"
 msgstr ""
 
@@ -2616,7 +2633,7 @@ msgstr ""
 msgid "Too many attempts. Try again in a few minutes."
 msgstr ""
 
-#: assets/js/noodled.js:1581
+#: assets/js/noodled.js:1582
 msgid "Tools"
 msgstr ""
 
@@ -2624,60 +2641,60 @@ msgstr ""
 msgid "Trash"
 msgstr ""
 
-#: assets/js/noodled.js:746
+#: assets/js/noodled.js:747
 msgid "Trash is empty"
 msgstr ""
 
-#: assets/js/noodled.js:4178
+#: assets/js/noodled.js:4189
 msgid "Type a command or note…"
 msgstr ""
 
-#: assets/js/noodled.js:2120
+#: assets/js/noodled.js:2121
 msgid "Type to search notes..."
 msgstr ""
 
-#: assets/js/noodled.js:1213
+#: assets/js/noodled.js:1214
 msgid "Typewriter mode"
 msgstr ""
 
-#: assets/js/noodled.js:3572
+#: assets/js/noodled.js:3583
 msgid "Typewriter mode off"
 msgstr ""
 
-#: assets/js/noodled.js:3572
+#: assets/js/noodled.js:3583
 msgid "Typewriter mode on"
 msgstr ""
 
-#: assets/js/noodled.js:4705
+#: assets/js/noodled.js:4716
 msgid "Undo"
 msgstr ""
 
-#: assets/js/noodled.js:4714
+#: assets/js/noodled.js:4725
 msgid "Undo failed"
 msgstr ""
 
-#: assets/js/noodled.js:1054
+#: assets/js/noodled.js:1055
 msgid "Unpin"
 msgstr ""
 
-#: assets/js/noodled.js:4329
+#: assets/js/noodled.js:4340
 msgid "Unpinned"
 msgstr ""
 
-#: assets/js/noodled.js:1064
+#: assets/js/noodled.js:1065
 msgid "Unstar"
 msgstr ""
 
-#: assets/js/noodled.js:4245 assets/js/noodled.js:4873
-#: assets/js/noodled.js:811 assets/js/noodled.js:817
+#: assets/js/noodled.js:4256 assets/js/noodled.js:4884
+#: assets/js/noodled.js:812 assets/js/noodled.js:818
 msgid "Untitled"
 msgstr ""
 
-#: includes/class-noodled-rest.php:636
+#: includes/class-noodled-rest.php:639
 msgid "Untitled Note"
 msgstr ""
 
-#: assets/js/noodled.js:4627
+#: assets/js/noodled.js:4638
 msgid "Updating %d note…"
 msgid_plural "Updating %d notes…"
 msgstr[0] ""
@@ -2687,11 +2704,11 @@ msgstr[1] ""
 msgid "Upload an HTML file to show as a landing page for visitors."
 msgstr ""
 
-#: assets/js/noodled.js:1856 assets/js/noodled.js:1862
+#: assets/js/noodled.js:1857 assets/js/noodled.js:1863
 msgid "Upload failed"
 msgstr ""
 
-#: assets/js/noodled.js:911
+#: assets/js/noodled.js:912
 msgid "Upload files"
 msgstr ""
 
@@ -2699,7 +2716,7 @@ msgstr ""
 msgid "Upload landing page HTML file"
 msgstr ""
 
-#: assets/js/noodled.js:1908
+#: assets/js/noodled.js:1909
 msgid "Uploading %d file…"
 msgid_plural "Uploading %d files…"
 msgstr[0] ""
@@ -2713,7 +2730,7 @@ msgstr ""
 msgid "Use as the site homepage"
 msgstr ""
 
-#: assets/js/noodled.js:1609
+#: assets/js/noodled.js:1610
 msgid "Use your noodle."
 msgstr ""
 
@@ -2742,15 +2759,15 @@ msgstr ""
 msgid "Version"
 msgstr ""
 
-#: assets/js/noodled.js:1216
+#: assets/js/noodled.js:1217
 msgid "Version history"
 msgstr ""
 
-#: assets/js/noodled.js:2690
+#: assets/js/noodled.js:2686
 msgid "View changes"
 msgstr ""
 
-#: assets/js/noodled.js:1567 assets/js/noodled.js:912
+#: assets/js/noodled.js:1568 assets/js/noodled.js:913
 msgid "Voice note"
 msgstr ""
 
@@ -2758,11 +2775,11 @@ msgstr ""
 msgid "WP"
 msgstr ""
 
-#: assets/js/noodled.js:3556
+#: assets/js/noodled.js:3567
 msgid "Waze"
 msgstr ""
 
-#: includes/class-noodled-app.php:403
+#: includes/class-noodled-app.php:412
 msgid "We email you sign-in PINs and any notifications you choose to receive, such as when a notebook is shared with you."
 msgstr ""
 
@@ -2790,7 +2807,7 @@ msgstr ""
 msgid "Welcome to Noodled"
 msgstr ""
 
-#: assets/js/noodled.js:440
+#: assets/js/noodled.js:441
 msgid "Welcome to noodled"
 msgstr ""
 
@@ -2798,11 +2815,11 @@ msgstr ""
 msgid "Welcome!"
 msgstr ""
 
-#: includes/class-noodled-app.php:401
+#: includes/class-noodled-app.php:410
 msgid "What we store"
 msgstr ""
 
-#: assets/js/noodled.js:2873
+#: assets/js/noodled.js:2884
 msgid "When"
 msgstr ""
 
@@ -2822,23 +2839,23 @@ msgstr ""
 msgid "Which map to embed when a member creates a Location note. Mapbox and Google Maps need a key/token below."
 msgstr ""
 
-#: assets/js/noodled.js:3005
+#: assets/js/noodled.js:3016
 msgid "Word Count Goal"
 msgstr ""
 
-#: assets/js/noodled.js:1218
+#: assets/js/noodled.js:1219
 msgid "Word count goal"
 msgstr ""
 
-#: assets/js/noodled.js:3632
+#: assets/js/noodled.js:3643
 msgid "Words"
 msgstr ""
 
-#: assets/js/noodled.js:3196
+#: assets/js/noodled.js:3207
 msgid "Yellow"
 msgstr ""
 
-#: assets/js/noodled.js:694
+#: assets/js/noodled.js:695
 msgid "Yesterday"
 msgstr ""
 
@@ -2846,23 +2863,23 @@ msgstr ""
 msgid "You already have access. Just sign in!"
 msgstr ""
 
-#: includes/class-noodled-app.php:390
+#: includes/class-noodled-app.php:399
 msgid "You are responsible for keeping your sign-in details secure and for activity that happens under your account. Tell us right away if you think someone else has access to it."
 msgstr ""
 
-#: assets/js/noodled.js:2846
+#: assets/js/noodled.js:2857
 msgid "You asked to be reminded about this note."
 msgstr ""
 
-#: includes/class-noodled-app.php:405
+#: includes/class-noodled-app.php:414
 msgid "You can edit or delete your notes at any time, and you can ask us to remove your account and its data."
 msgstr ""
 
-#: includes/class-noodled-rest.php:1042
+#: includes/class-noodled-rest.php:1058
 msgid "You can only share notebooks you own"
 msgstr ""
 
-#: includes/class-noodled-app.php:394
+#: includes/class-noodled-app.php:403
 msgid "You may stop using the service at any time. We may suspend or close accounts that break these terms."
 msgstr ""
 
@@ -2870,7 +2887,7 @@ msgstr ""
 msgid "You're already on the list — we'll be in touch soon."
 msgstr ""
 
-#: assets/js/noodled.js:2405
+#: assets/js/noodled.js:2406
 msgid "You're offline — changes are saved on this device and will sync when you reconnect"
 msgstr ""
 
@@ -2882,11 +2899,11 @@ msgstr ""
 msgid "Your %s login PIN"
 msgstr ""
 
-#: includes/class-noodled-app.php:390
+#: includes/class-noodled-app.php:399
 msgid "Your account"
 msgstr ""
 
-#: includes/class-noodled-app.php:401
+#: includes/class-noodled-app.php:410
 msgid "Your account email and the notes, notebooks, and attachments you create. That content is private to your account by default."
 msgstr ""
 
@@ -2894,11 +2911,11 @@ msgstr ""
 msgid "Your account is still awaiting approval."
 msgstr ""
 
-#: includes/class-noodled-app.php:392
+#: includes/class-noodled-app.php:401
 msgid "Your content"
 msgstr ""
 
-#: includes/class-noodled-app.php:405
+#: includes/class-noodled-app.php:414
 msgid "Your control"
 msgstr ""
 
@@ -2911,31 +2928,31 @@ msgstr ""
 msgid "Your notes, everywhere"
 msgstr ""
 
-#: includes/class-noodled-app.php:392
+#: includes/class-noodled-app.php:401
 msgid "Your notes, notebooks, and attachments stay yours. You grant us only the permission needed to store, process, and display that content back to you so the service can work."
 msgstr ""
 
-#: assets/js/noodled.js:1214
+#: assets/js/noodled.js:1215
 msgid "Zen mode"
 msgstr ""
 
-#: assets/js/noodled.js:3693
+#: assets/js/noodled.js:3704
 msgid "Zen mode off"
 msgstr ""
 
-#: assets/js/noodled.js:3693
+#: assets/js/noodled.js:3704
 msgid "Zen mode on"
 msgstr ""
 
-#: includes/class-noodled-rest.php:556
+#: includes/class-noodled-rest.php:559
 msgid "Zip support unavailable"
 msgstr ""
 
-#: includes/class-noodled-rest.php:514
+#: includes/class-noodled-rest.php:517
 msgid "Zip support unavailable on this server."
 msgstr ""
 
-#: assets/js/noodled.js:1588
+#: assets/js/noodled.js:1589
 msgid "Zip the whole lot up. Belt, meet suspenders."
 msgstr ""
 
@@ -2951,68 +2968,68 @@ msgstr ""
 msgid "days"
 msgstr ""
 
-#: assets/js/noodled.js:2016
+#: assets/js/noodled.js:2017
 msgid "drop"
 msgstr ""
 
-#: assets/js/noodled.js:2027
+#: assets/js/noodled.js:2028
 msgid "drop folder"
 msgstr ""
 
-#: assets/js/noodled.js:2876
+#: assets/js/noodled.js:2887
 msgid "e.g. Follow up on this"
 msgstr ""
 
-#: assets/js/noodled.js:333 assets/js/noodled.js:376
+#: assets/js/noodled.js:334 assets/js/noodled.js:377
 msgid "edit"
 msgstr ""
 
-#: assets/js/noodled.js:2024
+#: assets/js/noodled.js:2025
 msgid "email"
 msgstr ""
 
-#: assets/js/noodled.js:2049
+#: assets/js/noodled.js:2050
 msgid "email?"
 msgstr ""
 
-#: assets/js/noodled.js:2042 assets/js/noodled.js:2052
+#: assets/js/noodled.js:2043 assets/js/noodled.js:2053
 msgid "failed"
 msgstr ""
 
-#: assets/js/noodled.js:2057
+#: assets/js/noodled.js:2058
 msgid "invited ✓"
 msgstr ""
 
-#: assets/js/noodled.js:1407
+#: assets/js/noodled.js:1408
 msgid "item"
 msgstr ""
 
-#: assets/js/noodled.js:2277
+#: assets/js/noodled.js:2278
 msgid "just now"
 msgstr ""
 
-#: assets/js/noodled.js:3883
+#: assets/js/noodled.js:3894
 msgid "map"
 msgstr ""
 
-#: assets/js/noodled.js:2018
+#: assets/js/noodled.js:2019
 msgid "member"
 msgstr ""
 
-#: assets/js/noodled.js:2025
+#: assets/js/noodled.js:2026
 msgid "name (optional)"
 msgstr ""
 
-#: assets/js/noodled.js:346 includes/class-noodled-auth.php:372
-#: includes/class-noodled-rest.php:367
+#: assets/js/noodled.js:347 includes/class-noodled-auth.php:372
+#: includes/class-noodled-rest.php:370
 msgid "note"
 msgstr ""
 
-#: includes/class-noodled-auth.php:372 includes/class-noodled-rest.php:328
+#: includes/class-noodled-auth.php:372 includes/class-noodled-rest.php:331
 msgid "notebook"
 msgstr ""
 
-#: assets/js/noodled.js:333 assets/js/noodled.js:376
+#: assets/js/noodled.js:334 assets/js/noodled.js:377
 msgid "read"
 msgstr ""
 
@@ -3032,7 +3049,7 @@ msgstr ""
 msgid "u{1F4E5} Anything you add to **this folder** is automatically shared with %1$s.\n\nDrop notes here that you'd like %2$s to see. Your other notebooks stay private.\n"
 msgstr ""
 
-#: assets/js/noodled.js:2282
+#: assets/js/noodled.js:2283
 msgid "yesterday"
 msgstr ""
 
@@ -3040,7 +3057,7 @@ msgstr ""
 msgid "you@example.com"
 msgstr ""
 
-#: includes/class-noodled-app.php:413
+#: includes/class-noodled-app.php:422
 msgid "© %1$s %2$s"
 msgstr ""
 
@@ -3052,19 +3069,19 @@ msgstr ""
 msgid "— emailed ✓"
 msgstr ""
 
-#: assets/js/noodled.js:2530
+#: assets/js/noodled.js:2531
 msgid "↓ Pull to refresh"
 msgstr ""
 
-#: assets/js/noodled.js:427
+#: assets/js/noodled.js:428
 msgid "✨ Updated to v%s"
 msgstr ""
 
-#: assets/js/noodled.js:1027
+#: assets/js/noodled.js:1028
 msgid "📍 %1$s, %2$s"
 msgstr ""
 
-#: assets/js/noodled.js:1029
+#: assets/js/noodled.js:1030
 msgid "📍 Near %1$s (%2$s, %3$s)"
 msgstr ""
 

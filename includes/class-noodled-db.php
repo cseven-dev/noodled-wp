@@ -109,6 +109,16 @@ CREATE TABLE {$wpdb->prefix}noodled_reminders (
   KEY idx_user_due (user_id, sent, remind_at),
   KEY idx_note (note_id)
 ) $charset;
+
+CREATE TABLE {$wpdb->prefix}noodled_revisions (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  note_id bigint(20) unsigned NOT NULL,
+  title varchar(500) NOT NULL DEFAULT '',
+  body longtext,
+  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_note (note_id)
+) $charset;
 ";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
