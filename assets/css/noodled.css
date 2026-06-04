@@ -1043,6 +1043,13 @@ html.theme-switching * {
   padding: 8px 24px 40px;
   padding-bottom: max(40px, env(safe-area-inset-bottom, 40px));
 }
+.md-filter-wrap { position: sticky; top: 0; z-index: 1; padding: 6px 0 2px; background: var(--bg-content); }
+.md-filter {
+  width: 100%; box-sizing: border-box; padding: 11px 14px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg-input); color: var(--text); font-size: 14px; outline: none;
+}
+.md-filter:focus { border-color: var(--accent); }
 .md-sec { margin-top: 24px; }
 .md-sec-t {
   font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 16px;

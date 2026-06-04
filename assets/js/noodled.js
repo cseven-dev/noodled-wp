@@ -558,6 +558,7 @@ function dateGroup(dateStr) {
 function renderNoteList() {
   const el = document.getElementById('noteList');
   setupNoteSwipe();
+  setupPullRefresh();
   const countEl = document.getElementById('noteCount');
   const q = (document.getElementById('searchInput') || {}).value || '';
   const searching = !!q.trim();
@@ -1397,7 +1398,36 @@ function closeMenuDashboard() {
   document.removeEventListener('keydown', menuDashEsc);
   setTimeout(() => { if (!c.classList.contains('open')) c.innerHTML = ''; }, 240);
 }
-function menuDashEsc(e) { if (e.key === 'Escape') closeMenuDashboard(); }
+function menuDashEsc(e) {
+  if (e.key === 'Escape') { closeMenuDashboard(); return; }
+  // Arrow-key navigation between the (visible) option cards.
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const active = document.activeElement;
+  if (!active || !active.classList || !active.classList.contains('md-card')) return;
+  e.preventDefault();
+  const cards = Array.from(document.querySelectorAll('#menuDashboard .md-card')).filter(c => !c.hasAttribute('data-hidden'));
+  const i = cards.indexOf(active);
+  const next = e.key === 'ArrowDown' ? cards[i + 1] : cards[i - 1];
+  if (next) next.focus();
+}
+
+// Type-to-filter the dashboard cards (and hide empty sections).
+function filterMenuDash(q) {
+  q = (q || '').trim().toLowerCase();
+  const root = document.getElementById('menuDashboard');
+  if (!root) return;
+  root.querySelectorAll('.md-sec').forEach(sec => {
+    const cards = sec.querySelectorAll('.md-card');
+    if (!cards.length) { sec.style.display = q ? 'none' : ''; return; } // theme section
+    let any = false;
+    cards.forEach(card => {
+      const show = !q || card.textContent.toLowerCase().includes(q);
+      card.style.display = show ? '' : 'none';
+      if (show) { card.removeAttribute('data-hidden'); any = true; } else { card.setAttribute('data-hidden', '1'); }
+    });
+    sec.style.display = any ? '' : 'none';
+  });
+}
 // Back-compat: anything that still calls toggleAppMenu now toggles the dashboard.
 function toggleAppMenu() {
   const c = document.getElementById('menuDashboard');
@@ -1469,6 +1499,9 @@ function renderMenuDashboard() {
         <button class="md-close" onclick="closeMenuDashboard()" aria-label="${escAttr(__( 'Close menu', 'noodled' ))}"><span aria-hidden="true">&#10005;</span></button>
       </div>
       <div class="md-body">
+        <div class="md-filter-wrap">
+          <input type="search" id="mdFilter" class="md-filter" placeholder="${escAttr(__( 'Filter…', 'noodled' ))}" aria-label="${escAttr(__( 'Filter menu', 'noodled' ))}" oninput="filterMenuDash(this.value)" onkeydown="if(event.key==='ArrowDown'){event.preventDefault();document.querySelector('#menuDashboard .md-card:not([data-hidden])')?.focus();}">
+        </div>
         ${sections.map(section).join('')}
         <section class="md-sec">
           <h3 class="md-sec-t">${esc(__( 'Appearance', 'noodled' ))}</h3>
@@ -3882,6 +3915,38 @@ function setupNoteSwipe() {
   list.addEventListener('touchend', end);
   list.addEventListener('touchcancel', end);
 }
+// Pull down at the top of the note list to refresh (reloads notebooks + notes).
+function setupPullRefresh() {
+  const sc = document.getElementById('noteList');
+  const ind = document.getElementById('pullIndicator');
+  if (!sc || !ind || sc._pullWired) return;
+  sc._pullWired = true;
+  let startY = 0, pulling = false, dist = 0, busy = false;
+  const reset = () => { ind.classList.remove('show'); ind.textContent = '↓ ' + __( 'Pull to refresh', 'noodled' ); };
+  sc.addEventListener('touchstart', (e) => { pulling = sc.scrollTop <= 0 && !busy; startY = e.touches[0].clientY; dist = 0; }, { passive: true });
+  sc.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist > 8 && sc.scrollTop <= 0) {
+      ind.classList.add('show');
+      ind.textContent = (dist > 70 ? '↑ ' + __( 'Release to refresh', 'noodled' ) : '↓ ' + __( 'Pull to refresh', 'noodled' ));
+      if (dist > 12) e.preventDefault();
+    } else if (dist <= 0) { ind.classList.remove('show'); }
+  }, { passive: false });
+  const end = async () => {
+    if (!pulling) return;
+    const ready = dist > 70; pulling = false; dist = 0;
+    if (!ready) { reset(); return; }
+    busy = true;
+    ind.classList.add('show'); ind.textContent = '⟳ ' + __( 'Refreshing…', 'noodled' );
+    try { await loadNotebooks(); await loadNotes(); } catch (e) {}
+    busy = false;
+    setTimeout(reset, 300);
+  };
+  sc.addEventListener('touchend', end);
+  sc.addEventListener('touchcancel', end);
+}
+
 async function swipeTrash(id) {
   const n = notes.find(x => x.id === id); if (!n) return;
   try { await api.delete_note(n.notebook, id); } catch (e) { showToast(__( 'Delete failed', 'noodled' )); return; }
