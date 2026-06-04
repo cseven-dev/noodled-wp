@@ -232,9 +232,14 @@ function renderNotebooks() {
   const el = document.getElementById('nbList');
   // Group by parent_id to render a collapsible tree. Sibling order follows the
   // notebooks array (already sorted by sort_order from the server).
+  // Your own notebooks render as the tree; notebooks shared with you (drop folders
+  // and other people's shares) are grouped under "Others' Noodles" instead of
+  // mixing into your list.
+  const mine = notebooks.filter(nb => nb.access === 'owner');
+  const shared = notebooks.filter(nb => nb.access !== 'owner');
   const childrenOf = {};
-  notebooks.forEach(nb => { const p = nb.parent || 0; (childrenOf[p] = childrenOf[p] || []).push(nb); });
-  const known = new Set(notebooks.map(n => n.id));
+  mine.forEach(nb => { const p = nb.parent || 0; (childrenOf[p] = childrenOf[p] || []).push(nb); });
+  const known = new Set(mine.map(n => n.id));
   const collapsed = new Set(config.nb_collapsed || []);
   let ci = 0; // color index, advanced in traversal order
 
@@ -265,9 +270,37 @@ function renderNotebooks() {
   }
 
   const roots = (childrenOf[0] || []).slice();
-  // Orphans (parent points at a notebook the user can't see) render at top level.
-  notebooks.forEach(nb => { if (nb.parent && !known.has(nb.parent)) roots.push(nb); });
-  el.innerHTML = roots.map(nb => nbItem(nb, 0)).join('');
+  // Orphans (parent points at a notebook outside your own set) render at top level.
+  mine.forEach(nb => { if (nb.parent && !known.has(nb.parent)) roots.push(nb); });
+  let html = roots.map(nb => nbItem(nb, 0)).join('');
+
+  // ── "Others' Noodles": everything shared with you, grouped (by person when
+  // someone shared more than one notebook). ──
+  if (shared.length) {
+    const okey = '__others__';
+    const oCol = collapsed.has(okey);
+    html += `<div class="nb-item nb-others-head" role="button" tabindex="0" aria-expanded="${oCol ? 'false' : 'true'}" aria-label="${escAttr(__( "Others' Noodles", 'noodled' ))}" onclick="toggleNbCollapse('${okey}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNbCollapse('${okey}')}">
+      <span class="nb-caret${oCol ? '' : ' open'}" aria-hidden="true">&#9656;</span>
+      <span class="nb-name">&#128101; ${esc(__( "Others' Noodles", 'noodled' ))}</span>
+      <span class="count">${shared.length}</span>
+    </div>`;
+    if (!oCol) {
+      const byPerson = {};
+      shared.forEach(nb => { const p = nb.owner_name || __( 'Shared with me', 'noodled' ); (byPerson[p] = byPerson[p] || []).push(nb); });
+      Object.keys(byPerson).sort((a, b) => a.localeCompare(b)).forEach(person => {
+        const list = byPerson[person];
+        // A single shared folder (e.g. a drop folder already named after the
+        // person) renders directly; 2+ get a person sub-heading.
+        if (list.length > 1) {
+          html += `<div class="nb-person-head">${esc(person)}</div>`;
+          list.forEach(nb => { html += nbItem(nb, 2); });
+        } else {
+          html += nbItem(list[0], 1);
+        }
+      });
+    }
+  }
+  el.innerHTML = html;
 
   document.getElementById('nbAll').className = 'nb-all' + (activeNotebook === null && !viewingTrash && !viewingStarred && !viewingTasks && _activeSmart === null ? ' active' : '');
   renderSmartNotebooks();
@@ -2090,9 +2123,9 @@ function manageUsers() {
   const menu = document.getElementById('appMenu'); if (menu) menu.classList.remove('show');
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:540px">
+    <div class="modal mu-modal" style="max-width:min(540px,94vw)">
       <h3>${esc(__( 'People', 'noodled' ))}</h3>
-      <div id="muBody" style="max-height:62vh;overflow:auto;margin-top:8px">${esc(__( 'Loading…', 'noodled' ))}</div>
+      <div id="muBody" style="max-height:64vh;overflow:auto;margin-top:8px">${esc(__( 'Loading…', 'noodled' ))}</div>
       <div class="modal-buttons" style="margin-top:12px">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
@@ -2112,18 +2145,18 @@ async function renderManageUsers() {
   if (pending.length) {
     h += '<div class="mu-head">' + esc(__( 'Pending requests', 'noodled' )) + '</div>';
     pending.forEach(u => {
-      h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)}</span></div>
-        <div class="mu-actions"><button class="btn btn-sm btn-accent" onclick="muApprove(${u.id})">${esc(__( 'Approve', 'noodled' ))}</button><button class="btn btn-sm" onclick="muRemove(${u.id})">${esc(__( 'Deny', 'noodled' ))}</button></div></div>`;
+      h += `<div class="mu-card"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span class="mu-sub">${esc(u.email)}</span></div>
+        <div class="mu-actions"><button class="btn btn-sm btn-accent" onclick="muApprove(${u.id})">${esc(__( 'Approve', 'noodled' ))}</button><button class="btn btn-sm mu-remove" onclick="muRemove(${u.id})">${esc(__( 'Deny', 'noodled' ))}</button></div></div>`;
     });
   }
   h += '<div class="mu-head">' + esc(__( 'Members', 'noodled' )) + '</div>';
   members.forEach(u => {
     const drop = u.role === 'member'
-      ? `<label class="mu-drop"><input type="checkbox" ${u.drop ? 'checked' : ''} onchange="muDrop(${u.id}, this.checked)"> ${esc(__( 'drop', 'noodled' ))}</label>` : '';
+      ? `<label class="mu-drop"><input type="checkbox" ${u.drop ? 'checked' : ''} onchange="muDrop(${u.id}, this.checked)"> ${esc(__( 'Drop folder', 'noodled' ))}</label>` : '';
     /* translators: %s is the member name or email */
     const removeAria = escAttr(sprintf( __( 'Remove %s', 'noodled' ), u.display_name || u.email || __( 'member', 'noodled' ) ));
-    h += `<div class="mu-row"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span>${esc(u.email)} · ${esc(u.role)}</span><span class="mu-pin" id="mu-pin-${u.id}"></span></div>
-      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">${esc(__( 'PIN', 'noodled' ))}</button><button class="btn btn-sm" aria-label="${removeAria}" onclick="muRemove(${u.id})">&#10005;</button></div></div>`;
+    h += `<div class="mu-card"><div class="mu-info"><b>${esc(u.display_name || u.email)}</b><span class="mu-sub">${esc(u.email)}<span class="mu-role">${esc(u.role)}</span></span><span class="mu-pin" id="mu-pin-${u.id}"></span></div>
+      <div class="mu-actions">${drop}<button class="btn btn-sm" onclick="muPin(${u.id})">${esc(__( 'Send PIN', 'noodled' ))}</button><button class="btn btn-sm mu-remove" aria-label="${removeAria}" onclick="muRemove(${u.id})">${esc(__( 'Remove', 'noodled' ))}</button></div></div>`;
   });
   h += `<div class="mu-head">${esc(__( 'Invite someone', 'noodled' ))}</div>
     <div class="mu-invite">

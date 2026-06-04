@@ -533,10 +533,16 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  min-width: 340px;
-  max-width: 500px;
+  min-width: 0;
+  /* Never exceed the viewport (with box-sizing the padding is included), so
+     modals can't get clipped at the screen edges on a phone. */
+  max-width: min(500px, 94vw);
+  box-sizing: border-box;
   animation: slideUp 0.2s ease;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+@media (max-width: 560px) {
+  .modal { padding: 18px 16px; max-width: 94vw; }
 }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -820,6 +826,11 @@ body.reading-mode .rendered-content { cursor: default; }
 .mermaid-out { text-align: center; }
 .mermaid-out svg { max-width: 100%; height: auto; }
 .math-out { padding: 6px 0; overflow-x: auto; }
+
+/* ── "Others' Noodles" shared-folder group ── */
+.nb-others-head { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 8px; }
+.nb-others-head .nb-name { color: var(--text-muted); font-weight: 600; }
+.nb-person-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); padding: 6px 8px 2px 28px; }
 
 /* ── Nested notebooks (tree) ── */
 .nb-caret { flex: 0 0 auto; width: 14px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); font-size: 9px; transition: transform 0.12s; }
@@ -1408,24 +1419,29 @@ html.theme-switching * {
 
 /* ── Owner: manage people ── */
 .mu-head { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin: 16px 0 6px; }
-.mu-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
-.mu-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.mu-info b { color: var(--text-bright); font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
-.mu-info span { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
-.mu-pin { color: var(--green, #34d399); }
-.mu-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.mu-drop { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
-.mu-invite { display: flex; flex-direction: column; gap: 8px; }
-.mu-invite-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.mu-status { font-size: 12px; color: var(--text-muted); }
-/* On phones, stack each person's info above their action buttons so the name,
-   email, PIN and the drop/PIN/remove controls never collide. */
-@media (max-width: 768px) {
-  .mu-row { flex-direction: column; align-items: stretch; gap: 8px; }
-  .mu-info { width: 100%; }
-  .mu-info b, .mu-info span { white-space: normal; word-break: break-word; }
-  .mu-actions { justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
-  .mu-invite-row { gap: 8px; }
+.mu-card { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.mu-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 150px; }
+.mu-info b { color: var(--text-bright); font-size: 14px; word-break: break-word; }
+.mu-sub { font-size: 11px; color: var(--text-muted); word-break: break-word; }
+.mu-role { display: inline-block; background: var(--bg-input); border-radius: 8px; padding: 0 6px; margin-left: 5px; font-size: 10px; text-transform: capitalize; }
+.mu-pin { display: block; font-size: 12px; color: var(--green, #34d399); margin-top: 3px; }
+.mu-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.mu-actions .btn { min-height: 34px; }
+.mu-remove { color: #f87171; }
+.mu-drop { font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.mu-drop input { margin: 0; }
+.mu-invite { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.mu-invite-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mu-status { font-size: 12px; color: var(--text-muted); flex-basis: 100%; }
+/* On phones: each person is a card; the action buttons share the row evenly and
+   the drop toggle drops to its own full-width line, so nothing overlaps or clips. */
+@media (max-width: 560px) {
+  .mu-card { flex-direction: column; align-items: stretch; gap: 10px; }
+  .mu-info { width: 100%; flex: none; }
+  .mu-actions { width: 100%; }
+  .mu-actions .btn { flex: 1 1 auto; }
+  .mu-drop { flex: 1 1 100%; justify-content: center; }
+  .mu-invite-row .btn { flex: 1 1 auto; }
 }
 
 /* ── Save queue indicator ── */

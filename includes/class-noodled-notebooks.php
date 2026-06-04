@@ -31,6 +31,7 @@ class Noodled_Notebooks {
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT n.*, COALESCE(c.cnt, 0) AS note_count,
 			        ad.display_name AS drop_admin,
+			        ow.display_name AS owner_name, ow.email AS owner_email,
 			        CASE WHEN n.owner_id = %d THEN 'owner'
 			             WHEN p.can_write = 1 THEN 'write'
 			             ELSE 'read' END AS access
@@ -42,6 +43,7 @@ class Noodled_Notebooks {
 			 ) c ON c.notebook_id = n.id
 			 LEFT JOIN {$pt} p ON p.notebook_id = n.id AND p.user_id = %d
 			 LEFT JOIN {$ut} ad ON ad.id = n.drop_to
+			 LEFT JOIN {$ut} ow ON ow.id = n.owner_id
 			 WHERE n.owner_id = %d OR (p.user_id = %d AND p.can_read = 1)
 			 ORDER BY n.sort_order ASC, n.name ASC",
 			$user_id, $user_id, $user_id, $user_id
@@ -64,6 +66,7 @@ class Noodled_Notebooks {
 				'drop'   => $is_drop,
 				'color'  => $r['color'] ?? '',
 				'parent' => (int) ( $r['parent_id'] ?? 0 ),
+				'owner_name' => $r['owner_name'] ?: ( $r['owner_email'] ?? '' ),
 			];
 		}, $rows ?: [] );
 	}
