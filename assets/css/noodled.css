@@ -98,6 +98,12 @@ body {
   align-self: center;
 }
 
+/* Hamburger (menu) button: larger, easier tap target */
+#appMenuBtn { font-size: 20px; }
+@media (max-width: 768px) {
+  #appMenuBtn { font-size: 24px; padding: 8px 12px; }
+}
+
 .toolbar .spacer { flex: 1; }
 
 .toolbar .status {
@@ -811,27 +817,30 @@ body.reading-mode .rendered-content { cursor: default; }
 .bottom-nav {
   display: none; position: fixed; bottom: 0; left: 0; right: 0;
   background: var(--bg-toolbar); border-top: 1px solid var(--border);
-  z-index: 75; padding: 4px 0; padding-bottom: env(safe-area-inset-bottom, 4px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  z-index: 75; padding: 8px 6px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  padding-left: max(10px, env(safe-area-inset-left, 0px));
+  padding-right: max(10px, env(safe-area-inset-right, 0px));
 }
 .bottom-nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  gap: 2px; background: none; border: none; color: var(--text-muted);
-  font-size: 10px; padding: 6px 0; cursor: pointer;
+  gap: 4px; background: none; border: none; color: var(--text-muted);
+  font-size: 10px; padding: 8px 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent; transition: color 0.15s;
 }
 .bottom-nav-item:active { color: var(--accent); transform: scale(0.92); }
-.bottom-nav-icon { font-size: 20px; line-height: 1; }
+.bottom-nav-icon { font-size: 21px; line-height: 1; }
 .bottom-nav-label { font-size: 10px; }
 .bottom-nav-primary {
-  margin-top: -12px; background: var(--accent); color: #fff;
-  width: 48px; height: 48px; border-radius: 50%;
+  /* Fixed circle (no flex-grow) so it stays round and the side items get the
+     freed-up width. */
+  flex: 0 0 58px; width: 58px; height: 58px;
+  margin-top: -18px; background: var(--accent); color: #fff;
+  border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.32);
 }
 .bottom-nav-primary:active { background: var(--accent-hover); }
-.bottom-nav-primary .bottom-nav-icon { font-size: 24px; font-weight: 300; transition: transform 0.2s ease; }
+.bottom-nav-primary .bottom-nav-icon { font-size: 30px; font-weight: 300; transition: transform 0.2s ease; }
 .bottom-nav-primary.open { background: var(--accent-hover); }
 .bottom-nav-primary.open .bottom-nav-icon { transform: rotate(45deg); }
 
@@ -844,7 +853,7 @@ body.reading-mode .rendered-content { cursor: default; }
 .quick-add-scrim.show { opacity: 1; }
 .quick-add-menu {
   position: fixed; left: 0; right: 0; z-index: 81;
-  bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 16px);
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 16px);
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 0 24px; pointer-events: none;
 }
@@ -1467,12 +1476,12 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   .fab { display: none; }
 
   /* Adjust for bottom nav */
-  .main { height: calc(100vh - 42px - 60px); }
+  .main { height: calc(100vh - 42px - 72px); }
   .col-notes { padding-bottom: 0; }
 
 
   /* Toast: above bottom nav */
-  .toast { left: 16px; right: 16px; bottom: 80px; text-align: center; }
+  .toast { left: 16px; right: 16px; bottom: 92px; text-align: center; }
 }
 
 @media (min-width: 769px) {

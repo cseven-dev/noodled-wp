@@ -72,7 +72,7 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
   </div>
   <span class="status" id="status"></span>
   <div class="sync-pill" id="syncPill" aria-live="polite"></div>
-  <button class="btn btn-sm" onclick="syncPull()" id="syncPullBtn" title="<?php esc_attr_e( 'Sync with GitHub', 'noodled' ); ?>"><?php esc_html_e( 'Sync', 'noodled' ); ?></button>
+  <button class="btn btn-sm hide-mobile" onclick="syncPull()" id="syncPullBtn" title="<?php esc_attr_e( 'Sync with GitHub', 'noodled' ); ?>"><?php esc_html_e( 'Sync', 'noodled' ); ?></button>
   <?php if ( Noodled_Plaud::is_configured() ) : ?>
   <button class="btn btn-sm" onclick="syncPlaud()" id="plaudSyncBtn" title="<?php esc_attr_e( 'Import Plaud recordings', 'noodled' ); ?>"><?php esc_html_e( 'Plaud', 'noodled' ); ?></button>
   <?php endif; ?>
