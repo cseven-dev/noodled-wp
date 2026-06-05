@@ -1818,6 +1818,8 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 /* ── Checklist progress badges ── */
 .att-badge.task-badge { background: rgba(59,130,246,.16); }
 .att-badge.task-badge.all-done { background: rgba(16,185,129,.2); color: var(--text); }
+/* Offline-first (#6): a quiet green dot marking notes cached for offline opening. */
+.note-item .offline-dot { color: #34d399; font-size: 14px; line-height: 1; opacity: .8; }
 .footer-tasks .ftbar { display: inline-block; width: 46px; height: 5px; border-radius: 3px;
   background: var(--border); margin-left: 6px; vertical-align: middle; overflow: hidden; }
 .footer-tasks .ftbar > span { display: block; height: 100%; background: var(--accent); }

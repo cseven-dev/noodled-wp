@@ -85,6 +85,78 @@ self.addEventListener('notificationclick', event => {
   })());
 });
 
+// ── Offline queue flush (Background Sync, #4) ─────────────────────────────────
+// Mirrors the app's IndexedDB ('noodled' DB, 'meta' store). When the device
+// reconnects, replay the signed-in user's queued note saves so edits made with
+// the app closed still reach the server. Chromium only; iOS has no Background
+// Sync and falls back to the app's in-page retry on next open.
+function swIdbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('noodled', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('bodies')) db.createObjectStore('bodies', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('meta'))   db.createObjectStore('meta',   { keyPath: 'key' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function swIdbGet(db, store, key) {
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(store, 'readonly').objectStore(store).get(key);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+function swIdbPut(db, store, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function flushQueue() {
+  const db = await swIdbOpen();
+  const active = await swIdbGet(db, 'meta', 'activeUser');
+  if (!active || !active.email || !active.apiBase) return;
+  const qKey = 'queue::' + active.email;
+  const rec = await swIdbGet(db, 'meta', qKey);
+  const items = (rec && Array.isArray(rec.items)) ? rec.items : [];
+  if (!items.length) return;
+
+  const remaining = [];
+  let flushed = 0, networkFail = false;
+  for (const item of items) {
+    const payload = { title: item.title, body: item.body };
+    if (item.base) payload.base_modified = item.base; // conflict-safe, never blind force
+    try {
+      const res = await fetch(active.apiBase + '/notes/' + item.noteId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': active.nonce || '' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) { remaining.push(item); continue; } // auth/server issue → resolve in-app
+      const data = await res.json().catch(() => ({}));
+      if (data && data.conflict) { remaining.push(item); continue; } // surfaces in the app's resolver
+      flushed++;
+    } catch (e) {
+      remaining.push(item); networkFail = true; // still offline → keep for the next sync
+    }
+  }
+  await swIdbPut(db, 'meta', { key: qKey, items: remaining });
+  const cs = await self.clients.matchAll({ includeUncontrolled: true });
+  for (const c of cs) c.postMessage({ type: 'noodled-synced', count: flushed });
+  // Reject so the browser reschedules the sync if we're still offline; a conflict
+  // or auth failure is terminal here (the app resolves it on next open).
+  if (networkFail) throw new Error('offline — retry later');
+}
+self.addEventListener('sync', event => {
+  if (event.tag === 'noodled-flush') event.waitUntil(flushQueue());
+});
+
 // Server-initiated web push (future: needs VAPID keys + a wp-cron sender). The
 // client-side scheduler already fires due reminders while the app is open; this
 // handler lets a real push service deliver them when it is closed.

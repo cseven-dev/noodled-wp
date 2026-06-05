@@ -48,7 +48,7 @@ const api = {
   set_notebook_color(name, color)        { return this._fetch('/notebooks/color', { method: 'POST', body: JSON.stringify({ name, color }) }); },
   set_notebook_parent(name, parent)      { return this._fetch('/notebooks/parent', { method: 'POST', body: JSON.stringify({ name, parent }) }); },
   get_notes(notebook)                    { return this._fetch('/notes' + (notebook ? '?notebook=' + encodeURIComponent(notebook) : '')); },
-  get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId); },
+  get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId).then(note => { cacheBody(note); return note; }).catch(async err => { const c = await readCachedBody(noteId); if (c) return c; throw err; }); },
   create_note(notebook, title, body)     { return this._fetch('/notes', { method: 'POST', body: JSON.stringify({ notebook, title, body: body || '' }) }); },
   save_note(notebook, noteId, title, body, opts) { const p = { title, body }; if (opts && opts.base) p.base_modified = opts.base; if (opts && opts.force) p.force = true; return this._fetch('/notes/' + noteId, { method: 'PUT', body: JSON.stringify(p) }); },
   delete_note(notebook, noteId)          { return this._fetch('/notes/' + noteId, { method: 'DELETE' }); },
@@ -144,6 +144,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // notes/trash were already in flight in parallel.
   await loadNotebooks().catch(e => console.error('Noodled: notebooks load failed', e.message));
   await Promise.allSettled([ notesP, trashP ]);
+
+  // Offline-first (#6): mark which notes are already cached, then warm the cache
+  // with recent bodies so they open with no connection. Both off the critical path.
+  loadOfflineReady().then(() => renderNoteList());
+  warmOfflineCache();
+  // Ask the browser to keep the offline cache from being evicted under pressure.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 
   maybeWhatsNew();
   maybeSeedStarter();
@@ -569,17 +576,82 @@ async function loadNotes() {
   _bodiesLoaded = false; // list responses are body-free; re-hydrate lazily on demand
   try {
     notes = await api.get_notes(activeNotebook);
-    // Cache for offline reading (keyed by notebook scope).
-    try { localStorage.setItem('noodled_notes_cache', JSON.stringify({ nb: activeNotebook, notes })); } catch (e) {}
+    cacheNotesList(activeNotebook, notes);
   } catch (e) {
     // Offline / fetch failed → fall back to the last cached copy so notes stay readable.
-    try {
-      const c = JSON.parse(localStorage.getItem('noodled_notes_cache') || 'null');
-      if (c && c.nb === activeNotebook && Array.isArray(c.notes)) { notes = c.notes; showToast(__( 'Offline — showing cached notes', 'noodled' )); }
-      else throw e;
-    } catch (_) { throw e; }
+    const cached = await readCachedNotesList(activeNotebook);
+    if (cached) { notes = cached; showToast(__( 'Offline — showing cached notes', 'noodled' )); }
+    else throw e;
   }
   filterNotes();
+}
+// Per-user, per-notebook list cache in IndexedDB (localStorage mirrored as the
+// fallback for private mode). Body-free — the offline body cache is Phase 1.
+function cacheNotesList(nb, list) {
+  try { localStorage.setItem('noodled_notes_cache', JSON.stringify({ nb, notes: list })); } catch (e) {}
+  idb.put('meta', { key: 'notes::' + userScope() + '::' + (nb || '*'), nb, notes: list, time: Date.now() }).catch(() => {});
+}
+async function readCachedNotesList(nb) {
+  try {
+    const rec = await idb.get('meta', 'notes::' + userScope() + '::' + (nb || '*'));
+    if (rec && Array.isArray(rec.notes)) return rec.notes;
+  } catch (e) {}
+  try {
+    const c = JSON.parse(localStorage.getItem('noodled_notes_cache') || 'null');
+    if (c && c.nb === nb && Array.isArray(c.notes)) return c.notes;
+  } catch (e) {}
+  return null;
+}
+
+// ── Offline body cache (#6) ───────────────────────────────────────────────────
+// Stores full note objects so any cached note opens with no connection. Capped:
+// all pinned are kept plus the BODY_CACHE_CAP most-recently-cached, LRU evicted.
+// Scoped per user (key prefix) so a shared device never leaks across members.
+const BODY_CACHE_CAP = 200;
+const _offlineReady = new Set(); // note ids with a cached body (drives the list marker)
+function bodyKey(id) { return 'body::' + userScope() + '::' + id; }
+function cacheBody(note) {
+  if (!note || !note.id || note.body == null) return;
+  _offlineReady.add(note.id);
+  idb.put('bodies', { key: bodyKey(note.id), user: userScope(), id: note.id, note, pinned: !!note.pinned, time: Date.now() }).catch(() => {});
+}
+async function readCachedBody(id) {
+  try { const rec = await idb.get('bodies', bodyKey(id)); return rec ? rec.note : null; }
+  catch (e) { return null; }
+}
+// Pull already-cached ids into memory at startup so the list can mark "available
+// offline" without a per-row async lookup.
+async function loadOfflineReady() {
+  try {
+    const me = userScope();
+    (await idb.getAll('bodies') || []).forEach(r => { if (r.user === me && r.id) _offlineReady.add(r.id); });
+  } catch (e) {}
+}
+// LRU eviction: keep all pinned + the BODY_CACHE_CAP most-recent bodies for this user.
+async function evictBodyCache() {
+  try {
+    const me = userScope();
+    const rows = (await idb.getAll('bodies') || []).filter(r => r.user === me);
+    const rest = rows.filter(r => !r.pinned).sort((a, b) => (b.time || 0) - (a.time || 0));
+    for (const r of rest.slice(BODY_CACHE_CAP)) { _offlineReady.delete(r.id); await idb.del('bodies', r.key); }
+  } catch (e) {}
+}
+// Shared-device privacy (decision #1): wipe all offline data so a previous
+// member's notes never linger when a different member signs in on this browser.
+async function purgeOfflineCache() {
+  _offlineReady.clear();
+  try { await idb.clear('bodies'); } catch (e) {}
+  try { await idb.clear('meta'); } catch (e) {}
+  try { localStorage.removeItem('noodled_notes_cache'); localStorage.removeItem(SAVE_QUEUE_KEY); } catch (e) {}
+}
+// Warm the offline cache: hydrate all bodies in scope (via ensureBodies) and
+// persist them, so recent notes open offline without opening each one first.
+// Runs once per session, online only, deferred off the critical path.
+let _offlineWarmed = false;
+function warmOfflineCache() {
+  if (_offlineWarmed || !navigator.onLine) return;
+  _offlineWarmed = true;
+  setTimeout(() => { ensureBodies().then(() => renderNoteList()).catch(() => {}); }, 3000);
 }
 
 // Note bodies are no longer shipped in the list (fast first paint). Features that
@@ -598,6 +670,9 @@ async function ensureBodies() {
         const merge = arr => arr.forEach(n => { if (n && n.body == null && byId[n.id] != null) n.body = byId[n.id]; });
         merge(notes); merge(filteredNotes);
         _bodiesLoaded = true;
+        // Warm the offline-open cache (#6) with everything just hydrated, then
+        // trim to the cap. Best-effort, off the critical path.
+        try { notes.forEach(n => { if (n && n.body != null) cacheBody(n); }); evictBodyCache(); } catch (e) {}
       } catch (e) { /* offline / failed → features degrade to title+preview */ }
       finally { _bodiesPromise = null; }
     })();
@@ -902,6 +977,8 @@ function renderNoteItem(n) {
     const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${escAttr(sprintf( __( '%1$d of %2$d tasks done', 'noodled' ), tasks.done, tasks.total ))}">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
     const time = relativeTime(n.modified || n.created);
     const fullDate = n.modified || n.created || '';
+    // Offline-first (#6): a quiet dot marking notes whose body is cached locally.
+    const offlineDot = _offlineReady.has(n.id) ? `<span class="offline-dot" title="${escAttr(__( 'Available offline', 'noodled' ))}" aria-label="${escAttr(__( 'Available offline', 'noodled' ))}">&#8226;</span>` : '';
     /* translators: %s is the note title */
     const checkbox = bulkMode ? `<input type="checkbox" class="bulk-cb" aria-label="${escAttr(sprintf( __( 'Select note: %s', 'noodled' ), n.title || __( 'Untitled', 'noodled' ) ))}" ${bulkSelected.has(n.id) ? 'checked' : ''} onclick="toggleBulkSelect(${n.id}, event)">` : '';
     const noteColor = getNoteColor(n.id);
@@ -920,6 +997,7 @@ function renderNoteItem(n) {
         <div class="meta">
           <span class="note-time" data-ts="${escAttr(fullDate)}" title="${escAttr(fullDate)}">${esc(time)}</span>
           <span>${esc(n.notebook)}</span>
+          ${offlineDot}
           ${attBadge}
           ${taskBadge}
         </div>
@@ -2655,15 +2733,88 @@ function updateSyncPill() {
   if (!_syncPillTimer) _syncPillTimer = setInterval(updateSyncPill, 30000);
 }
 
+// ── IndexedDB layer (offline store shared by the app + service worker) ────────
+// localStorage is too small for note bodies and the service worker can't read it,
+// so the offline-open cache (#6) and the durable save queue (#4) live here. Every
+// record key is prefixed with the signed-in user (see userScope) so a shared
+// device never surfaces one member's notes to another; the store is wiped on
+// logout / user-switch. All ops are best-effort: localStorage stays as the
+// synchronous fallback if IndexedDB is unavailable (private mode, old browser).
+const IDB_NAME = 'noodled';
+const IDB_VERSION = 1;
+let _idbPromise = null;
+function idbReady() {
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject) => {
+    let req;
+    try { req = indexedDB.open(IDB_NAME, IDB_VERSION); }
+    catch (e) { return reject(e); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('bodies')) db.createObjectStore('bodies', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('meta'))   db.createObjectStore('meta',   { keyPath: 'key' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+  return _idbPromise;
+}
+function idbTx(store, mode, fn) {
+  return idbReady().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, mode);
+    const r = fn(tx.objectStore(store));
+    let out;
+    if (r) r.onsuccess = () => { out = r.result; };
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort  = () => reject(tx.error);
+  }));
+}
+const idb = {
+  get:    (store, key)   => idbTx(store, 'readonly',  os => os.get(key)),
+  getAll: (store)        => idbTx(store, 'readonly',  os => os.getAll()),
+  put:    (store, value) => idbTx(store, 'readwrite', os => os.put(value)),
+  del:    (store, key)   => idbTx(store, 'readwrite', os => os.delete(key)),
+  clear:  (store)        => idbTx(store, 'readwrite', os => os.clear()),
+};
+// Stable per-user scope key: the signed-in email (only ever stored in this user's
+// own browser). Falls back to 'anon' for a logged-out shell.
+function userScope() {
+  try { return (noodledConfig.user && noodledConfig.user.email) || 'anon'; }
+  catch (e) { return 'anon'; }
+}
+
 const SAVE_QUEUE_KEY = 'noodled_save_queue';
 function persistSaveQueue() {
   try { localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(saveQueue)); } catch (e) {}
+  // Mirror to IndexedDB (per-user) so a Background Sync handler can flush the
+  // queue even when the app is closed (Phase 2). Best-effort.
+  idb.put('meta', { key: 'queue::' + userScope(), items: saveQueue }).catch(() => {});
   updateOfflineBanner();
 }
 function loadSaveQueue() {
-  try { const q = JSON.parse(localStorage.getItem(SAVE_QUEUE_KEY) || '[]'); if (Array.isArray(q)) saveQueue = q; } catch (e) {}
-  if (saveQueue.length && !saveRetryTimer) saveRetryTimer = setInterval(retrySaveQueue, 15000);
-  updateOfflineBanner();
+  const fromLocal = () => {
+    try { const q = JSON.parse(localStorage.getItem(SAVE_QUEUE_KEY) || '[]'); if (Array.isArray(q)) saveQueue = q; } catch (e) {}
+  };
+  const finish = () => {
+    // Record who's active + how the SW should authenticate the background flush
+    // (the noodled_session cookie rides along automatically; the nonce is only
+    // needed for the WP-admin path and is refreshed every load).
+    idb.put('meta', { key: 'activeUser', email: userScope(), nonce: noodledConfig.nonce, apiBase: noodledConfig.apiBase }).catch(() => {});
+    idb.get('meta', 'queue::' + userScope()).then(rec => {
+      if (rec && Array.isArray(rec.items) && rec.items.length) saveQueue = rec.items;
+      else fromLocal();
+    }).catch(fromLocal).finally(() => {
+      if (saveQueue.length && !saveRetryTimer) saveRetryTimer = setInterval(retrySaveQueue, 15000);
+      updateOfflineBanner();
+    });
+  };
+  // If a different member is now signed in on this browser, purge the previous
+  // user's offline data first (decision #1), then load this user's queue.
+  idb.get('meta', 'activeUser')
+    .then(prev => (prev && prev.email && prev.email !== userScope()) ? purgeOfflineCache() : null)
+    .catch(() => {})
+    .finally(finish);
 }
 
 // ── Sync pull ──
@@ -3398,7 +3549,18 @@ async function removeReminder(id) {
   openReminderModal();
 }
 function onSwMessage(e) {
-  if (e.data && e.data.type === 'noodled-open-note' && e.data.noteId) openNoteFromNotification(+e.data.noteId);
+  if (!e.data) return;
+  if (e.data.type === 'noodled-open-note' && e.data.noteId) openNoteFromNotification(+e.data.noteId);
+  // The service worker flushed queued edits in the background (#4): re-sync the
+  // in-memory queue from IndexedDB, refresh the list, and confirm.
+  if (e.data.type === 'noodled-synced') {
+    idb.get('meta', 'queue::' + userScope()).then(rec => {
+      saveQueue = (rec && Array.isArray(rec.items)) ? rec.items : [];
+      updateOfflineBanner();
+      loadNotes().then(renderNoteList).catch(() => {});
+      if (e.data.count > 0) showToast(__( 'Synced pending changes', 'noodled' ));
+    }).catch(() => {});
+  }
 }
 async function openNoteFromNotification(id) {
   try { if (!notes.find(n => n.id === id)) await loadNotes(); selectNote(id); } catch (e) {}
@@ -4561,8 +4723,9 @@ async function queuedSave(notebook, noteId, title, body, base) {
     // Offline / network error → persist the edit so it survives a reload and
     // flushes on reconnect. Keep only the latest pending edit per note.
     saveQueue = saveQueue.filter(q => q.noteId !== noteId);
-    saveQueue.push({ notebook, noteId, title, body, time: Date.now() });
+    saveQueue.push({ notebook, noteId, title, body, base, time: Date.now() });
     persistSaveQueue();
+    registerFlushSync(); // ask the SW to flush when the device reconnects (#4)
     const indicator = document.getElementById('saveIndicator');
     if (indicator) indicator.className = 'save-indicator save-queued';
     if (!saveRetryTimer) {
@@ -4581,7 +4744,17 @@ async function retrySaveQueue() {
   }
   const item = saveQueue[0];
   try {
-    await api.save_note(item.notebook, item.noteId, item.title, item.body, { force: true });
+    // Conflict-safe replay (decision #3): send the base the edit was made against
+    // instead of a blind force, so a note changed elsewhere isn't silently
+    // overwritten. (Legacy items with no base just save, as before.)
+    const r = await api.save_note(item.notebook, item.noteId, item.title, item.body, item.base ? { base: item.base } : {});
+    if (r && r.conflict) {
+      saveQueue = saveQueue.filter(q => q.noteId !== item.noteId);
+      persistSaveQueue();
+      try { await selectNote(item.noteId); } catch (e) {}
+      showConflict(r.server, { title: item.title, body: item.body });
+      return;
+    }
     saveQueue.shift();
     persistSaveQueue();
     showSaveIndicator('saved');
@@ -4593,6 +4766,15 @@ async function retrySaveQueue() {
       retrySaveQueue();
     }
   } catch (e) {}
+}
+// Register a one-off Background Sync so the service worker flushes the queue when
+// the device reconnects, even with the app closed (#4). Chromium only; on iOS
+// (no Background Sync) the in-app 15s retry above is the fallback.
+function registerFlushSync() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready
+    .then(reg => reg.sync && reg.sync.register('noodled-flush'))
+    .catch(() => {});
 }
 
 // ── Improved find with highlights ──
@@ -4641,6 +4823,8 @@ function showLoadingSkeleton() {
 // ── Logout ──
 async function doLogout() {
   try { await api._fetch('/auth/logout', { method: 'POST' }); } catch (e) {}
+  // Wipe offline data so nothing is readable after sign-out (decision #1).
+  try { await purgeOfflineCache(); } catch (e) {}
   document.cookie = 'noodled_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   // Also log out of WordPress
   window.location.href = noodledConfig.appUrl || '/';

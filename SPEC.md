@@ -54,6 +54,23 @@ GitHub bidirectional sync (Contents API + webhook + full import); markdown
 frontmatter matching the desktop format; **offline write queue** with reconnect
 replay and a **conflict resolver** (keep mine / theirs / both).
 
+### Offline-first
+Goal: open and edit any recent note with no connection, and never lose an edit.
+Backed by an **IndexedDB layer shared by the app and the service worker** (records
+scoped by user, wiped on logout / user-switch so a shared device never leaks one
+member's notes to another).
+- **Offline note opening (#6, all platforms):** note bodies are cached on read,
+  plus a warm cache of **all pinned + the 200 most-recently-modified** notes (LRU
+  evicted). `get_note` falls back to the cached body offline; cached notes show an
+  "available offline" marker.
+- **Background flush (#4, Chromium only):** the durable save queue lives in
+  IndexedDB; a service-worker **Background Sync** (`sync`) handler replays it when
+  the device reconnects, even with the app closed. iOS Safari/PWA has no Background
+  Sync, so it falls back to the existing flush-on-next-open behaviour.
+- **Conflict-safe replay:** background replay uses the modified-timestamp guard
+  (never a blind overwrite); a conflict re-queues the edit and raises the
+  conflict resolver the next time the app opens.
+
 ### Accounts & sharing
 Magic-link + PIN auth (1-year session); per-notebook and per-note read/write
 permissions (private by default, no admin god-view); owner-initiated sharing with
@@ -75,13 +92,12 @@ ship server-built `preview`+`tasks` (not full bodies) with lazy `/bodies` +
 
 ## Non-goals
 
-Real-time multi-cursor collaboration; public note publishing; nested-notebook
-hierarchies (flat for now); a browser web-clipper extension; OCR. (Tracked as
-possible future work, not current promises.)
+Real-time multi-cursor collaboration; public note publishing; a browser
+web-clipper extension; OCR. (Tracked as possible future work, not current
+promises.)
 
 ## Roadmap (near-term)
 
 - VAPID + wp-cron so reminders fire when the app is fully closed.
-- RTL support if multilingual ships.
-- Nested notebooks / folder hierarchy.
 - First-run onboarding to tame the feature surface.
+- RTL support if multilingual ships.

@@ -3291,3 +3291,7 @@ msgstr ""
 #: includes/class-noodled-rest.php:1002
 msgid "set"
 msgstr ""
+
+#: assets/js/noodled.js:971
+msgid "Available offline"
+msgstr ""
