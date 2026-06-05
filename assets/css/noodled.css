@@ -1820,6 +1820,10 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
 .att-badge.task-badge.all-done { background: rgba(16,185,129,.2); color: var(--text); }
 /* Offline-first (#6): a quiet green dot marking notes cached for offline opening. */
 .note-item .offline-dot { color: #34d399; font-size: 14px; line-height: 1; opacity: .8; }
+/* First-run onboarding tips */
+.onboard-tips { list-style: none; margin: 14px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.onboard-tips li { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; line-height: 1.45; }
+.onboard-tips li span { flex: 0 0 1.4em; text-align: center; opacity: .9; }
 .footer-tasks .ftbar { display: inline-block; width: 46px; height: 5px; border-radius: 3px;
   background: var(--border); margin-left: 6px; vertical-align: middle; overflow: hidden; }
 .footer-tasks .ftbar > span { display: block; height: 100%; background: var(--accent); }

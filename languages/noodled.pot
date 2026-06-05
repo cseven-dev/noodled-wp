@@ -3295,3 +3295,51 @@ msgstr ""
 #: assets/js/noodled.js:971
 msgid "Available offline"
 msgstr ""
+
+#: includes/class-noodled-settings.php
+msgid "Plaud API Token"
+msgstr ""
+
+#: includes/class-noodled-settings.php
+msgid "Paste your Plaud token to show the Plaud sync button in the app and import voice transcripts. Get it from your signed-in Plaud web session."
+msgstr ""
+
+#: includes/class-noodled-settings.php
+msgid "Save Plaud Token"
+msgstr ""
+
+#: includes/class-noodled-settings.php
+msgid "Token detected from %s. Voice recordings sync via the app toolbar."
+msgstr ""
+
+#: includes/class-noodled-settings.php
+msgid "Plaud is configured. Voice recordings sync via the app toolbar."
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Welcome to %s 🍜"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "A few places to know, then you're off:"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "The + button — new note, photo, voice note, or location"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Type “/” in a note for headings, tables, to-dos and more"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Search finds anything across every note"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "The menu (top right) holds everything else — tasks, calendar, graph…"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Start noodling"
+msgstr ""

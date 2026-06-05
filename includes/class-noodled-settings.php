@@ -133,6 +133,10 @@ class Noodled_Settings {
 		if ( isset( $input['github_branch'] ) )  $clean['github_branch']  = sanitize_text_field( $input['github_branch'] ) ?: 'main';
 		if ( isset( $input['webhook_secret'] ) ) $clean['webhook_secret'] = sanitize_text_field( $input['webhook_secret'] );
 
+		// Plaud (voice transcript import). Stored here because hosted installs do
+		// not ship the desktop .env that the env-var path reads.
+		if ( isset( $input['plaud_token'] ) ) $clean['plaud_token'] = sanitize_text_field( $input['plaud_token'] );
+
 		// Flush rewrite rules when path changes
 		if ( ( $old['app_path'] ?? 'noodled' ) !== ( $clean['app_path'] ?? 'noodled' ) ) {
 			delete_option( 'rewrite_rules' );
@@ -698,12 +702,28 @@ class Noodled_Settings {
 			<p><?php esc_html_e( 'Add this as a push webhook in your GitHub repo settings:', 'noodled' ); ?></p>
 			<code style="display:inline-block;padding:8px 14px;background:#f5f5f5;border-radius:4px"><?php echo esc_html( $webhook_url ); ?></code>
 
-			<?php if ( Noodled_Plaud::is_configured() ) : ?>
 			<h2 style="margin-top:30px"><?php esc_html_e( 'Plaud', 'noodled' ); ?></h2>
-			<p style="color:green">&#10003; <?php
-				/* translators: %s is the .env filename shown in a code tag */
-				printf( esc_html__( 'Plaud token detected from %s file. Voice recordings will sync via the app toolbar.', 'noodled' ), '<code>.env</code>' );
-			?></p>
+			<?php $plaud_env = getenv( 'PLAUD_TOKEN' ) || file_exists( NOODLED_PATH . '.env' ); ?>
+			<form method="post" action="options.php">
+				<?php settings_fields( 'noodled_sync' ); ?>
+				<table class="form-table">
+					<tr>
+						<th><label for="noodled-plaud-token"><?php esc_html_e( 'Plaud API Token', 'noodled' ); ?></label></th>
+						<td>
+							<input type="password" id="noodled-plaud-token" name="<?php echo self::$option_key; ?>[plaud_token]" value="<?php echo esc_attr( $opts['plaud_token'] ?? '' ); ?>" class="regular-text" autocomplete="off">
+							<p class="description"><?php esc_html_e( 'Paste your Plaud token to show the Plaud sync button in the app and import voice transcripts. Get it from your signed-in Plaud web session.', 'noodled' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button( __( 'Save Plaud Token', 'noodled' ) ); ?>
+			</form>
+			<?php if ( Noodled_Plaud::is_configured() ) : ?>
+				<p style="color:green">&#10003; <?php
+					echo $plaud_env && empty( $opts['plaud_token'] )
+						/* translators: %s is the .env filename shown in a code tag */
+						? wp_kses( sprintf( __( 'Token detected from %s. Voice recordings sync via the app toolbar.', 'noodled' ), '<code>.env</code>' ), [ 'code' => [] ] )
+						: esc_html__( 'Plaud is configured. Voice recordings sync via the app toolbar.', 'noodled' );
+				?></p>
 			<?php endif; ?>
 		<?php
 	}

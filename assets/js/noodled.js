@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   maybeWhatsNew();
   maybeSeedStarter();
+  maybeOnboarding();
   handleLaunchParams();
 
   document.getElementById('splash')?.classList.add('hidden');
@@ -541,6 +542,33 @@ async function maybeSeedStarter() {
     const body = __( '# Welcome to noodled 🍜\n\nThis is your first note. A few things to try:\n\n- Type `#`, `*`, and `- [ ]` and watch it render live\n- Link notes with `[[double brackets]]`\n- Tap the **+** to add a photo, voice note, or location\n- Open the **menu** (top right) for everything else\n\nDelete this whenever you like. Use your noodle.\n', 'noodled' );
     const note = await api.create_note(activeNotebook || 'General', __( 'Welcome to noodled', 'noodled' ), body);
     if (note && !note.error) { await loadNotebooks(); await loadNotes(); }
+  } catch (e) {}
+}
+
+// First run only (once per device): a short welcome that orients people to the
+// few entry points that matter, so the 50+ tools don't overwhelm (coach finding).
+// Distinct from the starter note (which is content) — this points at where things
+// live. Shown once for everyone, including existing members, then never again.
+function maybeOnboarding() {
+  try {
+    if (localStorage.getItem('noodled_onboarded')) return;
+    const el = document.getElementById('modalContainer');
+    if (!el) return;
+    localStorage.setItem('noodled_onboarded', '1');
+    const brand = (typeof noodledConfig !== 'undefined' && noodledConfig.brandName) || 'noodled';
+    el.innerHTML = `<div class="modal-overlay"><div class="modal onboard" role="dialog" aria-modal="true" aria-labelledby="obTitle" style="max-width:440px">
+      <h3 id="obTitle">${esc(sprintf( /* translators: %s is the app/brand name */ __( 'Welcome to %s 🍜', 'noodled' ), brand ))}</h3>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.5">${esc(__( "A few places to know, then you're off:", 'noodled' ))}</p>
+      <ul class="onboard-tips">
+        <li><span aria-hidden="true">➕</span> ${esc(__( 'The + button — new note, photo, voice note, or location', 'noodled' ))}</li>
+        <li><span aria-hidden="true">/</span> ${esc(__( 'Type “/” in a note for headings, tables, to-dos and more', 'noodled' ))}</li>
+        <li><span aria-hidden="true">🔍</span> ${esc(__( 'Search finds anything across every note', 'noodled' ))}</li>
+        <li><span aria-hidden="true">☰</span> ${esc(__( 'The menu (top right) holds everything else — tasks, calendar, graph…', 'noodled' ))}</li>
+      </ul>
+      <div class="modal-buttons"><button class="btn btn-accent" id="obDone">${esc(__( 'Start noodling', 'noodled' ))}</button></div>
+    </div></div>`;
+    el.querySelector('#obDone').onclick = () => { el.innerHTML = ''; };
+    setTimeout(() => { const b = el.querySelector('#obDone'); if (b) b.focus(); }, 40);
   } catch (e) {}
 }
 
@@ -2040,8 +2068,10 @@ function htmlToMarkdown(el) {
     if (!rows.length) return;
     const cell = c => inlineHtmlToMd(c).replace(/\n/g, ' ').replace(/\|/g, '\\|').trim();
     const row = tr => '| ' + [...tr.children].map(cell).join(' | ') + ' |';
+    // Preserve per-column alignment (set as inline text-align by the renderer/paste).
+    const marker = c => { const a = (c.style && c.style.textAlign) || ''; return a === 'center' ? ':-:' : a === 'right' ? '--:' : a === 'left' ? ':--' : '---'; };
     lines.push(row(rows[0]));
-    lines.push('| ' + Array(rows[0].children.length || 1).fill('---').join(' | ') + ' |');
+    lines.push('| ' + [...rows[0].children].map(marker).join(' | ') + ' |');
     for (let r = 1; r < rows.length; r++) lines.push(row(rows[r]));
   }
   function inlineHtmlToMd(node) {
@@ -2513,32 +2543,25 @@ function renderMarkdown(text) {
       out.push(`<div class="transclude" data-embed="${escAttr(embedMatch[1].trim())}" contenteditable="false"><div class="transclude-body">${esc(__( 'Loading…', 'noodled' ))}</div></div>`);
       continue;
     }
-    // Table rows
+    // Table: consume the whole block at once (header + optional separator + body
+    // rows) so per-column alignment from the separator applies consistently and
+    // the first row always becomes the accessible <th> header.
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       closeList();
-      // Check if this is start of a table
-      if (!out.length || !out[out.length - 1].includes('<td>') && !out[out.length - 1].includes('<th>')) {
-        // Check if next line is separator
-        const nextLine = (lines[i + 1] || '').trim();
-        const isSep = /^\|[\s:-]+\|/.test(nextLine);
-        const cells = trimmed.split('|').filter((_, j, a) => j > 0 && j < a.length - 1).map(c => c.trim());
-        if (isSep) {
-          out.push('<table><thead><tr>' + cells.map(c => `<th scope="col">${inlineFormat(escLine(c))}</th>`).join('') + '</tr></thead><tbody>');
-          i++; // skip separator line
-        } else {
-          // No separator row: treat the first row as the header so the table still
-          // exposes column headers to assistive tech.
-          out.push('<table><thead><tr>' + cells.map(c => `<th scope="col">${inlineFormat(escLine(c))}</th>`).join('') + '</tr></thead><tbody>');
-        }
-      } else {
-        const cells = trimmed.split('|').filter((_, j, a) => j > 0 && j < a.length - 1).map(c => c.trim());
-        out.push('<tr>' + cells.map(c => `<td>${inlineFormat(escLine(c))}</td>`).join('') + '</tr>');
+      const splitCells = ln => ln.split('|').filter((_, j, a) => j > 0 && j < a.length - 1).map(c => c.trim());
+      const nextLine = (lines[i + 1] || '').trim();
+      const hasSep = /^\|[\s:|-]+\|$/.test(nextLine) && nextLine.includes('-');
+      const aligns = hasSep ? parseTableAligns(nextLine) : [];
+      const header = splitCells(trimmed);
+      let html = '<table><thead><tr>' + header.map((c, k) => `<th scope="col"${alignAttr(aligns[k])}>${inlineFormat(escLine(c))}</th>`).join('') + '</tr></thead><tbody>';
+      let j = i + (hasSep ? 2 : 1);
+      for (; j < lines.length; j++) {
+        const rowLn = (lines[j] || '').trim();
+        if (!rowLn.startsWith('|') || !rowLn.endsWith('|')) break;
+        html += '<tr>' + splitCells(rowLn).map((c, k) => `<td${alignAttr(aligns[k])}>${inlineFormat(escLine(c))}</td>`).join('') + '</tr>';
       }
-      // Check if next line is NOT a table row
-      const nextTrimmed = (lines[i + 1] || '').trim();
-      if (!nextTrimmed.startsWith('|') || !nextTrimmed.endsWith('|')) {
-        out.push('</tbody></table>');
-      }
+      out.push(html + '</tbody></table>');
+      i = j - 1; // the loop's i++ advances past the last consumed row
       continue;
     }
     closeList();
@@ -3264,10 +3287,50 @@ function toggleReadingMode() {
 }
 
 // ── Auto-link URLs on paste ──
+// Per-column table alignment helpers (shared by the renderer, the serializer,
+// and table paste). A GFM separator cell of ":--"/":-:"/"--:" maps to a CSS
+// text-align that round-trips through tableToMd.
+function parseTableAligns(sep) {
+  return sep.split('|').filter((_, j, a) => j > 0 && j < a.length - 1).map(c => {
+    c = c.trim(); const l = c.startsWith(':'), r = c.endsWith(':');
+    return (l && r) ? 'center' : r ? 'right' : l ? 'left' : '';
+  });
+}
+function alignAttr(a) { return a ? ` style="text-align:${a}"` : ''; }
+// Build a real <table> from a pasted TSV (Sheets/Excel) or markdown table, or
+// null if the clipboard text isn't tabular. Conservative on purpose so normal
+// multi-line pastes are never hijacked.
+function tableFromPaste(text) {
+  const lines = (text || '').replace(/\r/g, '').split('\n').filter(l => l.trim() !== '');
+  if (lines.length < 2) return null;
+  let rows, aligns = [];
+  const isMdSep = /^\|?[\s:|-]+\|?$/.test(lines[1].trim()) && lines[1].includes('-');
+  if (lines.every(l => l.includes('|')) && isMdSep) {
+    const split = ln => ln.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    aligns = parseTableAligns(lines[1].trim());
+    rows = [split(lines[0]), ...lines.slice(2).map(split)];
+  } else if (lines.every(l => l.includes('\t'))) {
+    rows = lines.map(l => l.split('\t').map(c => c.trim()));
+  } else {
+    return null;
+  }
+  const cols = Math.max(...rows.map(r => r.length));
+  if (cols < 2 || rows.length < 2) return null;
+  const pad = r => { const a = r.slice(); while (a.length < cols) a.push(''); return a; };
+  const th = (t, k) => `<th scope="col"${alignAttr(aligns[k])}>${esc(t || '')}</th>`;
+  const td = (t, k) => `<td${alignAttr(aligns[k])}>${esc(t || '')}</td>`;
+  let html = '<table><thead><tr>' + pad(rows[0]).map(th).join('') + '</tr></thead><tbody>';
+  for (let r = 1; r < rows.length; r++) html += '<tr>' + pad(rows[r]).map(td).join('') + '</tr>';
+  return html + '</tbody></table>';
+}
+
 document.addEventListener('paste', e => {
   const el = document.getElementById('noteBody');
   if (!el || document.activeElement !== el) return;
   const text = (e.clipboardData || window.clipboardData).getData('text');
+  // Tabular paste → a real, editable table (round-trips via tableToMd on save).
+  const tbl = tableFromPaste(text);
+  if (tbl) { e.preventDefault(); document.execCommand('insertHTML', false, tbl); schedSave(); return; }
   if (/^https?:\/\/\S+$/.test(text.trim())) {
     e.preventDefault();
     const url = text.trim();
@@ -4742,6 +4805,10 @@ async function retrySaveQueue() {
     updateOfflineBanner();
     return;
   }
+  // Pause while a conflict modal is open: resolving it can take time, and
+  // processing the next queued item now could raise a second conflict that the
+  // single-modal guard would swallow — silently dropping that offline edit.
+  if (_conflictOpen) return;
   const item = saveQueue[0];
   try {
     // Conflict-safe replay (decision #3): send the base the edit was made against

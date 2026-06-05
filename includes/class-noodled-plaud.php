@@ -32,6 +32,13 @@ class Noodled_Plaud {
 			}
 		}
 
+		// Stored admin setting — the only source on hosted installs (noodled.ca),
+		// where the desktop .env is intentionally not deployed.
+		$opt = Noodled_Settings::get();
+		if ( ! empty( $opt['plaud_token'] ) ) {
+			return (string) $opt['plaud_token'];
+		}
+
 		return '';
 	}
 
