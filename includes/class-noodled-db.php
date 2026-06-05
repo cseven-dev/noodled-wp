@@ -111,6 +111,17 @@ CREATE TABLE {$wpdb->prefix}noodled_reminders (
   KEY idx_note (note_id)
 ) $charset;
 
+CREATE TABLE {$wpdb->prefix}noodled_push_subs (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  endpoint text NOT NULL,
+  p256dh varchar(255) NOT NULL DEFAULT '',
+  auth varchar(255) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_user (user_id)
+) $charset;
+
 CREATE TABLE {$wpdb->prefix}noodled_revisions (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   note_id bigint(20) unsigned NOT NULL,

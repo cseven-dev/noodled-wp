@@ -3542,6 +3542,32 @@ async function loadReminders() {
   if (!Array.isArray(reminders)) reminders = [];
   if (!_reminderTimer) _reminderTimer = setInterval(checkReminders, 30000);
   checkReminders();
+  // If notifications are already allowed, (re)register for server push so
+  // reminders also fire when the app is closed (#22). No-op without permission.
+  if ('Notification' in window && Notification.permission === 'granted') subscribePush();
+}
+// Subscribe this device to web push and hand the subscription to the server.
+// Best-effort and idempotent; only proceeds once notifications are granted.
+async function subscribePush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const r = await api._fetch('/push/key');
+      if (!r || !r.key) return;
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(r.key) });
+    }
+    await api._fetch('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+  } catch (e) { /* push is a bonus; the in-app scheduler is the fallback */ }
+}
+function urlB64ToBytes(base64) {
+  const pad = '='.repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64), arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
 }
 function checkReminders() {
   const now = Date.now();
@@ -3598,6 +3624,7 @@ async function saveReminder() {
   const at = new Date(whenEl.value).getTime();
   if (!at || at < Date.now() - 60000) { showToast(__( 'Pick a time in the future', 'noodled' )); return; }
   if ('Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
+  subscribePush(); // register for closed-app delivery now that we may have permission (#22)
   const r = await api.create_reminder(activeNote.id, at, label);
   if (r && r.id) {
     reminders.push({ id: r.id, note_id: activeNote.id, at, label, sent: 0, title: activeNote.title });

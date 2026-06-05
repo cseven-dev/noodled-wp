@@ -3343,3 +3343,11 @@ msgstr ""
 #: assets/js/noodled.js
 msgid "Start noodling"
 msgstr ""
+
+#: noodled.php
+msgid "Every 5 minutes (noodled)"
+msgstr ""
+
+#: noodled.php
+msgid "Reminder"
+msgstr ""

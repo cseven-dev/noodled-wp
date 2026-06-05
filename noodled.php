@@ -3,7 +3,7 @@
  * Plugin Name: Noodled
  * Plugin URI:  https://github.com/cseven-dev/noodled-wp
  * Description: A full web version of the noodled note-taking app with family sharing, magic-link login, and GitHub sync.
- * Version:     1.1.139
+ * Version:     1.1.140
  * Author:      Simon
  * License:     GPL-2.0-or-later
  * Text Domain: noodled
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // "Cannot redeclare class" and a 500 on every page.
 if ( defined( 'NOODLED_VERSION' ) ) return;
 
-define( 'NOODLED_VERSION', '1.1.139' );
+define( 'NOODLED_VERSION', '1.1.140' );
 define( 'NOODLED_FILE', __FILE__ );
 define( 'NOODLED_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NOODLED_URL', plugin_dir_url( __FILE__ ) );
@@ -79,6 +79,7 @@ try {
 	require_once NOODLED_PATH . 'includes/class-noodled-auth.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-permissions.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-plaud.php';
+	require_once NOODLED_PATH . 'includes/class-noodled-push.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-evernote.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-rest.php';
 } catch ( \Throwable $e ) {
@@ -126,6 +127,13 @@ function noodled_init() {
 		if ( ! wp_next_scheduled( 'noodled_daily_cleanup' ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'noodled_daily_cleanup' );
 		}
+
+		// Reminder web push: check for due reminders every 5 minutes and deliver
+		// them so they fire when the app is closed (best-effort; the in-app
+		// scheduler covers the app-open case).
+		if ( ! wp_next_scheduled( 'noodled_push_check' ) ) {
+			wp_schedule_event( time() + 120, 'noodled_5min', 'noodled_push_check' );
+		}
 	} catch ( \Throwable $e ) {
 		noodled_fail_safe( $e, 'init' );
 	}
@@ -149,6 +157,46 @@ function noodled_run_cleanup() {
 	) );
 	foreach ( $ids as $id ) {
 		Noodled_Notes::permanent_delete( (int) $id );
+	}
+}
+
+// A 5-minute cron interval for the reminder push check.
+add_filter( 'cron_schedules', function ( $schedules ) {
+	$schedules['noodled_5min'] = [ 'interval' => 300, 'display' => __( 'Every 5 minutes (noodled)', 'noodled' ) ];
+	return $schedules;
+} );
+
+/**
+ * Deliver web-push notifications for reminders that are due and not yet sent, so
+ * they fire when the app is closed. Marks each reminder sent (shared flag with
+ * the in-app scheduler, so neither path double-notifies). Best-effort.
+ */
+add_action( 'noodled_push_check', 'noodled_run_push_check' );
+function noodled_run_push_check() {
+	global $wpdb;
+	$r = $wpdb->prefix . 'noodled_reminders';
+	$n = $wpdb->prefix . 'noodled_notes';
+	$now = current_time( 'mysql', true );
+	$due = $wpdb->get_results( $wpdb->prepare(
+		"SELECT r.id, r.note_id, r.user_id, r.label, n.title
+		   FROM {$r} r LEFT JOIN {$n} n ON n.id = r.note_id
+		  WHERE r.sent = 0 AND r.remind_at <= %s
+		  ORDER BY r.remind_at ASC LIMIT 50", $now
+	), ARRAY_A );
+	foreach ( (array) $due as $row ) {
+		$title = $row['label'] ?: ( $row['title'] ?: __( 'Reminder', 'noodled' ) );
+		$delivered = Noodled_Push::send_to_user( (int) $row['user_id'], [
+			'title'  => get_bloginfo( 'name' ) ?: 'noodled',
+			'body'   => $title,
+			'noteId' => (int) $row['note_id'],
+			'tag'    => 'noodled-reminder-' . (int) $row['id'],
+		] );
+		// Only consume the reminder if a push actually went out. If the user has
+		// no working subscription (or delivery failed), leave it unsent so the
+		// in-app scheduler still fires it when the app next opens (no regression).
+		if ( $delivered > 0 ) {
+			$wpdb->update( $r, [ 'sent' => 1 ], [ 'id' => (int) $row['id'] ] );
+		}
 	}
 }
 

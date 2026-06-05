@@ -91,6 +91,16 @@ class Noodled_REST {
 		register_rest_route( $ns, '/reminders/(?P<id>\d+)/sent', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'mark_reminder_sent' ], ] + $auth,
 		] );
+		// Web push (reminder delivery when the app is closed)
+		register_rest_route( $ns, '/push/key', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'push_key' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/push/subscribe', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'push_subscribe' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/push/unsubscribe', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'push_unsubscribe' ], ] + $auth,
+		] );
 		// Note sharing (owner-initiated, user-to-user)
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/shares', [
 			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'note_shares' ], ] + $auth,
@@ -711,6 +721,23 @@ class Noodled_REST {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
 		return new \WP_REST_Response( Noodled_Notes::toggle_task( $id, (int) $req->get_param( 'idx' ) ) );
+	}
+
+	/* ── Web push ── */
+
+	public static function push_key(): \WP_REST_Response {
+		return new \WP_REST_Response( [ 'key' => Noodled_Push::public_key() ] );
+	}
+
+	public static function push_subscribe( \WP_REST_Request $req ): \WP_REST_Response {
+		$sub = $req->get_json_params();
+		$ok  = is_array( $sub ) ? Noodled_Push::subscribe( self::current_user_id(), $sub ) : false;
+		return new \WP_REST_Response( [ 'success' => (bool) $ok ] );
+	}
+
+	public static function push_unsubscribe( \WP_REST_Request $req ): \WP_REST_Response {
+		Noodled_Push::unsubscribe( self::current_user_id(), (string) $req->get_param( 'endpoint' ) );
+		return new \WP_REST_Response( [ 'success' => true ] );
 	}
 
 	/* ── Reminders (per-user, note-attached) ── */
