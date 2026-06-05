@@ -960,9 +960,11 @@ class Noodled_REST {
 		];
 		if ( current_user_can( 'manage_options' ) ) {
 			$cfg = Noodled_Settings::get();
-			$out['owner']     = $cfg['github_owner'] ?? '(empty)';
-			$out['repo']      = $cfg['github_repo'] ?? '(empty)';
-			$out['branch']    = $cfg['github_branch'] ?? '(empty)';
+			/* translators: shown to an admin when a GitHub sync field has no value */
+			$empty = __( '(empty)', 'noodled' );
+			$out['owner']     = $cfg['github_owner'] ?: $empty;
+			$out['repo']      = $cfg['github_repo'] ?: $empty;
+			$out['branch']    = $cfg['github_branch'] ?: $empty;
 			$out['has_token'] = ! empty( $cfg['github_token'] );
 		}
 		return new \WP_REST_Response( $out );
@@ -996,8 +998,8 @@ class Noodled_REST {
 				/* translators: 1: configured GitHub owner/org, or "empty"; 2: token state, "missing" or "set" */
 				'error' => sprintf(
 					__( 'GitHub not configured. Owner: %1$s, Token: %2$s', 'noodled' ),
-					$cfg['github_owner'] ?? 'empty',
-					empty( $cfg['github_token'] ) ? 'missing' : 'set'
+					$cfg['github_owner'] ?: __( 'empty', 'noodled' ),
+					empty( $cfg['github_token'] ) ? __( 'missing', 'noodled' ) : __( 'set', 'noodled' )
 				),
 			] );
 		}

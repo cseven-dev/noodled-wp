@@ -2630,7 +2630,7 @@ msgid "Table"
 msgstr ""
 
 #: assets/js/noodled.js:3263
-msgid "Table editing"
+msgid "Table editing — Alt+Shift+Arrow keys add or remove rows and columns"
 msgstr ""
 
 #: assets/js/noodled.js:4020
@@ -3275,3 +3275,19 @@ msgstr ""
 msgid "📍 Near %1$s (%2$s, %3$s)"
 msgstr ""
 
+
+#: includes/class-noodled-rest.php:964
+msgid "(empty)"
+msgstr ""
+
+#: includes/class-noodled-rest.php:1001
+msgid "empty"
+msgstr ""
+
+#: includes/class-noodled-rest.php:1002
+msgid "missing"
+msgstr ""
+
+#: includes/class-noodled-rest.php:1002
+msgid "set"
+msgstr ""

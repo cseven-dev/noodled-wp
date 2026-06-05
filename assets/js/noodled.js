@@ -3253,6 +3253,18 @@ function setupTableEditing() {
     _tblCell = cell;
     tableAct(act);
   });
+  // Keyboard users never fire the mouse "click" path, so reveal the toolbar
+  // whenever the caret lands in a table cell (its buttons' tooltips document the
+  // Alt+Shift+Arrow shortcuts, giving a discoverable keyboard entry point).
+  document.addEventListener('selectionchange', () => {
+    const ed = document.getElementById('noteBody');
+    const sel = window.getSelection();
+    if (!ed || !sel || !sel.isCollapsed || !sel.anchorNode || !ed.contains(sel.anchorNode)) return;
+    const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+    const cell = node && node.closest ? node.closest('#noteBody td, #noteBody th') : null;
+    if (cell) { _tblCell = cell; showTableTools(cell); }
+    else { const b = document.getElementById('tableTools'); if (b && b.style.display !== 'none') hideTableTools(); }
+  });
   window.addEventListener('scroll', hideTableTools, true);
 }
 function showTableTools(cell) {
@@ -3260,7 +3272,7 @@ function showTableTools(cell) {
   let bar = document.getElementById('tableTools');
   if (!bar) {
     bar = document.createElement('div'); bar.id = 'tableTools'; bar.className = 'table-tools';
-    bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', __( 'Table editing', 'noodled' ));
+    bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', __( 'Table editing — Alt+Shift+Arrow keys add or remove rows and columns', 'noodled' ));
     bar.innerHTML =
       `<button type="button" data-act="row+" title="${escAttr(__( 'Add row (Alt+Shift+Down)', 'noodled' ))}" aria-label="${escAttr(__( 'Add row', 'noodled' ))}">+ ${esc(__( 'Row', 'noodled' ))}</button>` +
       `<button type="button" data-act="col+" title="${escAttr(__( 'Add column (Alt+Shift+Right)', 'noodled' ))}" aria-label="${escAttr(__( 'Add column', 'noodled' ))}">+ ${esc(__( 'Col', 'noodled' ))}</button>` +

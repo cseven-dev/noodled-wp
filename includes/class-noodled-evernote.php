@@ -40,7 +40,7 @@ class Noodled_Evernote {
 	private static function import_note( \SimpleXMLElement $note, int $owner_id ): bool {
 		global $wpdb;
 
-		$title   = (string) $note->title ?: 'Untitled';
+		$title   = (string) $note->title ?: __( 'Untitled', 'noodled' );
 		$content = (string) $note->content ?: '';
 		$created = (string) $note->created ?: '';
 		$updated = (string) $note->updated ?: '';
