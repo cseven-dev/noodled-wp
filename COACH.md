@@ -42,15 +42,15 @@ no RTL. None are crises; they're the edge between "very good" and "world-class."
 
 ### 🏗️ High-impact
 - [x] Persist note version history server-side — _done 2026-06-04: new `noodled_revisions` table + `/notes/{id}/revisions`; `update()` snapshots the pre-edit state (deduped, pruned to 15); `showHistory()` now fetches from the server, so diff/restore survive reloads and work across devices_
-- [ ] Finish web push: VAPID keys + a wp-cron sender — _reminders currently fire only while the app is open; the SW `push` handler is already scaffolded; effort M_ → `class-noodled-rest.php` (cron), SW
-- [ ] First-run onboarding / progressive disclosure — _50+ tools is a lot of surface for a new user; a short guided tour or staged reveal would cut overwhelm; effort M_ → `noodled.js`
+- [x] Finish web push: VAPID keys + a wp-cron sender — _done 2026-06-05 (v1.1.140): new `class-noodled-push.php` (pure-PHP VAPID ES256 + RFC 8291 aes128gcm, encrypt→decrypt round-trip verified), `noodled_push_subs` table, `/push/*` REST, a 5-min cron that only consumes a reminder when a push actually delivered (in-app scheduler stays the fallback). Needs real-device confirmation of the live HTTP hop._
+- [x] First-run onboarding / progressive disclosure — _done 2026-06-05 (v1.1.139): one-time welcome modal orienting users to the +, /, search, and ☰ menu_
 - [ ] RTL support (`rtl.css` / CSS logical properties) — _only matters if Arabic/Hebrew/Farsi are in scope; the app has directional CSS and no RTL today; effort M_ → CSS, `/lr` fix list
-- [ ] Nested notebooks / folder hierarchy — _flat notebooks are the main capability gap vs Notion/Evernote nesting; effort L_ → notebooks model
+- [x] Nested notebooks / folder hierarchy — _done in v1.1.130 (`parent_id` + collapsible tree + "Move into…")_
 - [ ] Run `/gap` for competitive context (Notion, Obsidian Publish, Evernote, Standard Notes) — _no gap report exists; would surface table-stakes gaps + any Pro opportunity; effort S to run_ → `/gap`
 
 ### ✨ Polish
-- [ ] Table editor: paste a TSV/markdown table to auto-build, and per-column alignment markers — _rounds out the new table editing; effort S/M_ → `noodled.js`
-- [ ] Confirm the "Keep both" conflict copy lands in the visible notebook and refreshes cleanly — _new path, worth a manual pass; effort S_ → `showConflict`
+- [x] Table editor: paste a TSV/markdown table to auto-build, and per-column alignment markers — _done 2026-06-05 (v1.1.139): paste a TSV/Excel/markdown table → real editable table; GFM column alignment round-trips_
+- [x] Confirm the "Keep both" conflict copy lands in the visible notebook and refreshes cleanly — _done 2026-06-05: code-verified; also fixed a data-loss bug (two simultaneous offline conflicts could drop the second edit) by pausing queue replay while a conflict modal is open_
 - [ ] Consider a `/paid` free/pro split only if noodled.ca is meant to monetize — _currently single-tier (a deliberate family-product choice); list here as an option, not a gap; effort M_ → `/paid`
 
 ## Strengths to protect
@@ -66,3 +66,4 @@ no RTL. None are crises; they're the edge between "very good" and "world-class."
 - 2026-06-04 (later) — Overall A- 92; persisted version history server-side (new `revisions` table), fixed the landing double-`<h1>`, added `SPEC.md`, and ran the four audits: `/so` B+ 88, `/sa` A- 90, `/ac` B+ 94 (was B 90), `/lr` A- 95 (was B 90). New open items: gate GitHub sync diagnostics (security info-leak), `defer` the main script, keyboard path for the table toolbar.
 - 2026-06-04 (v1.1.130) — shipped a 9-feature product batch (from a `/pp` note-app market read): unified Tasks/agenda + due dates, smart notebooks, calendar, link graph, nested notebooks, note transclusion, rich markdown (mermaid/math/callouts/collapsible), audio memos. Per-note encryption deliberately deferred. Capability and Aesthetics both rise; discoverability of the now-larger surface makes first-run onboarding the clearest next lever.
 - 2026-06-04 (later still) — cleared all three new quick wins: gated `sync_status` GitHub diagnostics to admins (closes the /sa info-leak), `defer`red the main bundle (frontend speed), and added Alt+Shift+Arrow table-editing shortcuts (closes the /ac keyboard warning). Speed → ~A- and Security → A on the code layer once re-measured. Remaining headline item: VAPID web push.
+- 2026-06-05 (v1.1.137–1.1.140) — large execution batch: **offline-first** (IndexedDB body cache so any recent note opens offline + service-worker Background Sync so closed-app edits flush on reconnect, all per-user scoped + purged on logout), **web push** for reminders (verified VAPID + RFC 8291 crypto), **Plaud token** settable on hosted installs, **table paste** (TSV/markdown → table, alignment round-trips), **first-run onboarding**, plus a fixed offline-conflict data-loss bug. Security re-audited on the new surface: clean (1 Info, plaintext IndexedDB at rest, mitigated). a11y/i18n of the new surface: A. Resilience and Capability both rise. Remaining coach items: RTL (only if multilingual ships), run `/gap`, optional `/paid`.
