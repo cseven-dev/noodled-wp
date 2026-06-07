@@ -3351,3 +3351,95 @@ msgstr ""
 #: noodled.php
 msgid "Reminder"
 msgstr ""
+
+#: assets/js/noodled.js
+msgid "Set up a passkey"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Sign in with Face ID or a fingerprint next time, no PIN to type."
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Passkeys are not supported on this device."
+msgstr ""
+
+#: assets/js/noodled.js includes/class-noodled-app.php
+msgid "Follow your device prompt…"
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Could not start passkey setup."
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "✓ Passkey saved. Next time, just tap to sign in."
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Passkey setup failed."
+msgstr ""
+
+#: assets/js/noodled.js
+msgid "Passkey setup cancelled."
+msgstr ""
+
+#: includes/class-noodled-app.php
+msgid "Sign in with a passkey"
+msgstr ""
+
+#: includes/class-noodled-app.php
+msgid "Passkey sign-in failed. Use your PIN instead."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Registration timed out, please try again."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Could not read the passkey."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "This passkey type is not supported."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Passkey was not confirmed on the device."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Passkey is for a different site."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Malformed passkey response."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Unexpected passkey response."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Passkey challenge did not match."
+msgstr ""
+
+#: includes/class-noodled-webauthn.php
+msgid "Passkey came from the wrong site."
+msgstr ""
+
+#: includes/class-noodled-auth.php
+msgid "Please sign in first."
+msgstr ""
+
+#: includes/class-noodled-auth.php
+msgid "Account not found."
+msgstr ""
+
+#: includes/class-noodled-auth.php
+msgid "Passkey sign-in failed."
+msgstr ""
+
+#: includes/class-noodled-auth.php
+msgid "Account not available."
+msgstr ""

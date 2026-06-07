@@ -76,6 +76,20 @@ CREATE TABLE {$wpdb->prefix}noodled_sessions (
   KEY idx_expires (expires_at)
 ) $charset;
 
+CREATE TABLE {$wpdb->prefix}noodled_webauthn_creds (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  credential_id varchar(255) NOT NULL,
+  public_key text NOT NULL,
+  sign_count bigint(20) unsigned NOT NULL DEFAULT 0,
+  label varchar(100) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used datetime DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY credential_id (credential_id),
+  KEY idx_user (user_id)
+) $charset;
+
 CREATE TABLE {$wpdb->prefix}noodled_permissions (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   user_id bigint(20) unsigned NOT NULL,

@@ -137,6 +137,8 @@ class Noodled_App {
 		$pin_api     = rest_url( 'noodled/v1/auth/pin' );
 		$verify_api  = rest_url( 'noodled/v1/auth/verify' );
 		$request_api = rest_url( 'noodled/v1/auth/request' );
+		$pk_opts_api = rest_url( 'noodled/v1/auth/passkey/auth-options' );
+		$pk_auth_api = rest_url( 'noodled/v1/auth/passkey/auth' );
 		$brand       = Noodled_Settings::get_brand_name();
 		$accent      = Noodled_Settings::get_accent_color();
 
@@ -147,6 +149,9 @@ class Noodled_App {
 		$l_pinsub     = esc_html( __( "We'll send a PIN to your email", 'noodled' ) );
 		$l_continue   = esc_html( __( 'Continue', 'noodled' ) );
 		$l_havepin    = esc_html( __( 'Already have a PIN? Sign in', 'noodled' ) );
+		$l_passkey    = esc_html( __( 'Sign in with a passkey', 'noodled' ) );
+		$j_passkeyfail = esc_js( __( 'Passkey sign-in failed. Use your PIN instead.', 'noodled' ) );
+		$j_passkeywait = esc_js( __( 'Follow your device prompt…', 'noodled' ) );
 		$l_enterpin   = esc_html( __( 'Enter your PIN', 'noodled' ) );
 		$l_codesub    = esc_html( __( 'The 6-digit code from your noodle email', 'noodled' ) );
 		$l_signinbtn  = esc_html( __( 'Sign in', 'noodled' ) );
@@ -204,6 +209,7 @@ class Noodled_App {
       <div class="sub">{$l_pinsub}</div>
       <input class="n-login-input" type="email" id="nEmail" placeholder="you@example.com" aria-label="{$a_email}">
       <button class="n-login-btn" id="nEmailBtn" onclick="nSendPin()">{$l_continue}</button>
+      <button type="button" class="n-login-link" id="nPasskeyBtn" style="display:none" onclick="nPasskey()">&#128272; {$l_passkey}</button>
       <button type="button" class="n-login-link lg" onclick="nGotPin()">{$l_havepin} &rarr;</button>
     </div>
     <div id="nStepPin" style="display:none">
@@ -229,6 +235,10 @@ function nGotPin(){const e=document.getElementById('nEmail').value.trim();if(e)_
 function nGotoPin(){const pe=document.getElementById('nPinEmail');if(pe){if(_nEmail)pe.value=_nEmail;pe.style.display='none';}nShowStep('nStepPin');const f=document.getElementById('nPin');if(f)f.focus();}
 async function nSendPin(){const email=document.getElementById('nEmail').value;if(!email)return;_nEmail=email;const btn=document.getElementById('nEmailBtn');btn.disabled=true;btn.textContent='{$j_sending}';const msg=document.getElementById('nLoginMsg');msg.textContent='';try{const r=await fetch('{$login_api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error'}else{nGotoPin()}}catch(e){msg.textContent='{$j_wrong}';msg.className='n-login-msg error'}btn.disabled=false;btn.textContent='{$j_continue}'}
 async function nVerifyPin(){const pin=document.getElementById('nPin').value.trim();if(!pin)return;const email=(_nEmail||document.getElementById('nPinEmail').value||'').trim();const msg=document.getElementById('nLoginMsg');const btn=document.getElementById('nPinBtn');btn.disabled=true;btn.textContent='{$j_verifying}';try{let r;if(email){r=await fetch('{$pin_api}',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,pin})});}else{r=await fetch('{$verify_api}?token='+encodeURIComponent(pin),{credentials:'same-origin'});}const d=await r.json();if(d.error){msg.textContent=d.error;msg.className='n-login-msg error';btn.disabled=false;btn.textContent='{$j_signin}'}else{msg.innerHTML='&#10003; {$j_welcome}';msg.className='n-login-msg success';setTimeout(()=>window.location.href='{$app_url}'+('{$app_url}'.includes('?')?'&':'?')+'_='+Date.now(),500)}}catch(e){msg.textContent='{$j_wrong}';msg.className='n-login-msg error';btn.disabled=false;btn.textContent='{$j_signin}'}}
+function nB64uToBuf(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const r=atob(s),a=new Uint8Array(r.length);for(let i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a.buffer;}
+function nBufToB64u(b){let s='';const a=new Uint8Array(b);for(let i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+\$/,'');}
+async function nPasskey(){const msg=document.getElementById('nLoginMsg');const email=(document.getElementById('nEmail').value||'').trim();try{msg.textContent='{$j_passkeywait}';msg.className='n-login-msg';const o=await(await fetch('{$pk_opts_api}',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({email:email})})).json();const pub={challenge:nB64uToBuf(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification,allowCredentials:(o.allowCredentials||[]).map(function(c){return{type:'public-key',id:nB64uToBuf(c.id)};})};const cred=await navigator.credentials.get({publicKey:pub});const body={handle:o.handle,id:cred.id,clientDataJSON:nBufToB64u(cred.response.clientDataJSON),authenticatorData:nBufToB64u(cred.response.authenticatorData),signature:nBufToB64u(cred.response.signature)};const d=await(await fetch('{$pk_auth_api}',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body)})).json();if(d&&d.success){msg.innerHTML='&#10003; {$j_welcome}';msg.className='n-login-msg success';setTimeout(function(){window.location.href='{$app_url}'+('{$app_url}'.includes('?')?'&':'?')+'_='+Date.now();},400);}else{msg.textContent=(d&&d.error)||'{$j_passkeyfail}';msg.className='n-login-msg error';}}catch(e){if(e&&e.name==='NotAllowedError'){msg.textContent='';}else{msg.textContent='{$j_passkeyfail}';msg.className='n-login-msg error';}}}
+if(window.PublicKeyCredential){var _pkb=document.getElementById('nPasskeyBtn');if(_pkb)_pkb.style.display='block';}
 document.addEventListener('keydown',e=>{if(e.key==='Enter'){const pin=document.getElementById('nStepPin');if(pin&&pin.style.display!=='none')nVerifyPin();else if(document.getElementById('nStepEmail').style.display!=='none')nSendPin()}else if(e.key==='Escape'){const open=document.querySelectorAll('.n-login-overlay.show');if(open.length){open.forEach(o=>o.classList.remove('show'));if(_nLoginReturn){try{_nLoginReturn.focus();}catch(_){}_nLoginReturn=null;}}}});
 // Expired one-click link → open login modal, pre-fill the email so they don't retype it.
 (function(){const q=new URLSearchParams(location.search);if(q.get('login')==='expired'){nOpenLogin();const em=q.get('e');if(em){_nEmail=em;const ne=document.getElementById('nEmail');if(ne)ne.value=em;const pe=document.getElementById('nPinEmail');if(pe)pe.value=em;}const m=document.getElementById('nLoginMsg');if(m){m.textContent='{$j_expired}';m.className='n-login-msg error';}}})();

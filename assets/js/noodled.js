@@ -1877,6 +1877,9 @@ function renderMenuDashboard() {
     accountItems.push({ icon: '🌐', label: __( 'View marketing site', 'noodled' ), fn: 'viewMarketingSite', desc: __( 'Peek at your public landing page. A Back button brings you home.', 'noodled' ) });
     accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers', desc: __( 'Invite the family. Hand out PINs, not passwords.', 'noodled' ) });
   }
+  if (window.PublicKeyCredential) {
+    accountItems.push({ icon: '🔐', label: __( 'Set up a passkey', 'noodled' ), fn: 'registerPasskey', desc: __( 'Sign in with Face ID or a fingerprint next time, no PIN to type.', 'noodled' ) });
+  }
   accountItems.push({ icon: '🚪', label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true, desc: __( 'Lock it up behind you.', 'noodled' ) });
 
   const card = (it) => `<button class="md-card${it.danger ? ' md-danger' : ''}" onclick="menuDashPick('${it.fn}')"><span class="md-ic" aria-hidden="true">${it.icon}</span><span class="md-txt"><span class="md-lbl">${esc(it.label)}</span><span class="md-desc">${esc(it.desc || '')}</span></span></button>`;
@@ -3568,6 +3571,37 @@ function urlB64ToBytes(base64) {
   const raw = atob(b64), arr = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
   return arr;
+}
+
+// ── Passkeys (WebAuthn): one-tap biometric sign-in for returning visits ──────
+function bufToB64u(buf) {
+  let s = ''; const b = new Uint8Array(buf);
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+// Register a passkey for the signed-in user (called from the menu).
+async function registerPasskey() {
+  if (!window.PublicKeyCredential) { showToast(__( 'Passkeys are not supported on this device.', 'noodled' )); return; }
+  try {
+    showToast(__( 'Follow your device prompt…', 'noodled' ));
+    const opts = await api._fetch('/auth/passkey/register-options', { method: 'POST', body: '{}' });
+    if (!opts || opts.error) { showToast((opts && opts.error) || __( 'Could not start passkey setup.', 'noodled' )); return; }
+    opts.challenge = urlB64ToBytes(opts.challenge);
+    opts.user.id = urlB64ToBytes(opts.user.id);
+    (opts.excludeCredentials || []).forEach(c => { c.id = urlB64ToBytes(c.id); });
+    const cred = await navigator.credentials.create({ publicKey: opts });
+    const out = {
+      id: cred.id,
+      clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+      attestationObject: bufToB64u(cred.response.attestationObject),
+      label: (navigator.platform || '') + ' ' + (/iPhone|iPad|Android/.test(navigator.userAgent) ? 'phone' : 'device'),
+    };
+    const r = await api._fetch('/auth/passkey/register', { method: 'POST', body: JSON.stringify(out) });
+    showToast(r && r.success ? __( '✓ Passkey saved. Next time, just tap to sign in.', 'noodled' ) : ((r && r.error) || __( 'Passkey setup failed.', 'noodled' )));
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') showToast(__( 'Passkey setup cancelled.', 'noodled' ));
+    else showToast(__( 'Passkey setup failed.', 'noodled' ));
+  }
 }
 function checkReminders() {
   const now = Date.now();

@@ -52,6 +52,60 @@ class Noodled_Auth {
 			'callback'            => [ __CLASS__, 'handle_request' ],
 			'permission_callback' => '__return_true',
 		] );
+
+		// Passkeys (WebAuthn). register-* require an existing session; auth-* are
+		// the passwordless sign-in itself (public), and verify creates a session.
+		register_rest_route( 'noodled/v1', '/auth/passkey/register-options', [
+			'methods' => 'POST', 'callback' => [ __CLASS__, 'handle_passkey_register_options' ], 'permission_callback' => '__return_true',
+		] );
+		register_rest_route( 'noodled/v1', '/auth/passkey/register', [
+			'methods' => 'POST', 'callback' => [ __CLASS__, 'handle_passkey_register' ], 'permission_callback' => '__return_true',
+		] );
+		register_rest_route( 'noodled/v1', '/auth/passkey/auth-options', [
+			'methods' => 'POST', 'callback' => [ __CLASS__, 'handle_passkey_auth_options' ], 'permission_callback' => '__return_true',
+		] );
+		register_rest_route( 'noodled/v1', '/auth/passkey/auth', [
+			'methods' => 'POST', 'callback' => [ __CLASS__, 'handle_passkey_auth' ], 'permission_callback' => '__return_true',
+		] );
+	}
+
+	/* ── Passkey handlers ── */
+
+	private static function resolve_uid( array $u ): int {
+		if ( ! ( $u['wp'] ?? false ) ) return (int) ( $u['id'] ?? 0 );
+		return self::ensure_admin_user_row(); // a WP admin's noodled_users row id
+	}
+
+	public static function handle_passkey_register_options( \WP_REST_Request $req ): \WP_REST_Response {
+		$u = self::get_current_user();
+		if ( ! $u ) return new \WP_REST_Response( [ 'error' => __( 'Please sign in first.', 'noodled' ) ], 401 );
+		$uid = self::resolve_uid( $u );
+		if ( ! $uid ) return new \WP_REST_Response( [ 'error' => __( 'Account not found.', 'noodled' ) ], 400 );
+		return new \WP_REST_Response( Noodled_WebAuthn::register_options( $uid, (string) $u['email'], (string) $u['name'] ) );
+	}
+
+	public static function handle_passkey_register( \WP_REST_Request $req ): \WP_REST_Response {
+		$u = self::get_current_user();
+		if ( ! $u ) return new \WP_REST_Response( [ 'error' => __( 'Please sign in first.', 'noodled' ) ], 401 );
+		$uid = self::resolve_uid( $u );
+		if ( ! $uid ) return new \WP_REST_Response( [ 'error' => __( 'Account not found.', 'noodled' ) ], 400 );
+		$body = $req->get_json_params();
+		return new \WP_REST_Response( Noodled_WebAuthn::register_verify( $uid, is_array( $body ) ? $body : [], (string) $req->get_param( 'label' ) ) );
+	}
+
+	public static function handle_passkey_auth_options( \WP_REST_Request $req ): \WP_REST_Response {
+		return new \WP_REST_Response( Noodled_WebAuthn::auth_options( (string) $req->get_param( 'email' ) ) );
+	}
+
+	public static function handle_passkey_auth( \WP_REST_Request $req ): \WP_REST_Response {
+		$body = $req->get_json_params();
+		$uid  = Noodled_WebAuthn::auth_verify( is_array( $body ) ? $body : [] );
+		if ( ! $uid ) return new \WP_REST_Response( [ 'error' => __( 'Passkey sign-in failed.', 'noodled' ) ], 401 );
+		global $wpdb;
+		$user = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}noodled_users WHERE id = %d", $uid ), ARRAY_A );
+		if ( ! $user || $user['role'] === 'pending' ) return new \WP_REST_Response( [ 'error' => __( 'Account not available.', 'noodled' ) ], 403 );
+		self::create_session( $uid );
+		return new \WP_REST_Response( [ 'success' => true, 'name' => $user['display_name'] ] );
 	}
 
 	// ── Branded email ──
