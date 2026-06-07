@@ -97,6 +97,10 @@ class Noodled_App {
 
 		self::send_no_cache_headers();
 
+		// Mint a long-lived app session for a signed-in WP admin so they aren't
+		// logged out when the short WordPress login cookie lapses.
+		Noodled_Auth::ensure_admin_session();
+
 		$current_user = Noodled_Auth::get_current_user();
 
 		// Admin landing preview: view the public landing page even while logged in

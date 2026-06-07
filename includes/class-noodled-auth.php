@@ -211,24 +211,15 @@ class Noodled_Auth {
 
 		if ( ! $user ) return null;
 
-		// Create session
-		$session_token = wp_generate_password( 48, false );
-
+		// Clear the used magic-link token and stamp the login.
 		$wpdb->update( $table, [
-			'token'         => null,
-			'token_expiry'  => null,
-			'session_token' => $session_token,
-			'last_login'    => current_time( 'mysql', true ),
+			'token'        => null,
+			'token_expiry' => null,
+			'last_login'   => current_time( 'mysql', true ),
 		], [ 'id' => $user['id'] ] );
 
-		// Set cookie (1 year)
-		setcookie( self::$cookie_name, $session_token, [
-			'expires'  => time() + 365 * DAY_IN_SECONDS,
-			'path'     => '/',
-			'httponly' => true,
-			'secure'   => is_ssl(),
-			'samesite' => 'Lax',
-		] );
+		// New per-device session (does not disturb this user's other devices).
+		self::create_session( (int) $user['id'] );
 
 		return $user;
 	}
@@ -249,16 +240,11 @@ class Noodled_Auth {
 			];
 		}
 
-		// Check noodled session cookie
+		// Check the noodled session cookie against the per-device sessions table.
 		$session = $_COOKIE[ self::$cookie_name ] ?? '';
 		if ( ! $session ) return null;
 
-		global $wpdb;
-		$user = $wpdb->get_row( $wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}noodled_users WHERE session_token = %s",
-			$session
-		), ARRAY_A );
-
+		$user = self::user_by_session( $session );
 		if ( ! $user ) return null;
 
 		// Block pending users
@@ -278,6 +264,90 @@ class Noodled_Auth {
 	 */
 	public static function is_authenticated(): bool {
 		return self::get_current_user() !== null;
+	}
+
+	/* ── Session helpers (multi-device: one row per device in noodled_sessions, so
+	   signing in on one device never logs you out of another) ── */
+
+	private static function set_session_cookie( string $token, int $expires ): void {
+		setcookie( self::$cookie_name, $token, [
+			'expires'  => $expires,
+			'path'     => '/',
+			'httponly' => true,
+			'secure'   => is_ssl(),
+			'samesite' => 'Lax',
+		] );
+		$_COOKIE[ self::$cookie_name ] = $token; // visible within this same request
+	}
+
+	/** Create a new per-device session (1 year) for a user and set the cookie. */
+	public static function create_session( int $user_id ): string {
+		global $wpdb;
+		$token   = wp_generate_password( 48, false );
+		$expires = time() + 365 * DAY_IN_SECONDS;
+		$wpdb->insert( $wpdb->prefix . 'noodled_sessions', [
+			'user_id'    => $user_id,
+			'token'      => $token,
+			'user_agent' => substr( sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ?? '' ), 0, 255 ),
+			'created_at' => current_time( 'mysql', true ),
+			'expires_at' => gmdate( 'Y-m-d H:i:s', $expires ),
+		] );
+		self::set_session_cookie( $token, $expires );
+		return $token;
+	}
+
+	/** Resolve a session token to its (non-expired) user row, or null. */
+	private static function user_by_session( string $token ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT u.* FROM {$wpdb->prefix}noodled_users u
+			   JOIN {$wpdb->prefix}noodled_sessions s ON s.user_id = u.id
+			  WHERE s.token = %s AND s.expires_at > UTC_TIMESTAMP()",
+			$token
+		), ARRAY_A );
+		return $row ?: null;
+	}
+
+	/** Remove a single device's session (used by logout — this device only). */
+	private static function destroy_session( string $token ): void {
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'noodled_sessions', [ 'token' => $token ] );
+	}
+
+	/**
+	 * Give a signed-in WP admin a long-lived app session so they are not logged
+	 * out when the (short) WordPress login cookie lapses. Called on app load.
+	 * Day-to-day app access then persists for a year like a member; admin-only
+	 * management screens still re-check the live WordPress capability.
+	 */
+	public static function ensure_admin_session(): void {
+		if ( headers_sent() ) return; // can't set a cookie after output started
+		if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) return;
+		$existing = $_COOKIE[ self::$cookie_name ] ?? '';
+		if ( $existing && self::user_by_session( $existing ) ) return; // already has a valid app session
+		$uid = self::ensure_admin_user_row();
+		if ( $uid ) self::create_session( $uid );
+	}
+
+	/** Find or create the noodled_users row for the current WP admin; return its id. */
+	private static function ensure_admin_user_row(): int {
+		if ( ! is_user_logged_in() ) return 0;
+		$wp = wp_get_current_user();
+		if ( ! $wp || ! $wp->user_email ) return 0;
+		global $wpdb;
+		$id = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}noodled_users WHERE email = %s", $wp->user_email
+		) );
+		if ( $id ) return $id;
+		$wpdb->insert( $wpdb->prefix . 'noodled_users', [
+			'email'        => $wp->user_email,
+			'display_name' => $wp->display_name,
+			'role'         => 'admin',
+			'created_at'   => current_time( 'mysql', true ),
+		] );
+		$id = (int) $wpdb->insert_id;
+		if ( $id ) self::seed_new_user( $id );
+		return $id;
 	}
 
 	/**
@@ -301,10 +371,7 @@ class Noodled_Auth {
 	public static function logout(): void {
 		$session = $_COOKIE[ self::$cookie_name ] ?? '';
 		if ( $session ) {
-			global $wpdb;
-			$wpdb->update( $wpdb->prefix . 'noodled_users', [
-				'session_token' => null,
-			], [ 'session_token' => $session ] );
+			self::destroy_session( $session );
 		}
 
 		setcookie( self::$cookie_name, '', [
@@ -574,22 +641,15 @@ class Noodled_Auth {
 		// Clear rate limit on success
 		delete_transient( $rate_key );
 
-		// Create session
-		$session_token = wp_generate_password( 48, false );
+		// Clear the used PIN and stamp the login.
 		$wpdb->update( $wpdb->prefix . 'noodled_users', [
-			'token'         => null,
-			'token_expiry'  => null,
-			'session_token' => $session_token,
-			'last_login'    => current_time( 'mysql', true ),
+			'token'        => null,
+			'token_expiry' => null,
+			'last_login'   => current_time( 'mysql', true ),
 		], [ 'id' => $user['id'] ] );
 
-		setcookie( self::$cookie_name, $session_token, [
-			'expires'  => time() + 365 * DAY_IN_SECONDS,
-			'path'     => '/',
-			'httponly' => true,
-			'secure'   => is_ssl(),
-			'samesite' => 'Lax',
-		] );
+		// New per-device session (does not disturb this user's other devices).
+		self::create_session( (int) $user['id'] );
 
 		return [ 'success' => true, 'name' => $user['display_name'] ];
 	}

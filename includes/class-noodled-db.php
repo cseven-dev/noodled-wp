@@ -62,6 +62,20 @@ CREATE TABLE {$wpdb->prefix}noodled_users (
   UNIQUE KEY email (email)
 ) $charset;
 
+CREATE TABLE {$wpdb->prefix}noodled_sessions (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  token varchar(64) NOT NULL,
+  user_agent varchar(255) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at datetime NOT NULL,
+  last_seen datetime DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY token (token),
+  KEY idx_user (user_id),
+  KEY idx_expires (expires_at)
+) $charset;
+
 CREATE TABLE {$wpdb->prefix}noodled_permissions (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   user_id bigint(20) unsigned NOT NULL,

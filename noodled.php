@@ -3,7 +3,7 @@
  * Plugin Name: Noodled
  * Plugin URI:  https://github.com/cseven-dev/noodled-wp
  * Description: A full web version of the noodled note-taking app with family sharing, magic-link login, and GitHub sync.
- * Version:     1.1.140
+ * Version:     1.1.141
  * Author:      Simon
  * License:     GPL-2.0-or-later
  * Text Domain: noodled
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // "Cannot redeclare class" and a 500 on every page.
 if ( defined( 'NOODLED_VERSION' ) ) return;
 
-define( 'NOODLED_VERSION', '1.1.140' );
+define( 'NOODLED_VERSION', '1.1.141' );
 define( 'NOODLED_FILE', __FILE__ );
 define( 'NOODLED_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NOODLED_URL', plugin_dir_url( __FILE__ ) );
@@ -117,6 +117,13 @@ function noodled_init() {
 			update_option( 'noodled_uploads_protected', 1 );
 		}
 
+		// Move existing single-column sessions into the per-device sessions table
+		// so nobody is logged out by this upgrade.
+		if ( ! get_option( 'noodled_sessions_migrated' ) ) {
+			noodled_migrate_sessions();
+			update_option( 'noodled_sessions_migrated', 1 );
+		}
+
 		Noodled_Settings::init();
 		Noodled_App::init();
 		Noodled_REST::init();
@@ -147,9 +154,12 @@ add_action( 'plugins_loaded', 'noodled_init' );
  */
 add_action( 'noodled_daily_cleanup', 'noodled_run_cleanup' );
 function noodled_run_cleanup() {
+	global $wpdb;
+	// Prune expired login sessions (cheap hygiene, runs regardless of trash policy).
+	$wpdb->query( "DELETE FROM {$wpdb->prefix}noodled_sessions WHERE expires_at < UTC_TIMESTAMP()" );
+
 	$days = (int) get_option( 'noodled_trash_retention', 0 );
 	if ( $days <= 0 ) return;
-	global $wpdb;
 	$t      = $wpdb->prefix . 'noodled_notes';
 	$cutoff = gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS );
 	$ids    = $wpdb->get_col( $wpdb->prepare(
@@ -157,6 +167,29 @@ function noodled_run_cleanup() {
 	) );
 	foreach ( $ids as $id ) {
 		Noodled_Notes::permanent_delete( (int) $id );
+	}
+}
+
+/**
+ * Carry existing logins across the multi-device-session upgrade: copy each user's
+ * old single `session_token` into the new noodled_sessions table (1-year expiry)
+ * so current cookies keep working after the deploy. Idempotent.
+ */
+function noodled_migrate_sessions() {
+	global $wpdb;
+	$users    = $wpdb->prefix . 'noodled_users';
+	$sessions = $wpdb->prefix . 'noodled_sessions';
+	$rows = $wpdb->get_results( "SELECT id, session_token FROM {$users} WHERE session_token IS NOT NULL AND session_token != ''", ARRAY_A );
+	$expires = gmdate( 'Y-m-d H:i:s', time() + 365 * DAY_IN_SECONDS );
+	foreach ( (array) $rows as $r ) {
+		$exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$sessions} WHERE token = %s", $r['session_token'] ) );
+		if ( $exists ) continue;
+		$wpdb->insert( $sessions, [
+			'user_id'    => (int) $r['id'],
+			'token'      => $r['session_token'],
+			'created_at' => current_time( 'mysql', true ),
+			'expires_at' => $expires,
+		] );
 	}
 }
 
