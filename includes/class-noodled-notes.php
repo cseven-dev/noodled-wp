@@ -366,16 +366,56 @@ class Noodled_Notes {
 
 	public static function move( int $id, string $to_notebook, int $owner_id = 0 ): array {
 		global $wpdb;
+		$note = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . self::table() . " WHERE id = %d", $id ), ARRAY_A );
+		if ( ! $note ) return [ 'error' => __( 'Note not found', 'noodled' ) ];
+
+		$old_nb = Noodled_Notebooks::get_by_id( (int) $note['notebook_id'] );
 		// Scope the target notebook to the acting user so notes can't be moved
 		// into another tenant's notebook (or an orphaned owner_id=0 one).
 		$notebook_id = Noodled_Notebooks::ensure( $to_notebook, $owner_id );
 
+		// Guarantee a unique filename in the destination so the GitHub file
+		// (Folder/Title.md) can't collide with an existing note and overwrite it
+		// (this was the note-eating bug). Appends " 2"/" 3"/... on a real clash.
+		list( $title, $slug ) = self::unique_in_notebook( (string) $note['title'], $notebook_id, $id );
+
+		// Remove the old-folder GitHub file so it doesn't orphan and re-import as a
+		// duplicate, and clear the sha so the note re-pushes cleanly to its new path.
+		if ( (int) $note['notebook_id'] !== $notebook_id && ! empty( $note['sha'] ) && $old_nb && class_exists( 'Noodled_Sync' ) ) {
+			Noodled_Sync::delete_from_github( $old_nb['name'], (string) $note['title'], (string) $note['sha'] );
+		}
+
 		$wpdb->update( self::table(), [
 			'notebook_id' => $notebook_id,
+			'title'       => $title,
+			'slug'        => $slug,
+			'sha'         => null,
 			'modified_at' => current_time( 'mysql', true ),
 		], [ 'id' => $id ] );
 
 		return self::get_one( $id ) ?? [ 'error' => __( 'Note not found', 'noodled' ) ];
+	}
+
+	/**
+	 * Make a note's title/slug unique within a notebook so two notes can never
+	 * share the GitHub filename (Folder/Title.md), which is what let a move
+	 * overwrite another note. Appends " 2", " 3", ... to the title (and matching
+	 * slug) on collision. Returns [ title, slug ].
+	 */
+	private static function unique_in_notebook( string $title, int $notebook_id, int $exclude_id ): array {
+		global $wpdb;
+		$base = $title !== '' ? $title : __( 'Untitled Note', 'noodled' );
+		for ( $n = 1; $n <= 50; $n++ ) {
+			$try_title = $n === 1 ? $base : $base . ' ' . $n;
+			$try_slug  = self::slug( $try_title );
+			$clash = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM " . self::table() . " WHERE slug = %s AND notebook_id = %d AND id != %d AND deleted_at IS NULL",
+				$try_slug, $notebook_id, $exclude_id
+			) );
+			if ( ! $clash ) return [ $try_title, $try_slug ];
+		}
+		$suffix = wp_generate_password( 4, false );
+		return [ $base . ' ' . $suffix, self::slug( $base . '-' . $suffix ) ];
 	}
 
 	public static function toggle_pin( int $id ): array {
