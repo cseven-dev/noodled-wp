@@ -19,6 +19,70 @@ class Noodled_Notebooks {
 	}
 
 	/**
+	 * Find "duplicate person" notebooks to merge: a notebook YOU own whose name
+	 * matches a drop folder shared back to you (drop_to = you). These collide in
+	 * the sidebar (your own "Brent" + Brent's shared "Brent"). Returns a plan:
+	 * [ name, from (owned nb id), to (drop folder id), to_owner, notes[] ].
+	 */
+	public static function find_dup_merges( int $admin_id ): array {
+		global $wpdb;
+		$t = self::table(); $nt = self::notes_table();
+		if ( ! $admin_id ) return [];
+		$owned = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, name FROM {$t} WHERE owner_id = %d AND ( drop_to IS NULL OR drop_to = 0 )", $admin_id
+		), ARRAY_A );
+		$plan = [];
+		foreach ( $owned ?: [] as $o ) {
+			$drop = $wpdb->get_row( $wpdb->prepare(
+				"SELECT id, owner_id FROM {$t} WHERE name = %s AND drop_to = %d AND id != %d LIMIT 1",
+				$o['name'], $admin_id, (int) $o['id']
+			), ARRAY_A );
+			if ( ! $drop ) continue;
+			$notes = $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, title, slug FROM {$nt} WHERE notebook_id = %d AND deleted_at IS NULL ORDER BY id", (int) $o['id']
+			), ARRAY_A );
+			$plan[] = [
+				'name'      => $o['name'],
+				'from'      => (int) $o['id'],
+				'to'        => (int) $drop['id'],
+				'to_owner'  => (int) $drop['owner_id'],
+				'notes'     => $notes ?: [],
+			];
+		}
+		return $plan;
+	}
+
+	/**
+	 * Execute find_dup_merges(): move each owned notebook's notes into the shared
+	 * drop folder (unique slug per destination so nothing is overwritten), clear
+	 * the GitHub sha so they re-push under the new path, then delete the emptied
+	 * owned notebook. Returns a per-notebook summary.
+	 */
+	public static function merge_dups( int $admin_id ): array {
+		global $wpdb;
+		$t = self::table(); $nt = self::notes_table();
+		$plan = self::find_dup_merges( $admin_id );
+		$done = [];
+		foreach ( $plan as $p ) {
+			foreach ( $p['notes'] as $note ) {
+				$base = $note['slug'] ?: sanitize_title( $note['title'] );
+				$slug = $base; $i = 1;
+				while ( (int) $wpdb->get_var( $wpdb->prepare(
+					"SELECT COUNT(*) FROM {$nt} WHERE notebook_id = %d AND slug = %s AND id != %d AND deleted_at IS NULL",
+					$p['to'], $slug, (int) $note['id']
+				) ) > 0 ) { $i++; $slug = $base . '-' . $i; }
+				$wpdb->update( $nt, [ 'notebook_id' => $p['to'], 'slug' => $slug, 'sha' => null ], [ 'id' => (int) $note['id'] ] );
+			}
+			$left = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(*) FROM {$nt} WHERE notebook_id = %d AND deleted_at IS NULL", $p['from']
+			) );
+			if ( $left === 0 ) $wpdb->delete( $t, [ 'id' => $p['from'] ] );
+			$done[] = [ 'name' => $p['name'], 'moved' => count( $p['notes'] ), 'owned_deleted' => ( $left === 0 ) ];
+		}
+		return $done;
+	}
+
+	/**
 	 * Get notebooks visible to a user: owned + shared with them.
 	 */
 	public static function get_for_user( int $user_id ): array {

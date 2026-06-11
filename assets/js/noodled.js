@@ -75,6 +75,8 @@ const api = {
   admin_set_drop(id, enabled)            { return this._fetch('/admin/users/' + id + '/drop', { method: 'POST', body: JSON.stringify({ enabled }) }); },
   get_config()                           { return this._fetch('/config'); },
   set_config(key, value)                 { return this._fetch('/config', { method: 'PUT', body: JSON.stringify({ key, value }) }); },
+  clip_setup()                           { return this._fetch('/clip/setup'); },
+  clip_reset()                           { return this._fetch('/clip/setup', { method: 'POST' }); },
   get_version()                          { return Promise.resolve(noodledConfig.version); },
   sync_plaud()                           { return this._fetch('/plaud/sync', { method: 'POST' }); },
   git_push()                             { return this._fetch('/sync/push', { method: 'POST' }); },
@@ -769,7 +771,24 @@ function filterNotes() {
   }
   filteredNotes = applyListFilters(filteredNotes);
   sortFiltered();
+  partitionSharedLast();
   renderNoteList();
+}
+
+// The default "All Notes" browse view (no notebook / trash / starred / tasks /
+// smart notebook selected, not searching).
+function isAllNotesView() {
+  return !activeNotebook && !viewingTrash && !viewingStarred && !viewingTasks && _activeSmart === null;
+}
+
+// In All Notes, list your own notes first, then notes from folders shared with
+// you, so the two don't read as one merged/duplicate list. Stable — each side
+// keeps its existing sort order. Shared notes stay IN the list (just grouped
+// below a divider), so the All Notes filter still includes them. Optics only.
+function partitionSharedLast() {
+  if (!isAllNotesView() || (searchQuery || '').trim()) return;
+  if (!filteredNotes.some(n => n.shared)) return;
+  filteredNotes = filteredNotes.filter(n => !n.shared).concat(filteredNotes.filter(n => n.shared));
 }
 
 function onSearch() { updateSearchClear(); filterNotes(); }
@@ -917,9 +936,19 @@ function renderNoteList() {
   const coverHtml = cover ? `<div class="nb-cover" style="background-image:url('${cover}')"></div>` : '';
   // Group by date when browsing (not searching, default sort, not trash).
   const grouped = !searchQuery && sortMode === 'modified' && !viewingTrash;
+  // In All Notes, drop a divider where the shared notes begin (own notes were
+  // sorted ahead of them in partitionSharedLast). Only when there's a mix.
+  const showSharedDivider = isAllNotesView() && !searchQuery
+    && filteredNotes.some(n => n.shared) && filteredNotes.some(n => !n.shared);
+  let sharedHeaderDone = false;
   let lastGroup = null;
   const out = [];
   filteredNotes.forEach(n => {
+    if (showSharedDivider && n.shared && !sharedHeaderDone) {
+      sharedHeaderDone = true;
+      lastGroup = null; // restart date grouping under the shared section
+      out.push(`<div class="note-group note-group-shared">&#128101; ${esc(__( "Others' Noodles", 'noodled' ))}</div>`);
+    }
     if (grouped) {
       const g = n.pinned ? __( 'Pinned', 'noodled' ) : dateGroup(n.modified || n.created);
       if (g !== lastGroup) { lastGroup = g; out.push(`<div class="note-group">${esc(g)}</div>`); }
@@ -1073,6 +1102,8 @@ function dateTimeTitle() {
 // Put the caret in the note body so typed/dictated text becomes note content,
 // not the title. The title is pre-filled with the date/time and stays editable.
 function focusNoteBody() {
+  const code = document.getElementById('noteBodyCode');
+  if (code) { code.focus(); return; }
   const raw = document.getElementById('noteBodyRaw');
   if (raw) { raw.focus(); return; }
   const body = document.getElementById('noteBody');
@@ -1099,6 +1130,72 @@ async function createNote() {
   setTimeout(focusNoteBody, 100);
 }
 
+// ── Code notes ──────────────────────────────────────────────────────────────
+// A "code note" is a note whose whole body is a single fenced code block. It's
+// edited in a plain monospace <textarea> (not the contenteditable surface), so
+// the markdown editor never reflows, collapses whitespace, or interprets #/*/[
+// in your code — every character is kept exactly. Stored as ```lang … ``` so it
+// round-trips through GitHub sync and renders as a highlighted, copyable block
+// anywhere it's only being read.
+function codeNoteParts(body) {
+  const m = /^```([\w+.#-]*)[ \t]*\n([\s\S]*?)\n?```\s*$/.exec((body || '').trim());
+  return m ? { lang: m[1] || '', code: m[2] } : null;
+}
+
+// The note body as it stands in whichever editor is mounted (code textarea,
+// raw-markdown textarea, or the rendered contenteditable). Returns null when no
+// editor is present yet (e.g. mid-load), so callers can bail without clobbering.
+function currentBody() {
+  const code = document.getElementById('noteBodyCode');
+  if (code) {
+    const lang = (code.dataset.lang || '').trim();
+    return '```' + lang + '\n' + code.value + '\n```';
+  }
+  if (showRawMarkdown) {
+    const raw = document.getElementById('noteBodyRaw');
+    return raw ? raw.value : null;
+  }
+  const el = document.getElementById('noteBody');
+  return el ? htmlToMarkdown(el) : null;
+}
+
+// Tab inserts two spaces (expected in a code editor) rather than leaving the
+// field. Shift+Tab keeps its default (move focus back) as the keyboard escape,
+// so this isn't a focus trap.
+function codeEditorKey(e) {
+  if (e.key === 'Tab' && !e.shiftKey) {
+    e.preventDefault();
+    const ta = e.target;
+    const s = ta.selectionStart, en = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(en);
+    ta.selectionStart = ta.selectionEnd = s + 2;
+    schedSave();
+  }
+}
+
+// Re-wrap with the chosen language as the user types it, then save.
+function onCodeLangInput() {
+  const code = document.getElementById('noteBodyCode');
+  const input = document.getElementById('codeLangInput');
+  if (code && input) code.dataset.lang = input.value.trim();
+  schedSave();
+}
+
+async function createCodeNote() {
+  await doSave();
+  const nb = activeNotebook || 'General';
+  const note = await api.create_note(nb, dateTimeTitle(), '```\n\n```');
+  if (!note || note.error) { showToast(__( 'Could not create note', 'noodled' )); return; }
+  await loadNotebooks();
+  await loadNotes();
+  activeNote = note;
+  renderNoteList();
+  renderContent();
+  document.querySelector('.col-content')?.classList.add('open');
+  closeSidebar();
+  setTimeout(focusNoteBody, 100);
+}
+
 // ── Quick-add speed dial (the mobile + button) ──────────────────────────────
 // Opens a small menu: new note, photo/document, voice note, or location note.
 // Every option creates a note titled with the date/time it was started and
@@ -1112,6 +1209,7 @@ function quickAddOpen() {
     { icon: '📎', label: __( 'Photo or document', 'noodled' ), sub: __( 'Upload files', 'noodled' ),      run: quickAddFiles },
     { icon: '🎙️', label: __( 'Voice note', 'noodled' ),        sub: __( 'Dictate to text', 'noodled' ),   run: quickAddVoice },
     { icon: '📍', label: __( 'Location note', 'noodled' ),     sub: __( 'Pin where you are', 'noodled' ), run: quickAddLocation },
+    { icon: '💻', label: __( 'Code note', 'noodled' ),         sub: __( 'Keeps characters exactly', 'noodled' ), run: createCodeNote },
   ];
   window._quickAddRun = items.map(it => it.run);
   c.innerHTML =
@@ -1389,12 +1487,22 @@ function renderContent() {
   }
 
   const n = activeNote;
+  // A locked note shows an unlock panel instead of an editor (its body is
+  // encrypted ciphertext until unlocked).
+  const locked = noteIsLocked(n.body);
+  // A note whose whole body is one fenced code block is edited as plain code.
+  const codeParts = ( locked || showRawMarkdown ) ? null : codeNoteParts(n.body);
+  const isCode = !!codeParts;
   el.innerHTML = `
     <div class="content-toolbar">
       <input class="content-title-input" id="titleInput" value="${escAttr(n.title)}"
-             placeholder="${escAttr(__( 'Note title', 'noodled' ))}" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();document.getElementById(showRawMarkdown?'noteBodyRaw':'noteBody')?.focus();}">
+             placeholder="${escAttr(__( 'Note title', 'noodled' ))}" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();focusNoteBody();}">
       <span class="save-indicator" id="saveIndicator"></span>
       <div class="editor-actions">
+        ${isCode ? `<input id="codeLangInput" class="code-lang-input" value="${escAttr(codeParts.lang)}"
+               placeholder="${escAttr(__( 'language', 'noodled' ))}" oninput="onCodeLangInput()"
+               aria-label="${escAttr(__( 'Code language', 'noodled' ))}" title="${escAttr(__( 'Code language (for syntax highlighting)', 'noodled' ))}"
+               spellcheck="false" autocapitalize="off" autocomplete="off">` : ''}
         <button class="btn btn-sm" onclick="insertBullet()" title="${escAttr(__( 'Bullet list', 'noodled' ))}" aria-label="${escAttr(__( 'Bullet list', 'noodled' ))}"><span aria-hidden="true">&#9679;</span></button>
         <button class="btn btn-sm" onclick="insertChecklistItem()" title="${escAttr(__( 'Checklist', 'noodled' ))}" aria-label="${escAttr(__( 'Checklist', 'noodled' ))}"><span aria-hidden="true">&#9744;</span></button>
         <button class="btn btn-sm" onclick="insertHeading()" title="${escAttr(__( 'Heading', 'noodled' ))}" aria-label="${escAttr(__( 'Heading', 'noodled' ))}">H</button>
@@ -1408,6 +1516,7 @@ function renderContent() {
           <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="${escAttr(__( 'More tools', 'noodled' ))}" aria-label="${escAttr(__( 'More tools', 'noodled' ))}" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
           <div class="toolbar-dropdown" id="editorMenu" role="menu" aria-labelledby="editorMenuBtn">
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? esc(__( 'Preview mode', 'noodled' )) : esc(__( 'Source mode', 'noodled' ))}</div>
+            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="${locked ? 'unlockCurrentNote' : 'lockCurrentNote'}()">${locked ? esc(__( 'Unlock note', 'noodled' )) : esc(__( 'Lock note', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleFindReplace()">${esc(__( 'Find & replace', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTOC()">${esc(__( 'Table of contents', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="exportNote()">${esc(__( 'Export as HTML', 'noodled' ))}</div>
@@ -1430,7 +1539,18 @@ function renderContent() {
       </div>
     </div>
     <div class="content-body" id="dropZone">
-      ${showRawMarkdown
+      ${locked
+        ? `<div class="note-locked" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;text-align:center;color:var(--text-muted);padding:24px">
+             <div style="font-size:42px" aria-hidden="true">&#128274;</div>
+             <div>${esc(__( 'This note is locked and encrypted on your device.', 'noodled' ))}</div>
+             <button class="btn btn-accent" onclick="unlockCurrentNote()">${esc(__( 'Unlock', 'noodled' ))}</button>
+           </div>`
+        : isCode
+        ? `<textarea id="noteBodyCode" class="raw-markdown code-note-editor" data-lang="${escAttr(codeParts.lang)}"
+               aria-label="${escAttr(__( 'Code', 'noodled' ))}" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"
+               placeholder="${escAttr(__( 'Paste or type code — every character is kept exactly', 'noodled' ))}"
+               oninput="schedSave(); updateWordCount()" onkeydown="codeEditorKey(event)">${escAttr(codeParts.code)}</textarea>`
+        : showRawMarkdown
         ? `<textarea id="noteBodyRaw" class="raw-markdown" oninput="schedSave(); updateWordCount()">${escAttr(n.body || '')}</textarea>`
         : `<div class="rendered-content" id="noteBody" contenteditable="true"
                role="textbox" aria-multiline="true" aria-label="${escAttr(__( 'Note body', 'noodled' ))}"
@@ -1504,7 +1624,7 @@ function setupLinkClicks() {
 function updateWordCount() {
   const el = document.getElementById('editorFooter');
   if (!el || !activeNote) return;
-  const body = document.getElementById('noteBody') || document.getElementById('noteBodyRaw');
+  const body = document.getElementById('noteBody') || document.getElementById('noteBodyRaw') || document.getElementById('noteBodyCode');
   if (!body) return;
   const text = body.innerText || body.value || '';
   const words = text.trim().split(/\s+/).filter(w => w.length > 0);
@@ -1558,7 +1678,8 @@ function setupDropZone() {
 async function saveTitleOnly() {
   if (!activeNote) return;
   const title = document.getElementById('titleInput')?.value || activeNote.title;
-  const body = htmlToMarkdown(document.getElementById('noteBody'));
+  const cb = currentBody();
+  const body = cb === null ? (activeNote.body || '') : cb;
   const result = await api.save_note(activeNote.notebook, activeNote.id, title, body);
   if (!result.error) {
     activeNote = result;
@@ -1840,6 +1961,171 @@ function menuDashPick(fn) {
   try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {}
 }
 
+// ── Per-note lock (optional client-side end-to-end encryption) ───────────────
+// A locked note's body is AES-256-GCM encrypted in the browser with a key
+// derived (PBKDF2) from a protection passphrase that never leaves the device and
+// never reaches the server or GitHub. Locking is opt-in per note; every other
+// note stays plaintext and fully searchable. A forgotten passphrase means locked
+// notes are unrecoverable by anyone (that is the guarantee). The passphrase is
+// validated against a stored verifier and cached in memory for the session only.
+const NOTE_ENC_PREFIX = 'noodled:enc:v1:';
+const PROTECT_CHECK = 'noodled-protect-v1';
+
+function noteIsLocked(body) { return typeof body === 'string' && body.startsWith(NOTE_ENC_PREFIX); }
+
+function _b64bytes(buf) { let s = ''; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
+function _bytesFromB64(b64) { const s = atob(b64); const a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+
+async function _deriveKey(pass, salt) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+async function encryptBody(plain, pass) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await _deriveKey(pass, salt);
+  const ct   = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain)));
+  const out  = new Uint8Array(salt.length + iv.length + ct.length);
+  out.set(salt, 0); out.set(iv, salt.length); out.set(ct, salt.length + iv.length);
+  return NOTE_ENC_PREFIX + _b64bytes(out);
+}
+async function decryptBody(body, pass) {
+  const raw  = _bytesFromB64(body.slice(NOTE_ENC_PREFIX.length));
+  const salt = raw.slice(0, 16), iv = raw.slice(16, 28), ct = raw.slice(28);
+  const key  = await _deriveKey(pass, salt);
+  const pt   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return new TextDecoder().decode(pt);
+}
+
+// Make sure we hold a validated passphrase this session. Creates one (with a
+// loss warning) the first time, or asks for the existing one and verifies it.
+async function ensureUnlocked() {
+  if (window._protectPass) return true;
+  const verifier = config && config.protect_verifier;
+  if (verifier) {
+    const p = await promptPassphrase('enter');
+    if (p == null) return false;
+    try { if ((await decryptBody(verifier, p)) !== PROTECT_CHECK) { showToast(__( 'Wrong passphrase', 'noodled' )); return false; } }
+    catch (e) { showToast(__( 'Wrong passphrase', 'noodled' )); return false; }
+    window._protectPass = p; return true;
+  }
+  const np = await promptPassphrase('create');
+  if (np == null) return false;
+  try {
+    const v = await encryptBody(PROTECT_CHECK, np);
+    config.protect_verifier = v;
+    await api.set_config('protect_verifier', v);
+    window._protectPass = np; return true;
+  } catch (e) { showToast(__( 'Could not set passphrase', 'noodled' )); return false; }
+}
+
+function promptPassphrase(mode) {
+  return new Promise(resolve => {
+    const el = document.getElementById('modalContainer');
+    if (!el) { resolve(null); return; }
+    const create = mode === 'create';
+    el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:380px">
+      <h3>${esc(create ? __( 'Set a protection passphrase', 'noodled' ) : __( 'Enter passphrase', 'noodled' ))}</h3>
+      ${create ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5">${esc(__( 'Locked notes are encrypted on your device. If you forget this passphrase, those notes cannot be recovered by anyone, including the site admin.', 'noodled' ))}</p>` : ''}
+      <input type="password" id="ppass1" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Passphrase', 'noodled' ))}">
+      ${create ? `<input type="password" id="ppass2" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Confirm passphrase', 'noodled' ))}">` : ''}
+      <div id="pperr" style="color:#e11;font-size:12px;margin-top:6px;min-height:14px"></div>
+      <div class="modal-buttons" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-sm" id="ppcancel">${esc(__( 'Cancel', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" id="ppok">${esc(create ? __( 'Set', 'noodled' ) : __( 'Unlock', 'noodled' ))}</button>
+      </div></div></div>`;
+    const close = (v) => { el.innerHTML = ''; resolve(v); };
+    const submit = () => {
+      const p1 = el.querySelector('#ppass1').value;
+      if (!p1) { el.querySelector('#pperr').textContent = __( 'Required', 'noodled' ); return; }
+      if (create) {
+        const p2 = el.querySelector('#ppass2').value;
+        if (p1 !== p2) { el.querySelector('#pperr').textContent = __( 'Passphrases do not match', 'noodled' ); return; }
+        if (p1.length < 6) { el.querySelector('#pperr').textContent = __( 'Use at least 6 characters', 'noodled' ); return; }
+      }
+      close(p1);
+    };
+    el.querySelector('#ppcancel').onclick = () => close(null);
+    el.querySelector('#ppok').onclick = submit;
+    el.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); }));
+    setTimeout(() => { const i = el.querySelector('#ppass1'); if (i) i.focus(); }, 40);
+  });
+}
+
+async function lockCurrentNote() {
+  if (!activeNote || noteIsLocked(activeNote.body)) return;
+  if (!(await ensureUnlocked())) return;
+  await doSave(); // flush pending edits into activeNote.body first
+  const plain = (currentBody() ?? activeNote.body) || '';
+  let enc;
+  try { enc = await encryptBody(plain, window._protectPass); }
+  catch (e) { showToast(__( 'Encryption failed', 'noodled' )); return; }
+  const r = await api.save_note(activeNote.notebook, activeNote.id, activeNote.title, enc);
+  if (r && !r.error) { activeNote = r; await loadNotes(); renderNoteList(); renderContent(); showToast(__( 'Note locked', 'noodled' )); }
+  else showToast(__( 'Could not lock note', 'noodled' ));
+}
+
+async function unlockCurrentNote() {
+  if (!activeNote || !noteIsLocked(activeNote.body)) return;
+  if (!(await ensureUnlocked())) return;
+  let plain;
+  try { plain = await decryptBody(activeNote.body, window._protectPass); }
+  catch (e) { showToast(__( 'Could not decrypt (wrong passphrase?)', 'noodled' )); window._protectPass = ''; return; }
+  const r = await api.save_note(activeNote.notebook, activeNote.id, activeNote.title, plain);
+  if (r && !r.error) { activeNote = r; await loadNotes(); renderNoteList(); renderContent(); showToast(__( 'Note unlocked', 'noodled' )); }
+  else showToast(__( 'Could not unlock note', 'noodled' ));
+}
+
+// ── Web clipper: a bookmarklet that posts the current page/selection to the
+// token-authed /clip intake, which files it under a "Web Clips" notebook. ──
+function buildClipBookmarklet(token, endpoint) {
+  return "javascript:(function(){var t=document.title||'',u=location.href,s='';"
+    + "try{s=window.getSelection?String(window.getSelection()):''}catch(e){}"
+    + "var b=new URLSearchParams();b.append('token','" + token + "');"
+    + "b.append('title',t);b.append('url',u);b.append('text',s);"
+    + "fetch('" + endpoint + "',{method:'POST',body:b}).then(function(r){return r.json().catch(function(){return{ok:r.ok}})})"
+    + ".then(function(j){alert(j&&j.ok?'Saved to noodled ✓':'Clip failed'+(j&&j.error?': '+j.error:''))})"
+    + ".catch(function(){alert('Clip failed (offline?)')})})();";
+}
+
+function showWebClipper() {
+  const el = document.getElementById('modalContainer');
+  if (!el) return;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''"><div class="modal" style="max-width:480px"><h3>${esc(__( 'Web clipper', 'noodled' ))}</h3><p style="font-size:13px;color:var(--text-muted)">${esc(__( 'Loading…', 'noodled' ))}</p></div></div>`;
+  api.clip_setup().then(cfg => {
+    const bm = buildClipBookmarklet(cfg.token, cfg.endpoint);
+    const modal = el.querySelector('.modal');
+    if (!modal) return;
+    modal.innerHTML = `
+      <h3>${esc(__( 'Web clipper', 'noodled' ))}</h3>
+      <p style="font-size:13px;line-height:1.5">${esc(__( 'Drag this button to your browser’s bookmarks bar. Then on any web page, click it to save the page (and any text you’ve selected) into your', 'noodled' ))} <strong>Web Clips</strong> ${esc(__( 'notebook.', 'noodled' ))}</p>
+      <p style="margin:14px 0"><a id="clipBmLink" class="btn btn-accent" style="text-decoration:none" onclick="event.preventDefault()">✂️ ${esc(__( 'Clip to noodled', 'noodled' ))}</a></p>
+      <p style="font-size:12px;color:var(--text-muted)">${esc(__( 'On mobile (no bookmarks bar), copy the code below and make a new bookmark with it as the address:', 'noodled' ))}</p>
+      <textarea id="clipBmCode" readonly spellcheck="false" style="width:100%;height:64px;font-family:monospace;font-size:11px" onclick="this.select()"></textarea>
+      <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">${esc(__( 'Want a desktop drop folder too? The same token powers the noodled_dropbox watcher — drop a file in the folder and it becomes a note. Run the watcher script on your computer and paste this token into its config.', 'noodled' ))}</p>
+      <div class="modal-buttons" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-sm" onclick="regenClipToken()">${esc(__( 'Reset token', 'noodled' ))}</button>
+        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button>
+      </div>`;
+    // Set the bookmarklet href/textarea via properties so the javascript: URL
+    // isn't mangled by HTML attribute escaping.
+    const a = modal.querySelector('#clipBmLink'); if (a) a.setAttribute('href', bm);
+    const ta = modal.querySelector('#clipBmCode'); if (ta) ta.value = bm;
+  }).catch(() => {
+    const modal = el.querySelector('.modal');
+    if (modal) modal.innerHTML = `<h3>${esc(__( 'Web clipper', 'noodled' ))}</h3><p>${esc(__( 'Could not load the clipper. Try again.', 'noodled' ))}</p><div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>`;
+  });
+}
+
+async function regenClipToken() {
+  if (!(await showConfirm(__( 'Reset the clip token? Your old bookmarklet will stop working and you’ll need to re-drag the new one.', 'noodled' ), { okLabel: __( 'Reset', 'noodled' ) }))) return;
+  try { await api.clip_reset(); } catch (e) {}
+  showWebClipper();
+}
+
 function renderMenuDashboard() {
   const isOwner = !!(typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.owner);
   const userName = (typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.name) || '';
@@ -1849,11 +2135,13 @@ function renderMenuDashboard() {
       { icon: '📎', label: __( 'Photo or document', 'noodled' ), fn: 'quickAddFiles', desc: __( "Drop in a photo, a PDF, or fifty. We'll start the note for you.", 'noodled' ) },
       { icon: '🎙️', label: __( 'Voice note', 'noodled' ), fn: 'quickAddVoice', desc: __( "Talk, don't type. The mic's already listening.", 'noodled' ) },
       { icon: '📍', label: __( 'Location note', 'noodled' ), fn: 'quickAddLocation', desc: __( 'Drop a pin where you stand. Future-you will want to know.', 'noodled' ) },
+      { icon: '💻', label: __( 'Code note', 'noodled' ), fn: 'createCodeNote', desc: __( 'A plain monospace page that keeps every character — no formatting, no surprises.', 'noodled' ) },
     ] },
     { title: __( 'Capture', 'noodled' ), items: [
       { icon: '🧩', label: __( 'New from template', 'noodled' ), fn: 'showTemplates', desc: __( 'Start from a shape, not a blank stare.', 'noodled' ) },
       { icon: '📓', label: __( 'Daily journal', 'noodled' ), fn: 'openDailyJournal', desc: __( "Today's page, ready and waiting. Brain-dump and go.", 'noodled' ) },
       { icon: '⚡', label: __( 'Quick capture', 'noodled' ), fn: 'toggleQuickCapture', desc: __( 'A thought, before it wanders off. In and out in two seconds.', 'noodled' ) },
+      { icon: '✂️', label: __( 'Web clipper', 'noodled' ), fn: 'showWebClipper', desc: __( 'Save a page or selection from any browser straight into noodled.', 'noodled' ) },
     ] },
     { title: __( 'Organize', 'noodled' ), items: [
       { icon: '🏷️', label: __( 'Browse tags', 'noodled' ), fn: 'showTagCloud', desc: __( "Every #hashtag you've ever scribbled, gathered in one spot.", 'noodled' ) },
@@ -1960,14 +2248,9 @@ async function deleteCurrentNote() {
 
 function toggleMarkdownView() {
   if (!activeNote) return;
-  // Save current content first
-  if (showRawMarkdown) {
-    const raw = document.getElementById('noteBodyRaw');
-    if (raw) activeNote.body = raw.value;
-  } else {
-    const el = document.getElementById('noteBody');
-    if (el) activeNote.body = htmlToMarkdown(el);
-  }
+  // Capture whatever's in the current editor (code/raw/rendered) before swapping.
+  const cb = currentBody();
+  if (cb !== null) activeNote.body = cb;
   showRawMarkdown = !showRawMarkdown;
   renderContent();
 }
@@ -1983,16 +2266,8 @@ async function doSave() {
   if (!activeNote || viewingTrash || _conflictOpen) return;
   // Version history is snapshotted server-side on each content-changing save.
   const title = document.getElementById('titleInput')?.value || activeNote.title;
-  let body;
-  if (showRawMarkdown) {
-    const raw = document.getElementById('noteBodyRaw');
-    if (!raw) return;
-    body = raw.value;
-  } else {
-    const el = document.getElementById('noteBody');
-    if (!el) return;
-    body = htmlToMarkdown(el);
-  }
+  const body = currentBody();
+  if (body === null) return; // no editor mounted yet — don't clobber
   activeNote.body = body;
   // Pass the version we last saw so the server can flag a clobber (another
   // device edited this note since we loaded it).
@@ -5049,6 +5324,7 @@ function showCommandPalette() {
   const owner = !!(noodledConfig.user && noodledConfig.user.owner);
   const cmds = [
     { icon: '📝', label: __( 'New note', 'noodled' ), run: () => createNote() },
+    { icon: '💻', label: __( 'Code note', 'noodled' ), run: () => createCodeNote() },
     { icon: '📄', label: __( 'New from template', 'noodled' ), run: () => showTemplates() },
     { icon: '📎', label: __( 'Add files', 'noodled' ), run: () => uploadFiles() },
     { icon: '🔍', label: __( 'Search notes', 'noodled' ), run: () => document.getElementById('searchInput').focus() },

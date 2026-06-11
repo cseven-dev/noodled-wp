@@ -176,6 +176,24 @@ class Noodled_REST {
 			[ 'methods' => 'PUT', 'callback' => [ __CLASS__, 'set_config' ], ] + $auth,
 		] );
 
+		// Web clipper. `/clip/setup` (authed) issues/rotates the per-user clip token
+		// and returns the bookmarklet target. `/clip` is the intake the bookmarklet
+		// POSTs to from any website, so it is token-authed (not cookie-authed: the
+		// session cookie is SameSite=Lax and won't ride a cross-site POST) and is
+		// CORS-open for that one route only.
+		register_rest_route( $ns, '/clip/setup', [
+			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'clip_setup' ], ] + $auth,
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'clip_reset' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/clip', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'clip_intake' ], 'permission_callback' => '__return_true' ],
+		] );
+		// Desktop drop-folder intake: same per-user clip token, but accepts a file
+		// (base64) and makes one note per file (text → body, else → attachment).
+		register_rest_route( $ns, '/clip/file', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'clip_file_intake' ], 'permission_callback' => '__return_true' ],
+		] );
+
 		// Sync — admin only (shared GitHub repo is the admin desktop<->web pipeline)
 		$admin_only = [ 'permission_callback' => function() { return current_user_can( 'manage_options' ); } ];
 		register_rest_route( $ns, '/sync/status', [
@@ -973,6 +991,150 @@ class Noodled_REST {
 		$config[ $key ] = $value;
 		update_option( self::config_key(), $config );
 		return new \WP_REST_Response( $config );
+	}
+
+	// ── Web clipper ──
+
+	// token -> user_id map, kept in a single option so the public intake can
+	// resolve a token without scanning every user's config.
+	private static function clip_tokens(): array {
+		$m = get_option( 'noodled_clip_tokens', [] );
+		return is_array( $m ) ? $m : [];
+	}
+
+	private static function clip_token_for( int $uid, bool $rotate = false ): string {
+		$config = get_option( self::config_key(), [] );
+		$token  = $config['clip_token'] ?? '';
+		if ( $token && ! $rotate ) return $token;
+
+		$map = self::clip_tokens();
+		if ( $token ) unset( $map[ $token ] );          // drop the old token on rotate
+		$token = wp_generate_password( 40, false );      // url-safe-ish, no symbols
+		$config['clip_token'] = $token;
+		update_option( self::config_key(), $config );
+		$map[ $token ] = $uid;
+		update_option( 'noodled_clip_tokens', $map );
+		return $token;
+	}
+
+	public static function clip_setup(): \WP_REST_Response {
+		$uid = self::current_user_id();
+		return new \WP_REST_Response( [
+			'token'    => self::clip_token_for( $uid ),
+			'endpoint' => rest_url( self::$ns . '/clip' ),
+		] );
+	}
+
+	public static function clip_reset(): \WP_REST_Response {
+		$uid = self::current_user_id();
+		return new \WP_REST_Response( [
+			'token'    => self::clip_token_for( $uid, true ),
+			'endpoint' => rest_url( self::$ns . '/clip' ),
+		] );
+	}
+
+	public static function clip_intake( \WP_REST_Request $req ): \WP_REST_Response {
+		// WordPress core sends CORS headers for REST routes (it echoes the request
+		// Origin), and the bookmarklet posts form-encoded (a "simple" request), so
+		// no preflight and no manual CORS handling is needed here.
+		$token = (string) $req->get_param( 'token' );
+		$map   = self::clip_tokens();
+		$uid   = isset( $map[ $token ] ) ? (int) $map[ $token ] : 0;
+		if ( ! $token || ! $uid ) {
+			return new \WP_REST_Response( [ 'error' => 'Invalid clip token' ], 401 );
+		}
+
+		// Light rate limit per token (a leaked token can't spam-create notes).
+		$rk = 'noodled_clip_' . md5( $token );
+		$n  = (int) get_transient( $rk );
+		if ( $n >= 60 ) return new \WP_REST_Response( [ 'error' => 'Too many clips, try later' ], 429 );
+		set_transient( $rk, $n + 1, HOUR_IN_SECONDS );
+
+		$title = trim( (string) $req->get_param( 'title' ) );
+		$url   = trim( (string) $req->get_param( 'url' ) );
+		$text  = (string) $req->get_param( 'text' );
+		$url   = ( $url && filter_var( $url, FILTER_VALIDATE_URL ) ) ? $url : '';
+
+		if ( $title === '' ) $title = $url !== '' ? wp_parse_url( $url, PHP_URL_HOST ) : __( 'Web clip', 'noodled' );
+
+		// Build a plain-markdown body: source link, clipped time, then the selection
+		// (kept as text — never raw HTML — so a clip can't inject markup).
+		$lines = [];
+		if ( $url !== '' )  $lines[] = '[' . self::clip_line( $title ) . '](' . esc_url_raw( $url ) . ')';
+		$lines[] = '*' . sprintf( __( 'Clipped %s', 'noodled' ), current_time( 'Y-m-d H:i' ) ) . '*';
+		if ( $text !== '' ) { $lines[] = ''; $lines[] = sanitize_textarea_field( $text ); }
+		$body = implode( "\n", $lines ) . "\n";
+
+		$result = Noodled_Notes::create( 'Web Clips', $title, $body, $uid );
+		if ( isset( $result['error'] ) ) {
+			return new \WP_REST_Response( [ 'error' => $result['error'] ], 500 );
+		}
+		if ( class_exists( 'Noodled_Sync' ) && ! empty( $result['id'] ) ) {
+			Noodled_Sync::push_note( (int) $result['id'] );
+		}
+		return new \WP_REST_Response( [ 'ok' => true, 'id' => $result['id'] ?? 0 ] );
+	}
+
+	// Collapse a clipped title to a single safe line for the markdown link text.
+	private static function clip_line( string $s ): string {
+		$s = preg_replace( '/[\r\n\[\]]+/', ' ', $s );
+		return trim( preg_replace( '/\s+/', ' ', $s ) );
+	}
+
+	// Desktop drop-folder intake. Same per-user clip token as the bookmarklet,
+	// but takes a base64 file and makes one note per file: text files become the
+	// note body; everything else is attached (via the hardened attachment
+	// pipeline, which enforces the allowlist, 10 MB cap and content sniffing).
+	public static function clip_file_intake( \WP_REST_Request $req ): \WP_REST_Response {
+		$token = (string) $req->get_param( 'token' );
+		$map   = self::clip_tokens();
+		$uid   = isset( $map[ $token ] ) ? (int) $map[ $token ] : 0;
+		if ( ! $token || ! $uid ) {
+			return new \WP_REST_Response( [ 'error' => 'Invalid clip token' ], 401 );
+		}
+
+		$rk = 'noodled_clipf_' . md5( $token );
+		$n  = (int) get_transient( $rk );
+		if ( $n >= 120 ) return new \WP_REST_Response( [ 'error' => 'Too many uploads, try later' ], 429 );
+		set_transient( $rk, $n + 1, HOUR_IN_SECONDS );
+
+		$filename = ltrim( sanitize_file_name( (string) $req->get_param( 'filename' ) ), '.' );
+		$notebook = trim( (string) $req->get_param( 'notebook' ) );
+		if ( $notebook === '' ) $notebook = 'Inbox';
+		$data_b64 = (string) $req->get_param( 'data' );
+		if ( $filename === '' || $data_b64 === '' ) {
+			return new \WP_REST_Response( [ 'error' => 'filename and data are required' ], 400 );
+		}
+
+		$ext       = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+		$base      = pathinfo( $filename, PATHINFO_FILENAME ) ?: $filename;
+		$text_exts = [ 'md', 'markdown', 'txt', 'csv', 'tsv', 'log' ];
+
+		// Text files → the note body (no attachment).
+		if ( in_array( $ext, $text_exts, true ) ) {
+			$raw = base64_decode( $data_b64, true );
+			if ( $raw === false ) return new \WP_REST_Response( [ 'error' => 'Invalid base64 data' ], 400 );
+			if ( strlen( $raw ) > 1048576 ) return new \WP_REST_Response( [ 'error' => 'Text file too large (max 1 MB)' ], 413 );
+			$body   = wp_check_invalid_utf8( $raw, true );
+			$result = Noodled_Notes::create( $notebook, $base, $body, $uid );
+			if ( isset( $result['error'] ) ) return new \WP_REST_Response( [ 'error' => $result['error'] ], 500 );
+			if ( class_exists( 'Noodled_Sync' ) && ! empty( $result['id'] ) ) Noodled_Sync::push_note( (int) $result['id'] );
+			return new \WP_REST_Response( [ 'ok' => true, 'id' => $result['id'] ?? 0, 'attached' => false ] );
+		}
+
+		// Everything else → a note titled with the filename, file attached.
+		$note = Noodled_Notes::create( $notebook, $filename, '', $uid );
+		if ( isset( $note['error'] ) ) return new \WP_REST_Response( [ 'error' => $note['error'] ], 500 );
+		$note_id = (int) ( $note['id'] ?? 0 );
+
+		$att = Noodled_Attachments::save( $note_id, $filename, $data_b64 );
+		if ( isset( $att['error'] ) ) {
+			// Roll back the empty note so a rejected file leaves nothing behind.
+			if ( $note_id ) Noodled_Notes::permanent_delete( $note_id );
+			return new \WP_REST_Response( [ 'error' => $att['error'] ], 422 );
+		}
+		if ( class_exists( 'Noodled_Sync' ) && $note_id ) Noodled_Sync::push_note( $note_id );
+		return new \WP_REST_Response( [ 'ok' => true, 'id' => $note_id, 'attached' => true ] );
 	}
 
 	// ── Sync ──

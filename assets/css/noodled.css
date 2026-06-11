@@ -738,6 +738,14 @@ body.dragging-note .note-item { cursor: grabbing; }
   color: var(--text); font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
   line-height: 1.6; padding: 0; resize: none; outline: none;
 }
+/* Code note: a plain monospace editor that keeps every character exactly. */
+.code-note-editor { padding: 12px 14px; tab-size: 2; -moz-tab-size: 2; }
+.code-lang-input {
+  width: 92px; font-size: 12px; padding: 4px 8px; border-radius: 6px; margin-right: 4px;
+  border: 1px solid var(--border); background: var(--bg-content); color: var(--text);
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+.code-lang-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* ── Floating action button (mobile only) ── */
 .fab {
@@ -1814,6 +1822,11 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   background: var(--bg-panel, #16181c); z-index: 2;
 }
 .note-group:first-child { padding-top: 4px; }
+/* Divider where shared ("Others' Noodles") notes begin in the All Notes list. */
+.note-group-shared {
+  color: var(--text); border-top: 1px solid var(--border);
+  margin-top: 8px; padding-top: 12px;
+}
 
 /* ── Checklist progress badges ── */
 .att-badge.task-badge { background: rgba(59,130,246,.16); }

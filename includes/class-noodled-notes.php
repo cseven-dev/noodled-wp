@@ -41,6 +41,11 @@ class Noodled_Notes {
 
 	// A plain-text snippet of the note body for the list, with markdown stripped.
 	private static function preview_of( string $body ): string {
+		// Locked (client-side encrypted) notes never leak their ciphertext into
+		// the list preview.
+		if ( str_starts_with( $body, 'noodled:enc:v1:' ) ) {
+			return "\u{1F512} " . __( 'Locked note', 'noodled' );
+		}
 		$s = $body;
 		$s = preg_replace( '/```.*?```/s', ' ', $s );              // fenced code
 		$s = preg_replace( '/!\[[^\]]*\]\([^)]*\)/', ' ', $s );    // images
@@ -62,6 +67,9 @@ class Noodled_Notes {
 
 	// Checklist progress for the list badge, without shipping the body.
 	private static function task_counts( string $body ): array {
+		if ( str_starts_with( $body, 'noodled:enc:v1:' ) ) {
+			return [ 'done' => 0, 'total' => 0 ];
+		}
 		if ( ! preg_match_all( '/^\s*[-*+]\s+\[([ xX])\]/m', $body, $m ) ) {
 			return [ 'done' => 0, 'total' => 0 ];
 		}
@@ -185,17 +193,14 @@ class Noodled_Notes {
 		$notebook_id = Noodled_Notebooks::ensure( $notebook_name, $owner_id );
 		if ( ! $notebook_id ) return [ 'error' => __( 'Could not create notebook', 'noodled' ) ];
 
-		$slug = self::slug( $title );
-		$now  = current_time( 'mysql', true );
-
-		// Avoid slug collision within notebook
-		$existing = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM " . self::table() . " WHERE slug = %s AND notebook_id = %d AND deleted_at IS NULL",
-			$slug, $notebook_id
-		) );
-		if ( $existing ) {
-			$slug .= '-' . wp_generate_password( 4, false );
-		}
+		// Guarantee a unique title+slug within the notebook so the GitHub file
+		// (Folder/Title.md) can never collide with an existing note and overwrite
+		// it on push/import. The filename is derived from the TITLE, so deduping
+		// the slug alone is not enough (two same-titled notes share a filename) —
+		// this is the same note-eating bug move() was hardened against. Appends
+		// " 2"/" 3"/... on a clash. 0 = no existing note to exclude (not saved yet).
+		list( $title, $slug ) = self::unique_in_notebook( $title, $notebook_id, 0 );
+		$now = current_time( 'mysql', true );
 
 		$wpdb->insert( self::table(), [
 			'slug'        => $slug,

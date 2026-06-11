@@ -405,6 +405,18 @@ class Noodled_Auth {
 	}
 
 	/**
+	 * The current user's noodled_users row id (WP admins map to their row via
+	 * email; app sessions carry it directly). 0 if not signed in. Used by admin
+	 * maintenance that needs the real owner_id, which get_current_user() reports
+	 * as 0 for WP admins.
+	 */
+	public static function current_user_id(): int {
+		if ( is_user_logged_in() && current_user_can( 'manage_options' ) ) return self::ensure_admin_user_row();
+		$u = self::get_current_user();
+		return $u ? (int) $u['id'] : 0;
+	}
+
+	/**
 	 * Is the current request "the owner" — i.e. you? In wp-admin that's any WP
 	 * admin. In the app (PIN session) it's only the original admin account: the
 	 * one whose email matches the site admin email, or failing that the first
@@ -670,15 +682,31 @@ class Noodled_Auth {
 	 * Shared by the REST PIN endpoint and the one-click email magic link.
 	 * Returns [ 'success' => true, 'name' => ... ] or [ 'error' => ..., 'status' => int ].
 	 */
-	public static function login_with_pin( string $email, string $pin ): array {
+	public static function login_with_pin( string $email, string $pin, bool $by_link = false ): array {
 		$email = sanitize_email( $email );
 		$pin   = sanitize_text_field( $pin );
 		if ( ! $email || ! $pin ) return [ 'error' => __( 'Email and PIN required', 'noodled' ), 'status' => 400 ];
 
-		// Rate limiting: max 5 attempts per email per 15 minutes
-		$rate_key = 'noodled_pin_' . md5( $email );
+		// Two different threat models share this method:
+		//  - A PIN typed on the login screen is brute-forceable, so it's capped
+		//    tightly by EMAIL (5 / 15 min).
+		//  - A clicked email link ($by_link) is routinely pre-fetched by mail
+		//    security scanners (Outlook SafeLinks, Gmail, Mimecast, antivirus,
+		//    mobile previews), each fetch landing here from the scanner's own IP.
+		//    Keying that by email let those bot hits burn the real user's
+		//    allowance, so the human's own click came back "too many attempts"
+		//    and the link never worked. The link path is instead capped per-IP
+		//    with generous headroom: a scanner on another IP can't lock the user
+		//    out, and honest re-clicks / refreshes don't trip it.
+		if ( $by_link ) {
+			$rate_key = 'noodled_pinlink_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+			$cap      = 20;
+		} else {
+			$rate_key = 'noodled_pin_' . md5( $email );
+			$cap      = 5;
+		}
 		$attempts = (int) get_transient( $rate_key );
-		if ( $attempts >= 5 ) {
+		if ( $attempts >= $cap ) {
 			return [ 'error' => __( 'Too many attempts. Try again in a few minutes.', 'noodled' ), 'status' => 429 ];
 		}
 		set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );

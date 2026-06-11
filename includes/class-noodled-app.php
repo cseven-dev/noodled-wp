@@ -39,6 +39,74 @@ class Noodled_App {
 		header( 'Vary: Cookie' );
 	}
 
+	/**
+	 * Admin-only maintenance page: merge "duplicate person" notebooks (a notebook
+	 * you own whose name matches a drop folder shared back to you) into the shared
+	 * folder, so each person appears once. Dry-run by default; a nonce-protected
+	 * ?confirm=1 executes. Moving into the shared folder means those notes become
+	 * visible to that member — the dry run spells out exactly what moves.
+	 */
+	private static function serve_merge_dups(): void {
+		self::send_no_cache_headers();
+		if ( ! ( is_user_logged_in() && current_user_can( 'manage_options' ) ) ) {
+			status_header( 403 );
+			echo '<p style="font-family:sans-serif;padding:24px">' . esc_html__( 'Admins only.', 'noodled' ) . '</p>';
+			return;
+		}
+		$admin_id = Noodled_Auth::current_user_id();
+		$plan     = Noodled_Notebooks::find_dup_merges( $admin_id );
+		$back      = esc_url( self::get_app_url() );
+		$confirmed = isset( $_GET['confirm'] ) && $_GET['confirm'] === '1'
+			&& isset( $_GET['_wpnonce'] ) && wp_verify_nonce( $_GET['_wpnonce'], 'noodled_merge_dups' );
+
+		echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+		echo '<title>noodled — merge duplicate folders</title>';
+		echo '<body style="font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;line-height:1.5;color:#1a1a1f">';
+		echo '<h2>Merge duplicate folders</h2>';
+
+		if ( $confirmed ) {
+			$done = Noodled_Notebooks::merge_dups( $admin_id );
+			if ( ! $done ) {
+				echo '<p>Nothing to merge.</p>';
+			} else {
+				echo '<p><strong>Done.</strong></p><ul>';
+				foreach ( $done as $d ) {
+					echo '<li>' . esc_html( sprintf(
+						/* translators: 1: notebook name, 2: number of notes */
+						'%1$s — moved %2$d note(s) into the shared folder%3$s',
+						$d['name'], (int) $d['moved'], $d['owned_deleted'] ? ', removed the empty duplicate' : ''
+					) ) . '</li>';
+				}
+				echo '</ul>';
+			}
+			echo '<p><a href="' . $back . '">&larr; Back to noodled</a></p>';
+			return;
+		}
+
+		if ( ! $plan ) {
+			echo '<p>No duplicate person-notebooks found. Nothing to do.</p>';
+			echo '<p><a href="' . $back . '">&larr; Back to noodled</a></p>';
+			return;
+		}
+
+		echo '<p>These notebooks you own share a name with a folder shared back to you. '
+			. 'Merging moves your notes <strong>into the shared folder</strong>, so they become visible to that person. '
+			. 'Review carefully:</p>';
+		foreach ( $plan as $p ) {
+			echo '<div style="border:1px solid #ddd;border-radius:8px;padding:12px 16px;margin:12px 0">';
+			echo '<strong>' . esc_html( $p['name'] ) . '</strong> — '
+				. esc_html( sprintf( '%d note(s) will move into the shared folder:', count( $p['notes'] ) ) );
+			echo '<ul style="margin:8px 0">';
+			foreach ( $p['notes'] as $note ) {
+				echo '<li>' . esc_html( $note['title'] ?: '(untitled)' ) . '</li>';
+			}
+			echo '</ul></div>';
+		}
+		$go = esc_url( wp_nonce_url( add_query_arg( [ 'noodled_admin' => 'merge_dups', 'confirm' => '1' ], self::get_app_url() ), 'noodled_merge_dups' ) );
+		echo '<p style="margin-top:20px"><a href="' . $go . '" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Merge now</a>'
+			. ' &nbsp; <a href="' . $back . '" style="color:#555">Cancel</a></p>';
+	}
+
 	private static function build_config( array $current_user ): array {
 		return [
 			'apiBase'   => rest_url( 'noodled/v1' ),
@@ -82,9 +150,18 @@ class Noodled_App {
 		// One-click email magic link: verify the PIN, set the session, then
 		// bounce to the clean app URL so the address bar carries no secret.
 		if ( isset( $_GET['noodled_login'], $_GET['noodled_email'] ) ) {
+			// Magic links get pre-fetched by mail scanners and re-opened by the
+			// user. If this browser already has a valid session, just bounce into
+			// the app rather than re-spending the single-use PIN (which would then
+			// look "expired" on the user's real click).
+			if ( Noodled_Auth::is_authenticated() ) {
+				wp_safe_redirect( self::get_app_url() );
+				exit;
+			}
 			$result = Noodled_Auth::login_with_pin(
 				wp_unslash( $_GET['noodled_email'] ),
-				wp_unslash( $_GET['noodled_login'] )
+				wp_unslash( $_GET['noodled_login'] ),
+				true // one-click link: per-IP rate limit, not the typed-PIN email cap
 			);
 			// On failure bounce back with the email so the login box can pre-fill it
 			// (the user shouldn't have to retype it to get a fresh PIN).
@@ -92,6 +169,14 @@ class Noodled_App {
 				? add_query_arg( [ 'login' => 'expired', 'e' => sanitize_email( wp_unslash( $_GET['noodled_email'] ) ) ], self::get_app_url() )
 				: self::get_app_url();
 			wp_safe_redirect( $target );
+			exit;
+		}
+
+		// Admin maintenance: merge "duplicate person" notebooks (a notebook you own
+		// whose name matches a drop folder shared back to you) into the shared
+		// folder. Dry-run by default; ?confirm=1 executes. Admins only.
+		if ( isset( $_GET['noodled_admin'] ) && $_GET['noodled_admin'] === 'merge_dups' ) {
+			self::serve_merge_dups();
 			exit;
 		}
 
