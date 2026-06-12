@@ -1368,6 +1368,7 @@ function showNoteContext(event, noteId) {
     { label: __( 'Duplicate', 'noodled' ), action: () => duplicateNote(noteId) },
     { label: __( 'Open in split', 'noodled' ), action: () => openInSplit(noteId) },
     { label: __( 'Copy text', 'noodled' ), action: () => copyNoteText(noteId) },
+    { label: __( 'History…', 'noodled' ), action: () => openNoteHistory(noteId) },
     { label: __( 'Share with people…', 'noodled' ), action: () => showNoteShareDialog(noteId) },
     { label: __( 'Public link', 'noodled' ), action: () => shareNoteLink(noteId) },
     { sep: true },
@@ -1375,6 +1376,12 @@ function showNoteContext(event, noteId) {
     { sep: true },
     { label: __( 'Delete', 'noodled' ), danger: true, action: () => deleteNote(noteId) },
   ]);
+}
+
+// Open a note then show its version history (showHistory reads activeNote).
+async function openNoteHistory(noteId) {
+  if (!activeNote || activeNote.id !== noteId) await selectNote(noteId);
+  showHistory();
 }
 
 async function togglePin(noteId) {
@@ -1507,6 +1514,7 @@ function renderContent() {
         <button class="btn btn-sm" onclick="insertChecklistItem()" title="${escAttr(__( 'Checklist', 'noodled' ))}" aria-label="${escAttr(__( 'Checklist', 'noodled' ))}"><span aria-hidden="true">&#9744;</span></button>
         <button class="btn btn-sm" onclick="insertHeading()" title="${escAttr(__( 'Heading', 'noodled' ))}" aria-label="${escAttr(__( 'Heading', 'noodled' ))}">H</button>
         <span class="toolbar-divider" aria-hidden="true"></span>
+        <button class="btn btn-sm" onclick="showHistory()" title="${escAttr(__( 'Version history', 'noodled' ))}" aria-label="${escAttr(__( 'Version history', 'noodled' ))}"><span aria-hidden="true">&#128336;</span></button>
         <button class="btn btn-sm" onclick="copyBody()" title="${escAttr(__( 'Copy', 'noodled' ))}" aria-label="${escAttr(__( 'Copy note', 'noodled' ))}"><span aria-hidden="true">&#128203;</span></button>
         <button class="btn btn-sm" onclick="uploadFiles()" title="${escAttr(__( 'Add files', 'noodled' ))}" aria-label="${escAttr(__( 'Add files', 'noodled' ))}"><span aria-hidden="true">&#128206;</span></button>
         <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="${escAttr(__( 'Dictate', 'noodled' ))}" aria-label="${escAttr(__( 'Dictate', 'noodled' ))}"><span aria-hidden="true">&#127908;</span></button>
@@ -2126,6 +2134,97 @@ async function regenClipToken() {
   showWebClipper();
 }
 
+// ── Captain's Log: a (mostly true) ramen-flavoured history of noodled ─────────
+// Curated lore. Each end of day, prepend one { v, date, text } at the
+// __EOD_INSERT__ anchor below (and add an `eras` chapter when a day opens one).
+const CAPTAINS_LOG = {
+  eras: [
+    {
+      emoji: '🖥️', title: 'I — The Desktop Dawn', dates: 'May 30', stardate: '0.1–0.2.4',
+      log: `We launched a humble Python vessel, built from pywebview and sheer stubbornness. Our first act of command was to rename the ship from "noodle" to "noodled" — a single extra 'd' that somehow doubled crew morale. We learned to pin notes, lash them together with [[double brackets]], and fish anything back out of the trash. By 0.2.0 the holodeck auto-synced to GitHub. A rogue SSL certificate nearly wrecked us on the Windows shoals; certifi bailed out the broth just in time.`,
+      highlights: ['noodle → noodled rebrand', 'Wiki-links, pinning, trash', 'GitHub auto-sync', 'Windows SSL fix (certifi)'],
+    },
+    {
+      emoji: '🌐', title: 'II — The Web Awakening', dates: 'May 30 – Jun 1', stardate: '1.1.1–1.1.48',
+      log: `The vessel grew a second body: a WordPress lifeform at noodled.ca with its own database and a magic-link airlock — no passwords, only PINs, very civilized. We beamed aboard Plaud transcripts, file uploads and PWA powers, then began The Polishing: "30 features", then "40 more", shipped faster than the Captain could log them. We uncloaked a real menace too — SiteGround's cache was quietly serving one crewmate's notes to another. We vanquished it with cache-busting and no-store shields. (Also: iOS Safari kept zooming our text fields like an over-eager tractor beam, so we pinned every field to 16px until it stood down.)`,
+      highlights: ['WordPress reincarnation + magic-link', 'Plaud sync, uploads, PWA', 'Per-user privacy + sharing', 'Slew the SiteGround cross-user leak'],
+    },
+    {
+      emoji: '🛠️', title: 'III — The Feature Frenzy', dates: 'Jun 2 – 4', stardate: '1.1.49–1.1.137',
+      log: `Engineering went briefly feral. In roughly a day we materialized tasks, smart notebooks, a calendar, a force-directed link graph, nested notebooks, note transclusion, and rich markdown — mermaid diagrams and math summoned from a CDN like dilithium from a replicator. We added reminders, a table editor, and durable version history with a visual diff. An away-team hardened the shields against XSS and rogue uploads, we ran four accessibility passes (WCAG AA), and wrapped some 660 strings for every language in the quadrant. The very ☰ menu you opened this from was forged in this era.`,
+      highlights: ['Tasks, calendar, link graph, nesting', 'Rich markdown (mermaid/math/callouts)', 'Reminders + version-history diff', 'WCAG 2.2 AA + i18n (~660 strings)', 'Server-side note list for speed'],
+    },
+    {
+      emoji: '📡', title: 'IV — Offline & Identity', dates: 'Jun 5 – 7', stardate: '1.1.138–1.1.143',
+      log: `We cut the cord. Notes now open and edit with no subspace link at all and sync themselves the instant we reconnect, even with the app closed (on the Chromium-class ships; the iSafari runabouts sync on next boarding). Reminders learned to phone home by web push. Then we sorted out identity: stay logged in on every device at once without one knocking another offline, and sign in with a face or a fingerprint — passkeys, no PIN to type. Very 24th century.`,
+      highlights: ['Offline-first + background sync', 'Web push reminders', 'Multi-device sessions', 'Passkeys / WebAuthn'],
+    },
+    {
+      emoji: '🍜', title: 'V — The Hardening & Hijinks', dates: 'Jun 10 – 11', stardate: '1.1.145–1.1.153',
+      log: `Logged for the historians, blushing: we once shipped an update-server address pointing at a folder that did not exist, so the fleet could not find its own updates. We fixed it and moved on. We also caught two note-eating gremlins (creating or moving a note could clobber a same-named one — no longer). Then the fun: code notes that keep every character, lock-a-note with real AES-256, a web clipper, and a desktop drop folder that beams files straight aboard. And — breaking the fourth wall of the viewscreen — this very Captain's Log. If you are reading this sentence, the recursion is complete.`,
+      highlights: ['Note-eating bugs squashed', 'Code notes + lock-a-note (AES-256)', 'Web clipper + desktop drop folder', 'This Captain’s Log (hi)'],
+    },
+  ],
+  stardates: [
+    // __EOD_INSERT__ (newest entries go here, one { v, date, text } per day)
+    { v: '1.1.153', date: 'Jun 11', text: 'The Captain’s Log itself logs on. Hello from inside the page.' },
+    { v: '1.1.152', date: 'Jun 11', text: 'Desktop drop folder: drop a file on your desktop, it beams aboard as a note.' },
+    { v: '1.1.151', date: 'Jun 11', text: 'Web clipper + lock-a-note (AES-256). Clip the web; encrypt the secrets.' },
+    { v: '1.1.150', date: 'Jun 10', text: 'Admin tool to merge duplicate "person" notebooks. De-cloning, essentially.' },
+    { v: '1.1.149', date: 'Jun 10', text: 'Code notes (every character preserved) and a tidy divider for shared notes.' },
+    { v: '1.1.148', date: 'Jun 10', text: 'Fixed sign-in links crying "too many attempts" because email bots clicked them first.' },
+    { v: '1.1.147', date: 'Jun 10', text: 'Load-bearing hardening between the fixes — the boring, important kind.' },
+    { v: '1.1.145–1.1.146', date: 'Jun 10', text: 'Squashed a note-eater, then fixed the update URL that pointed nowhere. We earned that coffee.' },
+    { v: '1.1.144', date: 'Jun 10', text: 'Beamed into a transporter buffer and never fully rematerialized. We don’t talk about 1.1.144.' },
+    { v: '1.1.140–1.1.143', date: 'Jun 5–7', text: 'Web push, multi-device sessions, passkeys, and a move-note data-loss fix.' },
+    { v: '1.1.138–1.1.139', date: 'Jun 5', text: 'Offline-first opens notes with no signal; Plaud on the web; a gentle first-run welcome.' },
+    { v: '1.1.127–1.1.137', date: 'Jun 3–4', text: 'The Frenzy: reminders, tables, version diff, tasks, smart notebooks, calendar, graph, nesting, embeds, rich markdown, audio memos, Others’ Noodles, a11y + i18n.' },
+    { v: '1.1.105–1.1.126', date: 'Jun 3', text: 'Speed + mobile overhaul: server-side note list, the quick-add speed dial, location notes, and the branded ☰ menu you’re standing in.' },
+    { v: '1.1.49–1.1.104', date: 'Jun 2', text: 'Security QA (XSS, upload allowlist), the 10-note landing demo, four WCAG AA passes, and ~660 strings wrapped for translation.' },
+    { v: '1.1.41–1.1.48', date: 'Jun 1', text: '"Get a noodle" onboarding, owner approve/deny, sharing with email pings, and ~30 desktop-parity features.' },
+    { v: '1.1.1–1.1.40', date: 'May 31', text: 'The great polishing: "30 features", then "40 more", most shipped faster than they could be written down.' },
+    { v: '0.2.4', date: 'May 30', text: 'The web plugin’s first cut: multi-tenant privacy, magic-link, PHP 8.2 compatibility.' },
+    { v: '0.2.0–0.2.2', date: 'May 30', text: 'Desktop core: shortcuts, pinning, wiki-links, trash, word count, GitHub auto-sync, the SSL fix.' },
+    { v: '0.1.1', date: 'May 30', text: 'Stardate one. "noodle" becomes "noodled". A splash screen. A dream.' },
+  ],
+};
+
+function showCaptainsLog() {
+  const el = document.getElementById('modalContainer');
+  if (!el) return;
+  const brand = (typeof noodledConfig !== 'undefined' && noodledConfig.brandName) || 'noodled';
+  const ver = (typeof noodledConfig !== 'undefined' && noodledConfig.version) || '∞';
+  const eras = CAPTAINS_LOG.eras.slice().reverse().map(e => `
+    <div class="clog-era">
+      <div class="clog-era-head">
+        <span class="clog-emoji" aria-hidden="true">${e.emoji}</span>
+        <span><span class="clog-era-title">${esc(e.title)}</span>
+        <span class="clog-stardate">${esc(__( 'Stardate', 'noodled' ))} ${esc(e.stardate)} · ${esc(e.dates)}</span></span>
+      </div>
+      <p class="clog-log">${esc(e.log)}</p>
+      <div class="clog-chips">${e.highlights.map(h => `<span class="clog-chip">${esc(h)}</span>`).join('')}</div>
+    </div>`).join('');
+  const rows = CAPTAINS_LOG.stardates.map(s =>
+    `<div class="clog-row"><span class="clog-v">${esc(s.v)}</span><span class="clog-rt"><span class="clog-rdate">${esc(s.date)}</span> ${esc(s.text)}</span></div>`
+  ).join('');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal clog-modal">
+      <h3 class="clog-title">🚀🍜 ${esc(sprintf( /* translators: %s is the brand name */ __( "%s — Captain's Log", 'noodled' ), brand ))}</h3>
+      <p class="clog-sub">${esc(sprintf( /* translators: %s is the version number */ __( "Captain's Log, Stardate %s. The voyage so far: 150-plus releases in under a fortnight, not one of them sober about ramen.", 'noodled' ), ver ))}</p>
+      <div class="clog-scroll">
+        ${eras}
+        <details class="clog-manifest">
+          <summary>${esc(__( 'Full ship’s manifest (every stardate)', 'noodled' ))}</summary>
+          <div class="clog-rows">${rows}</div>
+        </details>
+      </div>
+      <div class="modal-buttons" style="margin-top:14px">
+        <button class="btn btn-sm btn-accent" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Engage', 'noodled' ))}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderMenuDashboard() {
   const isOwner = !!(typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.owner);
   const userName = (typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.name) || '';
@@ -2148,6 +2247,7 @@ function renderMenuDashboard() {
       { icon: '🗂️', label: __( 'Manage tags', 'noodled' ), fn: 'manageTags', desc: __( 'Rename the typos. Retire the ones from 2019.', 'noodled' ) },
       { icon: '🔗', label: __( 'Note links', 'noodled' ), fn: 'showLinkGraph', desc: __( 'See the whole tangle. Your notes were never a list.', 'noodled' ) },
       { icon: '📊', label: __( 'Statistics', 'noodled' ), fn: 'showStats', desc: __( "Proof you've been busy. Or proof you haven't.", 'noodled' ) },
+      { icon: '🚀', label: __( "Captain's Log", 'noodled' ), fn: 'showCaptainsLog', desc: __( "noodled's whole voyage so far, with jokes.", 'noodled' ) },
     ] },
     { title: __( 'Tools', 'noodled' ), items: [
       { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), fn: 'showFocusOptions', desc: __( 'A Pomodoro nudge for the days your brain wanders.', 'noodled' ) },

@@ -390,6 +390,9 @@ class Noodled_Notes {
 			Noodled_Sync::delete_from_github( $old_nb['name'], (string) $note['title'], (string) $note['sha'] );
 		}
 
+		// Snapshot before a move (which can force-rename the title on a clash) so the
+		// pre-move title/body stays recoverable from History.
+		self::save_revision( $id );
 		$wpdb->update( self::table(), [
 			'notebook_id' => $notebook_id,
 			'title'       => $title,

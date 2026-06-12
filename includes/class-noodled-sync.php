@@ -185,6 +185,9 @@ class Noodled_Sync {
 			];
 
 			if ( $existing_note ) {
+				// Snapshot the current (about-to-be-overwritten) content into version
+				// history first, so a sync that clobbers a web edit can be reverted.
+				Noodled_Notes::save_revision( (int) $existing_note['id'] );
 				$wpdb->update( "{$wpdb->prefix}noodled_notes", $data, [ 'id' => $existing_note['id'] ] );
 			} else {
 				$wpdb->insert( "{$wpdb->prefix}noodled_notes", $data );
@@ -315,6 +318,9 @@ class Noodled_Sync {
 			$gh_modified = $data['modified_at'];
 			$db_modified = $existing['modified_at'];
 			if ( $gh_modified >= $db_modified || $existing['sha'] !== $file['sha'] ) {
+				// Snapshot the current content before the sync overwrites it, so the
+				// pre-sync version stays recoverable from History.
+				Noodled_Notes::save_revision( (int) $existing['id'] );
 				$wpdb->update( "{$wpdb->prefix}noodled_notes", $data, [ 'id' => $existing['id'] ] );
 			}
 		} else {

@@ -546,6 +546,31 @@ body {
 }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+/* ── Captain's Log ── */
+.clog-modal { max-width: min(640px, 96vw); display: flex; flex-direction: column; max-height: 86vh; }
+.clog-title { font-size: 18px; }
+.clog-sub { font-size: 12.5px; color: var(--text-muted); font-style: italic; line-height: 1.5; margin: -6px 0 12px; }
+.clog-scroll { overflow-y: auto; padding-right: 4px; }
+.clog-era { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; background: var(--bg-content); }
+.clog-era-head { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+.clog-emoji { font-size: 22px; line-height: 1.1; }
+.clog-era-title { display: block; font-weight: 700; color: var(--text-bright); font-size: 14.5px; }
+.clog-stardate { display: block; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: var(--accent); margin-top: 1px; }
+.clog-log { font-size: 13px; line-height: 1.6; color: var(--text); margin: 0 0 10px; }
+.clog-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.clog-chip { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: var(--bg-item-hover, rgba(127,127,127,.12)); color: var(--text-muted); }
+.clog-manifest { margin-top: 4px; }
+.clog-manifest > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-bright); padding: 8px 0; }
+.clog-rows { display: flex; flex-direction: column; gap: 6px; padding: 6px 2px 2px; }
+.clog-row { display: flex; gap: 10px; font-size: 12.5px; line-height: 1.45; }
+.clog-v { flex: 0 0 92px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: var(--accent); padding-top: 1px; }
+.clog-rt { color: var(--text); }
+.clog-rdate { color: var(--text-muted); margin-right: 4px; }
+@media (max-width: 560px) {
+  .clog-v { flex-basis: 78px; }
+  .clog-row { flex-direction: column; gap: 1px; }
+}
+
 .modal h3 { font-size: 16px; color: var(--text-bright); margin-bottom: 14px; }
 .modal input {
   width: 100%;
