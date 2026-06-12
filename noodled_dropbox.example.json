@@ -1,0 +1,7 @@
+{
+  "site": "https://noodled.ca",
+  "token": "PASTE_YOUR_CLIP_TOKEN_HERE",
+  "folder": "%USERPROFILE%\\Desktop\\Noodled Drop",
+  "notebook": "Inbox",
+  "poll_seconds": 4
+}

@@ -39,15 +39,22 @@ permanent delete; sort by modified / created / alphabetical.
 Contenteditable live-markdown editor (headings, bold/italic/code, lists,
 checklists with toggle, blockquotes, **tables with add/remove row+column**,
 images, wiki-links); slash menu; find & replace; table of contents; reading /
-zen / typewriter modes; **durable server-side version history with a visual diff
-and restore**; **reminders** (date/time → notification); export HTML / download
-markdown / print.
+zen / typewriter modes; **code notes** (a verbatim monospace note that the
+markdown editor never reflows); **lock a note** (opt-in per-note end-to-end
+encryption, client-side AES-256-GCM, the passphrase never leaves the device);
+**durable server-side version history with a visual diff and restore** (now
+snapshotted on sync overwrites too, reachable from a toolbar clock icon or the
+note's right-click menu); **reminders** (date/time → notification); export HTML /
+download markdown / print.
 
 ### Capture
 Photo upload (auto-titled gallery note) with lightbox + EXIF; any-file attach via
 toolbar, drag-drop, or clipboard paste; dictation (Web Speech API); **location
 notes** (GPS → reverse-geocoded pinned map, admin-chosen provider); **voice
-notes**; Plaud transcript sync; Evernote `.enex` import.
+notes**; **web clipper** (a per-user-token bookmarklet that saves any page +
+selection into a Web Clips notebook); **desktop drop folder** (a small Windows
+watcher posts any file dropped in a folder to the app, text becomes the note body,
+other files are attached); Plaud transcript sync; Evernote `.enex` import.
 
 ### Sync & data
 GitHub bidirectional sync (Contents API + webhook + full import); markdown
@@ -72,32 +79,49 @@ member's notes to another).
   conflict resolver the next time the app opens.
 
 ### Accounts & sharing
-Magic-link + PIN auth (1-year session); per-notebook and per-note read/write
+Magic-link + PIN auth (1-year session, rate-limited against email-scanner
+prefetch); **passkeys / WebAuthn** (one-tap Face ID / fingerprint sign-in, PIN
+stays the fallback); **multi-device sessions** (one row per device, so signing in
+on one device never logs out another); per-notebook and per-note read/write
 permissions (private by default, no admin god-view); owner-initiated sharing with
 email notifications; admin drop folders (member-owned, shared to admin).
 
 ### Platform
 PWA: installable, home-screen shortcuts, share-target, service-worker app-shell
-caching, **reminder notifications** (client-scheduled today; VAPID server push is
-the planned next step). WCAG 2.2 AA pass; i18n (text domain, `.pot`, `wp.i18n`).
+caching, **reminder notifications** (client-scheduled in-app, plus **VAPID web
+push via wp-cron** so reminders fire when the app is closed). **Captain's Log**: a
+fun in-app history of the product, reachable from the ☰ menu. WCAG 2.2 AA pass;
+i18n (text domain, `.pot`, `wp.i18n`).
 
 ## Architecture (summary)
 
-PHP 8.2+ plugin; vanilla-JS SPA (`assets/js/noodled.js`); 8 custom tables via
-dbDelta (notebooks, notes, users, permissions, note_permissions, attachments,
-reminders, revisions); REST namespace `noodled/v1` (every response
+PHP 8.2+ plugin; vanilla-JS SPA (`assets/js/noodled.js`); 11 custom tables via
+dbDelta (notebooks, notes, users, sessions, permissions, note_permissions,
+attachments, reminders, revisions, push_subs, webauthn_creds); REST namespace
+`noodled/v1` (every response
 `private, no-store`); private attachment proxy; magic-link auth. List responses
 ship server-built `preview`+`tasks` (not full bodies) with lazy `/bodies` +
 `/backlinks` for speed. See `CLAUDE.md` for the file-by-file map.
 
 ## Non-goals
 
-Real-time multi-cursor collaboration; public note publishing; a browser
-web-clipper extension; OCR. (Tracked as possible future work, not current
-promises.)
+Real-time multi-cursor collaboration; public note publishing; OCR / handwriting
+recognition. (Tracked as possible future work, not current promises. The web
+clipper, once a non-goal, now ships as a bookmarklet.)
 
-## Roadmap (near-term)
+## Roadmap
 
-- VAPID + wp-cron so reminders fire when the app is fully closed.
-- First-run onboarding to tame the feature surface.
-- RTL support if multilingual ships.
+The four larger features still missing versus the market-leading PKM apps. See
+`ROADMAP.md` for the full scoping of each.
+
+- **AI: ask-your-notes / summarize** (Med) — bring-your-own-key, server-proxied,
+  never sends locked notes.
+- **Native mobile apps** (High) — Capacitor wrapper of the existing PWA, with
+  native push + share-extension; iOS push-when-closed is the 80/20 first slice.
+- **Canvas / whiteboard** (High) — an infinite board persisted as a note so it
+  syncs via GitHub like everything else.
+- **Plugin / extension system** (High) — a client-side hook bus so add-ons extend
+  the app without editing core.
+
+Smaller remaining items: transparent at-rest encryption (under the opt-in lock),
+public note publishing, OCR, and RTL support if multilingual ships.
