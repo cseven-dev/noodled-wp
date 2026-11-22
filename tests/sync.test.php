@@ -110,7 +110,7 @@ class Noodled_GitHub {
 class FakeWpdb {
 	public $prefix = 'wp_';
 	public $insert_id = 0;
-	public $t = [ 'notes' => [], 'notebooks' => [], 'users' => [] ];
+	public $t = [ 'notes' => [], 'notebooks' => [], 'users' => [], 'permissions' => [] ];
 	public $revisions = [];
 	private $seq = 1000;
 
@@ -126,6 +126,7 @@ class FakeWpdb {
 			'color' => '', 'created_at' => '2026-01-01 00:00:00', 'modified_at' => '2026-01-01 00:00:00',
 		],
 		'users' => [ 'id' => 0, 'email' => '', 'display_name' => '', 'role' => 'member' ],
+		'permissions' => [ 'id' => 0, 'notebook_id' => 0, 'user_id' => 0 ],
 	];
 
 	public function prepare( $query, ...$args ) {
@@ -165,6 +166,20 @@ class FakeWpdb {
 				if ( $v === null ? $row[ $k ] !== null : (string) $row[ $k ] !== (string) $v ) continue 2;
 			}
 			$this->t[ $tbl ][ $id ] = array_merge( $row, $data );
+			$n++;
+		}
+		return $n;
+	}
+
+	public function delete( $table, $where ) {
+		$tbl = $this->table( $table );
+		$this->check_cols( $tbl, array_keys( $where ) );
+		$n = 0;
+		foreach ( $this->t[ $tbl ] as $id => $row ) {
+			foreach ( $where as $k => $v ) {
+				if ( (string) $row[ $k ] !== (string) $v ) continue 2;
+			}
+			unset( $this->t[ $tbl ][ $id ] );
 			$n++;
 		}
 		return $n;
@@ -273,6 +288,35 @@ class FakeWpdb {
 					if ( $n['gh_path'] === $args[0] && (int) $n['notebook_id'] === (int) $args[1] && $n['deleted_at'] === null ) return [ [ 'id' => $n['id'] ] ];
 				}
 				return [];
+			case "SELECT id, title, slug, sha, gh_path FROM wp_noodled_notes WHERE notebook_id = %d AND deleted_at IS NULL AND sha != ''":
+				$out = [];
+				foreach ( $notes as $n ) {
+					if ( (int) $n['notebook_id'] === (int) $args[0] && $n['deleted_at'] === null && ! self::blank_sha( $n ) ) {
+						$out[] = array_intersect_key( $n, array_flip( [ 'id', 'title', 'slug', 'sha', 'gh_path' ] ) );
+					}
+				}
+				return $out;
+			case 'SELECT id FROM wp_noodled_notes WHERE gh_path = %s AND deleted_at IS NULL AND id != %d LIMIT 1':
+				foreach ( $notes as $n ) {
+					if ( $n['gh_path'] === $args[0] && $n['deleted_at'] === null && (int) $n['id'] !== (int) $args[1] ) return [ [ 'id' => $n['id'] ] ];
+				}
+				return [];
+			case "SELECT gh_path FROM wp_noodled_notes WHERE deleted_at IS NOT NULL AND push_pending = 1 AND sha != ''":
+				$out = [];
+				foreach ( $notes as $n ) {
+					if ( $n['deleted_at'] !== null && (int) $n['push_pending'] === 1 && ! self::blank_sha( $n ) ) $out[] = [ 'gh_path' => $n['gh_path'] ];
+				}
+				return $out;
+			case 'UPDATE wp_noodled_notes SET notebook_id = %d, deleted_from = %d WHERE deleted_at IS NOT NULL AND ( notebook_id = %d OR deleted_from = %d )':
+				$c = 0;
+				foreach ( $notes as $id => $n ) {
+					if ( $n['deleted_at'] !== null && ( (int) $n['notebook_id'] === (int) $args[2] || (int) $n['deleted_from'] === (int) $args[3] ) ) {
+						$notes[ $id ]['notebook_id']  = $args[0];
+						$notes[ $id ]['deleted_from'] = $args[1];
+						$c++;
+					}
+				}
+				return $c;
 		}
 		throw new Exception( "FakeWpdb: unrecognised query: $q" );
 	}
@@ -318,6 +362,13 @@ function md_of( int $id ): string {
 	return Noodled_Frontmatter::to_markdown( [ 'title' => $r['title'], 'body' => $r['body'] ?? '', 'source' => $r['source'],
 		'pinned' => (bool) $r['pinned'], 'created' => $r['created_at'], 'modified' => $r['modified_at'] ] );
 }
+// What REST delete_notebook does: queue the backup deletes, then delete the notebook.
+function delete_nb( string $name, int $uid ): void {
+	$nb = Noodled_Notebooks::get_by_name( $name, $uid );
+	if ( $nb && (int) $nb['owner_id'] === $uid ) Noodled_Sync::queue_notebook_delete( $nb );
+	Noodled_Notebooks::delete( $name, $uid );
+}
+function nb_id( string $name, int $owner ): int { return (int) ( Noodled_Notebooks::get_by_name( $name, $owner )['id'] ?? 0 ); }
 function fire_shutdown(): void { foreach ( $GLOBALS['actions']['shutdown'] ?? [] as $cb ) call_user_func( $cb ); }
 function pull( string $path ): bool {
 	$m = new ReflectionMethod( 'Noodled_Sync', 'pull_single_file' );
@@ -682,6 +733,161 @@ scenario( 'legacy row renamed: still gets backed up (old-title file is left behi
 	ok( ! empty( $r['success'] ), 'backed up' );
 	same( 'General/New title.md', row( 1800 )['gh_path'], 'gh_path recorded' );
 	same( [ 'General/New title.md', 'General/Old title.md' ], files(), 'orphan remains (path was never recorded)' );
+} );
+
+scenario( 'deleting an admin notebook removes its files after shutdown', function () {
+	base();
+	note( 2000, [ 'notebook_id' => 11, 'title' => 'One', 'body' => '1' ] );
+	note( 2001, [ 'notebook_id' => 11, 'title' => 'Two', 'body' => '2' ] );
+	note( 2002, [ 'notebook_id' => 11, 'title' => 'Never pushed', 'body' => '3' ] );
+	note( 2003, [ 'notebook_id' => 10, 'title' => 'Keep', 'body' => 'k' ] );
+	Noodled_Sync::push_note( 2000 );
+	Noodled_Sync::push_note( 2001 );
+	Noodled_Sync::push_note( 2003 );
+	Noodled_GitHub::$files['Work/Legacy.md'] = "legacy\n";
+	note( 2004, [ 'notebook_id' => 11, 'title' => 'Legacy', 'body' => 'l', 'sha' => blob_sha( "legacy\n" ) ] ); // no gh_path yet
+	Noodled_GitHub::$calls = [];
+	delete_nb( 'Work', 1 );
+	same( 4, count( files() ), 'nothing deleted before shutdown' );
+	same( 1, (int) row( 2000 )['push_pending'], 'queued' );
+	same( 'Work/Legacy.md', row( 2004 )['gh_path'], 'legacy row got its path' );
+	fire_shutdown();
+	same( [ 'General/Keep.md' ], files(), 'only the other notebook\'s file is left' );
+	same( 3, count( Noodled_GitHub::$calls ), 'three deletes, nothing for the never-pushed note' );
+	$home = nb_id( 'My Notes', 1 );
+	ok( $home > 0, 'My Notes created' );
+	same( null, Noodled_Notebooks::get_by_name( 'Work', 1 ), 'notebook row gone' );
+	foreach ( [ 2000, 2001, 2002, 2004 ] as $id ) {
+		ok( row( $id )['deleted_at'] !== null, "$id in Trash" );
+		same( $home, (int) row( $id )['notebook_id'], "$id re-homed into My Notes" );
+		same( $home, (int) row( $id )['deleted_from'], "$id restores into My Notes" );
+		same( '', (string) row( $id )['sha'], "$id sha cleared" );
+		same( 0, (int) row( $id )['push_pending'], "$id not pending" );
+	}
+	same( '', row( 2000 )['gh_path'], 'gh_path cleared' );
+	same( null, row( 2003 )['deleted_at'], 'live note elsewhere untouched' );
+	same( 10, (int) row( 2003 )['notebook_id'], 'live note not moved' );
+} );
+
+scenario( 'a normally trashed note with sha and gh_path (pending 0) is skipped, no API call', function () {
+	base();
+	note( 2100, [ 'notebook_id' => 10, 'title' => 'Binned', 'body' => 'b' ] );
+	Noodled_Sync::push_note( 2100 );
+	$sha = row( 2100 )['sha'];
+	set_row( 2100, [ 'deleted_at' => '2026-05-01 00:00:00', 'deleted_from' => 10 ] ); // what soft_delete writes
+	Noodled_GitHub::$calls = [];
+	$r = Noodled_Sync::push_note( 2100 );
+	ok( ! empty( $r['skipped'] ), 'skipped' );
+	ok( empty( $r['deleted'] ), 'not deleted' );
+	Noodled_Sync::drain();
+	same( 0, Noodled_GitHub::api_calls(), 'no API call' );
+	same( [ 'General/Binned.md' ], files(), 'backup file kept' );
+	same( $sha, row( 2100 )['sha'], 'sha kept' );
+	same( 'General/Binned.md', row( 2100 )['gh_path'], 'gh_path kept' );
+} );
+
+scenario( 'deleting a member notebook makes no API call', function () {
+	base();
+	note( 2200, [ 'notebook_id' => 20, 'title' => 'Mine', 'body' => 'm', 'sha' => 'abc', 'gh_path' => 'General/Mine.md' ] );
+	delete_nb( 'General', 2 );
+	ok( empty( $GLOBALS['actions']['shutdown'] ), 'no shutdown push registered' );
+	fire_shutdown();
+	Noodled_Sync::drain();
+	same( 0, Noodled_GitHub::api_calls(), 'no API call' );
+	same( 0, (int) row( 2200 )['push_pending'], 'not pending' );
+	same( nb_id( 'My Notes', 2 ), (int) row( 2200 )['notebook_id'], 're-homed into the member\'s My Notes' );
+	same( 10, nb_id( 'General', 1 ), 'admin\'s same-named notebook untouched' );
+} );
+
+scenario( 'a 500 on delete leaves the row pending, a later drain removes the file', function () {
+	base();
+	note( 2300, [ 'notebook_id' => 11, 'title' => 'Flaky', 'body' => 'f' ] );
+	Noodled_Sync::push_note( 2300 );
+	delete_nb( 'Work', 1 );
+	Noodled_GitHub::$fail_next = 1;
+	fire_shutdown();
+	same( [ 'Work/Flaky.md' ], files(), 'file still there' );
+	same( 1, (int) row( 2300 )['push_pending'], 'still pending' );
+	same( 1, (int) row( 2300 )['push_attempts'], 'attempt counted' );
+	same( 'Server Error', row( 2300 )['push_error'], 'error stored' );
+	$d = Noodled_Sync::drain();
+	same( 1, $d['pushed'], 'drain handled it' );
+	same( [], files(), 'file removed' );
+	same( '', row( 2300 )['sha'], 'sha cleared' );
+	same( 0, (int) row( 2300 )['push_pending'], 'pending cleared' );
+	same( 0, (int) row( 2300 )['push_attempts'], 'attempts reset' );
+} );
+
+scenario( 'a 409 on delete is retried with the remote sha', function () {
+	base();
+	note( 2400, [ 'notebook_id' => 11, 'title' => 'Edited', 'body' => 'e' ] );
+	Noodled_Sync::push_note( 2400 );
+	Noodled_GitHub::$files['Work/Edited.md'] = "changed on the desktop\n";
+	Noodled_GitHub::$calls = [];
+	delete_nb( 'Work', 1 );
+	fire_shutdown();
+	same( [ 'DELETE', 'GET', 'DELETE' ], array_column( Noodled_GitHub::$calls, 0 ), 'delete, read, delete again' );
+	same( blob_sha( "changed on the desktop\n" ), Noodled_GitHub::$calls[2][2] ?? null, 'retried with the remote sha' );
+	same( [], files(), 'file removed' );
+	same( 0, (int) row( 2400 )['push_pending'], 'pending cleared' );
+} );
+
+scenario( 'a stale delete never removes a file a live note now owns', function () {
+	base();
+	note( 2500, [ 'notebook_id' => 11, 'title' => 'Same', 'body' => 'new' ] );
+	Noodled_Sync::push_note( 2500 ); // live note owns Work/Same.md
+	note( 2501, [ 'notebook_id' => 10, 'title' => 'Same', 'body' => 'old', 'sha' => 'stale', 'gh_path' => 'Work/Same.md',
+		'push_pending' => 1, 'deleted_at' => '2026-05-01 00:00:00', 'deleted_from' => 10 ] );
+	Noodled_GitHub::$calls = [];
+	$r = Noodled_Sync::push_note( 2501 );
+	ok( ! empty( $r['success'] ), 'row released' );
+	same( 1, count( Noodled_GitHub::$calls ), 'no retry' );
+	same( [ 'Work/Same.md' ], files(), 'live note\'s file kept' );
+	same( '', row( 2501 )['gh_path'], 'trashed row lets go of the path' );
+	same( 0, (int) row( 2501 )['push_pending'], 'pending cleared' );
+} );
+
+scenario( 'full_import does not recreate a folder while its delete is pending', function () {
+	base();
+	note( 2600, [ 'notebook_id' => 11, 'title' => 'Pending', 'body' => 'p' ] );
+	Noodled_Sync::push_note( 2600 );
+	delete_nb( 'Work', 1 ); // no shutdown yet: the delete is still pending
+	$count = count( $GLOBALS['wpdb']->t['notes'] );
+	$r = Noodled_Sync::full_import();
+	same( 0, $r['notebooks'], 'no notebook created' );
+	same( 0, $r['notes'], 'nothing imported' );
+	same( 0, nb_id( 'Work', 1 ), 'Work not recreated' );
+	same( $count, count( $GLOBALS['wpdb']->t['notes'] ), 'no new rows' );
+	fire_shutdown();
+	same( [], files(), 'file removed' );
+	Noodled_Sync::full_import();
+	same( 0, nb_id( 'Work', 1 ), 'still not recreated' );
+} );
+
+scenario( 'restoring after a delete pushes to the new path and leaves one file', function () {
+	base();
+	note( 2700, [ 'notebook_id' => 11, 'title' => 'Back', 'body' => 'b' ] );
+	Noodled_Sync::push_note( 2700 );
+	delete_nb( 'Work', 1 );
+	fire_shutdown();
+	same( [], files(), 'deleted' );
+	set_row( 2700, [ 'deleted_at' => null, 'deleted_from' => null ] ); // what Notes::restore writes (notebook already My Notes)
+	Noodled_Sync::push_note( 2700 );
+	same( [ 'My Notes/Back.md' ], files(), 'one file, in My Notes' );
+	same( 'My Notes/Back.md', row( 2700 )['gh_path'], 'gh_path recorded' );
+} );
+
+scenario( 'restoring while the delete is still pending moves the file (one file left)', function () {
+	base();
+	note( 2800, [ 'notebook_id' => 11, 'title' => 'Quick', 'body' => 'q' ] );
+	Noodled_Sync::push_note( 2800 );
+	delete_nb( 'Work', 1 );
+	Noodled_GitHub::$fail_next = 1;
+	fire_shutdown(); // delete failed, still pending
+	set_row( 2800, [ 'deleted_at' => null, 'deleted_from' => null ] );
+	Noodled_Sync::push_note( 2800 );
+	same( [ 'My Notes/Quick.md' ], files(), 'one file, in My Notes' );
+	same( 0, (int) row( 2800 )['push_pending'], 'pending cleared' );
 } );
 
 // ── Summary ──

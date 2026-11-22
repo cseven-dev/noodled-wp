@@ -125,6 +125,41 @@ class Noodled_Sync {
 
 		if ( ! $row ) return [ 'error' => __( 'Note not found', 'noodled' ) ];
 
+		// A trashed note queued by queue_notebook_delete(): remove its repo file.
+		// Every other trashed row falls through to the skip below, as before.
+		if ( ! empty( $row['deleted_at'] ) && (int) $row['push_pending'] === 1
+			&& (string) $row['sha'] !== '' && (string) $row['gh_path'] !== '' ) {
+			$path    = (string) $row['gh_path'];
+			$message = "noodled sync: delete {$row['title']}";
+			$result  = Noodled_GitHub::delete_file( $path, (string) $row['sha'], $message );
+
+			// 409/422: our sha is stale. Retry once with the remote sha, unless a
+			// live note now owns this path: then the file is not ours to delete.
+			if ( is_wp_error( $result ) && in_array( self::error_status( $result ), [ 409, 422 ], true ) ) {
+				$owner = $wpdb->get_var( $wpdb->prepare(
+					"SELECT id FROM {$t} WHERE gh_path = %s AND deleted_at IS NULL AND id != %d LIMIT 1", $path, $note_id
+				) );
+				if ( $owner ) {
+					$result = [ 'released' => true ];
+				} else {
+					$remote = Noodled_GitHub::get_file( $path );
+					$result = is_wp_error( $remote ) ? $remote : Noodled_GitHub::delete_file( $path, (string) $remote['sha'], $message );
+				}
+			}
+
+			if ( ! is_wp_error( $result ) || self::error_status( $result ) === 404 ) {
+				$wpdb->update( $t, [ 'sha' => '', 'gh_path' => '', 'push_pending' => 0, 'push_attempts' => 0, 'push_error' => '' ], [ 'id' => $note_id ] );
+				return [ 'success' => true, 'deleted' => true ];
+			}
+
+			$msg = $result->get_error_message();
+			$wpdb->query( $wpdb->prepare(
+				"UPDATE {$t} SET push_pending = 1, push_attempts = push_attempts + 1, push_error = %s WHERE id = %d",
+				mb_substr( $msg, 0, 250 ), $note_id
+			) );
+			return [ 'error' => $msg ];
+		}
+
 		$nb = Noodled_Notebooks::get_by_id( (int) $row['notebook_id'] );
 		if ( ! $nb || ! self::is_pushable_notebook( $nb ) || ! empty( $row['deleted_at'] ) ) {
 			$wpdb->update( $t, [ 'push_pending' => 0 ], [ 'id' => $note_id ] );
@@ -215,6 +250,39 @@ class Noodled_Sync {
 			self::$shutdown_hooked = true;
 			add_action( 'shutdown', [ __CLASS__, 'push_queued' ] );
 		}
+	}
+
+	/**
+	 * Before a notebook is deleted: mark each live, backed-up note so push_note()
+	 * removes its repo file once the note is in Trash. Call while the notebook row
+	 * still exists. Returns how many notes were queued.
+	 */
+	public static function queue_notebook_delete( array $nb ): int {
+		if ( ! Noodled_GitHub::is_configured() || ! self::is_pushable_notebook( $nb ) ) return 0;
+		global $wpdb;
+		$t    = "{$wpdb->prefix}noodled_notes";
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, title, slug, sha, gh_path FROM {$t} WHERE notebook_id = %d AND deleted_at IS NULL AND sha != ''",
+			(int) $nb['id']
+		), ARRAY_A );
+
+		$count = 0;
+		foreach ( $rows ?: [] as $row ) {
+			$path = (string) $row['gh_path'];
+			if ( $path === '' ) {
+				$path = self::resolve_path( $row, $nb['name'], self::claimed_paths( $row, $nb['name'] ) )['current'];
+			}
+			if ( $path === '' ) continue;
+			$id = (int) $row['id'];
+			$wpdb->update( $t, [ 'gh_path' => $path, 'push_pending' => 1 ], [ 'id' => $id ] );
+			if ( ! in_array( $id, self::$queued, true ) ) self::$queued[] = $id;
+			$count++;
+		}
+		if ( $count && ! self::$shutdown_hooked ) {
+			self::$shutdown_hooked = true;
+			add_action( 'shutdown', [ __CLASS__, 'push_queued' ] );
+		}
+		return $count;
 	}
 
 	/** Shutdown callback for queue_push(): finish the response, then push up to 5 notes. */
@@ -387,8 +455,19 @@ class Noodled_Sync {
 			}
 		}
 
+		// Folders whose files are waiting to be deleted (queue_notebook_delete):
+		// do not recreate them as notebooks.
+		global $wpdb;
+		$pending_dirs = [];
+		foreach ( $wpdb->get_col(
+			"SELECT gh_path FROM {$wpdb->prefix}noodled_notes WHERE deleted_at IS NOT NULL AND push_pending = 1 AND sha != ''"
+		) ?: [] as $gh_path ) {
+			if ( str_contains( (string) $gh_path, '/' ) ) $pending_dirs[ explode( '/', (string) $gh_path )[0] ] = true;
+		}
+
 		// Create notebooks
 		foreach ( $dirs as $dir ) {
+			if ( isset( $pending_dirs[ $dir ] ) ) continue;
 			$existing = Noodled_Notebooks::get_by_name( $dir, $owner_id );
 			if ( ! $existing ) {
 				Noodled_Notebooks::create( $dir, $owner_id );

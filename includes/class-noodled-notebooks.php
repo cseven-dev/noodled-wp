@@ -402,6 +402,16 @@ class Noodled_Notebooks {
 
 		$wpdb->delete( self::perms_table(), [ 'notebook_id' => $nb['id'] ] );
 		$wpdb->delete( self::table(), [ 'id' => $nb['id'] ] );
+
+		// Re-home the trashed notes (only rows already in Trash) so Trash, which
+		// is scoped by notebook, can still show and restore them.
+		$home = self::ensure( 'My Notes', (int) $nb['owner_id'] );
+		if ( $home ) {
+			$wpdb->query( $wpdb->prepare(
+				"UPDATE " . self::notes_table() . " SET notebook_id = %d, deleted_from = %d WHERE deleted_at IS NOT NULL AND ( notebook_id = %d OR deleted_from = %d )",
+				$home, $home, (int) $nb['id'], (int) $nb['id']
+			) );
+		}
 		return true;
 	}
 

@@ -507,7 +507,11 @@ class Noodled_REST {
 	public static function delete_notebook( \WP_REST_Request $req ): \WP_REST_Response {
 		$name = $req->get_param( 'name' );
 		if ( ! $name ) return new \WP_REST_Response( [ 'error' => __( 'Name required', 'noodled' ) ], 400 );
-		Noodled_Notebooks::delete( $name, self::current_user_id() );
+		$uid = self::current_user_id();
+		$nb  = Noodled_Notebooks::get_by_name( $name, $uid );
+		// Before the notebook row goes: the backup paths are resolved from it.
+		if ( $nb && (int) $nb['owner_id'] === $uid ) Noodled_Sync::queue_notebook_delete( $nb );
+		Noodled_Notebooks::delete( $name, $uid );
 		return new \WP_REST_Response( true );
 	}
 
@@ -580,6 +584,7 @@ class Noodled_REST {
 		if ( ! class_exists( 'ZipArchive' ) ) { status_header( 500 ); esc_html_e( 'Zip support unavailable on this server.', 'noodled' ); exit; }
 		$uid = self::current_user_id();
 		if ( ! $uid ) { status_header( 403 ); exit; }
+		@set_time_limit( 300 );
 
 		$tmp = wp_tempnam( 'noodled-export' );
 		$zip = new \ZipArchive();
@@ -605,15 +610,14 @@ class Noodled_REST {
 			}
 		}
 		$zip->close();
-		$data = file_get_contents( $tmp );
-		@unlink( $tmp );
 
 		while ( ob_get_level() ) { ob_end_clean(); }
 		nocache_headers();
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="noodled-backup-' . gmdate( 'Y-m-d' ) . '.zip"' );
-		header( 'Content-Length: ' . strlen( $data ) );
-		echo $data;
+		header( 'Content-Length: ' . filesize( $tmp ) );
+		readfile( $tmp );
+		@unlink( $tmp );
 		exit;
 	}
 

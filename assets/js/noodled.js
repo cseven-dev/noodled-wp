@@ -522,7 +522,7 @@ async function renameNotebook(name) {
 
 async function deleteNotebook(name) {
   /* translators: %s is the notebook name */
-  if (!(await showConfirm(sprintf( __( 'Delete notebook "%s" and all its notes?', 'noodled' ), name ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
+  if (!(await showConfirm(sprintf( __( 'Delete notebook "%s"? Its notes move to Trash and are removed from the GitHub backup.', 'noodled' ), name ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   await api.delete_notebook(name);
   if (activeNotebook === name) activeNotebook = null;
   activeNote = null;
@@ -2368,7 +2368,7 @@ function renderMenuDashboard() {
     { title: __( 'Data & sync', 'noodled' ), items: [
       { icon: '🔄', label: __( 'Sync now', 'noodled' ), fn: 'syncPull', desc: __( "Push and pull with GitHub now. Don't wait for the clock.", 'noodled' ) },
       { icon: '📥', label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote', desc: __( "Bring the old shoebox over. We'll unpack the .enex.", 'noodled' ) },
-      { icon: '💾', label: __( 'Export backup', 'noodled' ), fn: 'exportBackup', desc: __( 'Zip the whole lot up. Belt, meet suspenders.', 'noodled' ) },
+      { icon: '💾', label: __( 'Download everything (zip)', 'noodled' ), fn: 'exportBackup', desc: __( 'Zip the whole lot up. Belt, meet suspenders.', 'noodled' ) },
       { icon: '📦', label: __( 'Import backup', 'noodled' ), fn: 'importBackup', desc: __( 'Put a backup back. No questions asked.', 'noodled' ) },
     ] },
   ];
@@ -5810,7 +5810,7 @@ function showCommandPalette() {
     { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), run: () => showFocusOptions() },
     { icon: '🔄', label: __( 'Sync now', 'noodled' ), run: () => syncPull() },
     { icon: '🌓', label: __( 'Toggle theme', 'noodled' ), run: () => toggleTheme() },
-    { icon: '⬇️', label: __( 'Export backup', 'noodled' ), run: () => exportBackup() },
+    { icon: '⬇️', label: __( 'Download everything (zip)', 'noodled' ), run: () => exportBackup() },
     { icon: '⬆️', label: __( 'Import backup', 'noodled' ), run: () => importBackup() },
     { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), run: () => showShortcutsHelp() },
   ];
