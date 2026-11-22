@@ -3159,7 +3159,9 @@ function dismissToast(t, now) {
   if (!t) return;
   clearTimeout(t._t);
   t.classList.remove('show');
-  setTimeout(() => t.remove(), now ? 0 : 240);
+  // "now" removes synchronously: showToast loops on the stack size, so a deferred
+  // removal would never let that loop end.
+  if (now) t.remove(); else setTimeout(() => t.remove(), 240);
 }
 function showToast(msg) {
   let stack = document.getElementById('toastStack');
