@@ -532,15 +532,36 @@ async function deleteNotebook(name) {
 }
 
 // ── Notes ──
-// One-time "what's new" toast when the app version changes (not on first run).
+// One-time "what's new" popup when the app version changes (not on first run).
+// The release notes come from the server (already sanitized to <ul>/<li>); with
+// no notes for this version it falls back to a toast.
 function maybeWhatsNew() {
   try {
     const v = (typeof noodledConfig !== 'undefined' && noodledConfig.version) || '';
     const seen = localStorage.getItem('noodled_seen_version');
-    /* translators: %s is the new version number */
-    if (seen && v && seen !== v) setTimeout(() => showToast(sprintf( __( '✨ Updated to v%s', 'noodled' ), v )), 1200);
+    if (seen && v && seen !== v) setTimeout(() => showWhatsNew(v), 1200);
     if (v) localStorage.setItem('noodled_seen_version', v);
   } catch (e) {}
+}
+
+function showWhatsNew(v) {
+  const notes = (typeof noodledConfig !== 'undefined' && noodledConfig.whatsNew) || '';
+  const el = document.getElementById('modalContainer');
+  /* translators: %s is the new version number */
+  if (!notes || !el || el.innerHTML.trim()) { showToast(sprintf( __( '✨ Updated to v%s', 'noodled' ), v )); return; }
+  /* translators: %s is the new version number */
+  const title = sprintf( __( "What's new in v%s", 'noodled' ), v );
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wnTitle" style="max-width:520px">
+      <h3 id="wnTitle">${esc(title)}</h3>
+      <div class="whats-new" style="max-height:60vh;overflow-y:auto;font-size:14px;line-height:1.5">${notes}</div>
+      <div class="modal-buttons" style="margin-top:14px">
+        <button class="btn btn-accent" id="wnClose" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Got it', 'noodled' ))}</button>
+      </div>
+    </div></div>`;
+  el.querySelectorAll('.whats-new ul').forEach(u => { u.style.paddingLeft = '20px'; u.style.margin = '0'; });
+  el.querySelectorAll('.whats-new li').forEach(li => { li.style.marginBottom = '8px'; });
+  const btn = document.getElementById('wnClose'); if (btn) btn.focus();
 }
 
 // First run only (once per device): if a brand-new account has no notes, seed a

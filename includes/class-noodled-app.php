@@ -107,11 +107,26 @@ class Noodled_App {
 			. ' &nbsp; <a href="' . $back . '" style="color:#555">Cancel</a></p>';
 	}
 
+	/** Release notes for the running version (from metadata.json), shown once in the "what's new" popup. */
+	private static function whats_new_html(): string {
+		$file = NOODLED_PATH . 'metadata.json';
+		if ( ! is_readable( $file ) ) {
+			return '';
+		}
+		$meta = json_decode( (string) file_get_contents( $file ), true );
+		$log  = is_array( $meta ) ? (string) ( $meta['sections']['changelog'] ?? '' ) : '';
+		if ( ! preg_match( '#<h4>' . preg_quote( NOODLED_VERSION, '#' ) . '</h4>\s*(<ul>.*?</ul>)#s', $log, $m ) ) {
+			return '';
+		}
+		return wp_kses( $m[1], [ 'ul' => [], 'li' => [] ] );
+	}
+
 	private static function build_config( array $current_user ): array {
 		return [
 			'apiBase'   => rest_url( 'noodled/v1' ),
 			'nonce'     => wp_create_nonce( 'wp_rest' ),
 			'version'   => NOODLED_VERSION,
+			'whatsNew'  => self::whats_new_html(),
 			'appUrl'    => self::get_app_url(),
 			'brandName' => Noodled_Settings::get_brand_name(),
 			'map'       => Noodled_Settings::get_map_config(),
