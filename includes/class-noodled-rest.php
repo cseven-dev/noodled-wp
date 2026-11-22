@@ -712,7 +712,11 @@ class Noodled_REST {
 		$force = (bool) $req->get_param( 'force' );
 		if ( $base !== '' && ! $force ) {
 			$cur = Noodled_Notes::get_one( (int) $req['id'] );
-			if ( $cur && substr( (string) ( $cur['modified'] ?? '' ), 0, 16 ) !== substr( $base, 0, 16 ) ) {
+			// A full "Y-m-d H:i:s" base (the `mtime` field) compares to the second;
+			// a shorter one (older cached clients, queued offline edits) keeps the
+			// old minute comparison.
+			$len = strlen( $base ) >= 19 ? 19 : 16;
+			if ( $cur && substr( (string) ( $cur['mtime'] ?? '' ), 0, $len ) !== substr( $base, 0, $len ) ) {
 				return new \WP_REST_Response( [ 'conflict' => true, 'server' => $cur ] );
 			}
 		}

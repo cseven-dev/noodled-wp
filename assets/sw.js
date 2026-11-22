@@ -128,6 +128,7 @@ async function flushQueue() {
 
   const remaining = [];
   let flushed = 0, networkFail = false;
+  const saved = []; // { item, note } so an open app tab can adopt the new mtime
   for (const item of items) {
     const payload = { title: item.title, body: item.body };
     if (item.base) payload.base_modified = item.base; // conflict-safe, never blind force
@@ -142,13 +143,14 @@ async function flushQueue() {
       const data = await res.json().catch(() => ({}));
       if (data && data.conflict) { remaining.push(item); continue; } // surfaces in the app's resolver
       flushed++;
+      saved.push({ item, note: data });
     } catch (e) {
       remaining.push(item); networkFail = true; // still offline → keep for the next sync
     }
   }
   await swIdbPut(db, 'meta', { key: qKey, items: remaining });
   const cs = await self.clients.matchAll({ includeUncontrolled: true });
-  for (const c of cs) c.postMessage({ type: 'noodled-synced', count: flushed });
+  for (const c of cs) c.postMessage({ type: 'noodled-synced', count: flushed, saved });
   // Reject so the browser reschedules the sync if we're still offline; a conflict
   // or auth failure is terminal here (the app resolves it on next open).
   if (networkFail) throw new Error('offline — retry later');

@@ -31,6 +31,8 @@ class Noodled_Notes {
 			'pinned'   => (bool) $r['pinned'],
 			'created'  => $r['created_at'] ? substr( $r['created_at'], 0, 16 ) : '',
 			'modified' => $r['modified_at'] ? substr( $r['modified_at'], 0, 16 ) : '',
+			// Full-second version stamp for the save-conflict check (update_note).
+			'mtime'    => $r['modified_at'] ? (string) $r['modified_at'] : '',
 			'att'      => isset( $r['att_count'] ) ? (int) $r['att_count'] : 0,
 			'preview'  => self::preview_of( $body ),
 			'tasks'    => self::task_counts( $body ),

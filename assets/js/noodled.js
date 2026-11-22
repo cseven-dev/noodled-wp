@@ -760,7 +760,7 @@ function filterNotes() {
     api.search(document.getElementById('searchInput').value.trim()).then(results => {
       if (searchQuery.trim() !== q) return; // a newer keystroke superseded this
       filteredNotes = applyListFilters(Array.isArray(results) ? results : []);
-      sortFiltered(); renderNoteList();
+      sortFiltered(); titleMatchesFirst(q); renderNoteList();
     }).catch(() => {});
     return;
   }
@@ -780,8 +780,18 @@ function filterNotes() {
   }
   filteredNotes = applyListFilters(filteredNotes);
   sortFiltered();
+  if (q) titleMatchesFirst(q);
   partitionSharedLast();
   renderNoteList();
+}
+
+// While searching, list notes whose TITLE holds every search word ahead of
+// notes that only match in the body. Stable: each group keeps the sort order
+// (pinned first within each group, as sortFiltered left them).
+function titleMatchesFirst(q) {
+  const toks = q.split(/\s+/);
+  const inTitle = n => { const t = (n.title || '').toLowerCase(); return toks.every(k => t.includes(k)); };
+  filteredNotes = filteredNotes.filter(inTitle).concat(filteredNotes.filter(n => !inTitle(n)));
 }
 
 // The default "All Notes" browse view (no notebook / trash / starred / tasks /
@@ -1471,7 +1481,7 @@ async function moveNote(noteId, toNotebook) {
   }
   filterNotes();
   try {
-    await api.move_note(fromNotebook, noteId, toNotebook);
+    adoptMtime(await api.move_note(fromNotebook, noteId, toNotebook));
     loadNotebooks(); // refresh notebook counts in the background
     /* translators: %s is the destination notebook name */
     showUndoToast(sprintf( __( 'Moved to %s', 'noodled' ), toNotebook ), () => moveNote(noteId, fromNotebook));
@@ -1740,7 +1750,8 @@ async function saveTitleOnly() {
   const title = document.getElementById('titleInput')?.value || activeNote.title;
   const cb = currentBody();
   const body = cb === null ? (activeNote.body || '') : cb;
-  const result = await api.save_note(activeNote.notebook, activeNote.id, title, body);
+  const n = activeNote;
+  const result = await serialSave(() => api.save_note(n.notebook, n.id, title, body));
   if (!result.error) {
     activeNote = result;
     await loadNotebooks();
@@ -1916,13 +1927,27 @@ function adoptSaved(result) {
       result.attachments = activeNote.attachments;
     }
     activeNote = result;
+    adoptMtime(result);
   }
   return result;
 }
 
+// After any server call that changed a note, take the fresh version stamp from
+// the response (the open note, its list row, and its offline cache copy), so the
+// next save's base matches the server and doesn't raise a false conflict.
+function adoptMtime(r) {
+  if (!r || r.error || !r.id || !r.mtime) return r;
+  if (activeNote && activeNote.id === r.id) { activeNote.mtime = r.mtime; activeNote.modified = r.modified; }
+  const n = notes.find(x => x.id === r.id);
+  if (n) { n.mtime = r.mtime; n.modified = r.modified; }
+  if (r.body != null) readCachedBody(r.id).then(c => { if (c) cacheBody({ ...c, ...r, attachments: c.attachments }); }).catch(() => {});
+  return r;
+}
+
 async function saveAndRerender() {
   const title = document.getElementById('titleInput')?.value || activeNote.title;
-  const result = await api.save_note(activeNote.notebook, activeNote.id, title, activeNote.body);
+  const n = activeNote, body = activeNote.body;
+  const result = await serialSave(() => api.save_note(n.notebook, n.id, title, body));
   if (!result.error) { adoptSaved(result); await loadNotes(); }
   renderContent();
   setTimeout(() => {
@@ -2414,7 +2439,18 @@ function schedSave() {
   saveTimer = setTimeout(doSave, 2000);
 }
 
-async function doSave() {
+// Saves run one at a time: a save that starts while another is in flight waits
+// for it, so it sends the mtime the first one returned as its base (overlapping
+// saves would send a stale base and raise a false "changed elsewhere" conflict).
+let _saveChain = Promise.resolve();
+function serialSave(fn) {
+  const p = _saveChain.then(fn, fn);
+  _saveChain = p.catch(() => {});
+  return p;
+}
+function doSave() { return serialSave(doSaveNow); }
+
+async function doSaveNow() {
   if (!activeNote || viewingTrash || _conflictOpen) return;
   // Version history is snapshotted server-side on each content-changing save.
   const title = document.getElementById('titleInput')?.value || activeNote.title;
@@ -2425,7 +2461,7 @@ async function doSave() {
   activeNote.body = body;
   // Pass the version we last saw so the server can flag a clobber (another
   // device edited this note since we loaded it).
-  const base = activeNote.modified || '';
+  const base = activeNote.mtime || activeNote.modified || '';
   const result = await queuedSave(activeNote.notebook, activeNote.id, title, body, base);
   if (result && result.conflict) { showConflict(result.server, { title, body }); return; }
   if (!result.error) {
@@ -2839,7 +2875,8 @@ async function toggleCheck(checkIndex) {
     }
     activeNote.body = lines.join('\n');
   }
-  await api.save_note(activeNote.notebook, activeNote.id, activeNote.title, activeNote.body);
+  const n = activeNote, body = activeNote.body;
+  await serialSave(async () => adoptSaved(await api.save_note(n.notebook, n.id, n.title, body)));
   renderContent();
 }
 
@@ -3527,6 +3564,7 @@ async function toggleAgendaTask(noteId, idx, el) {
   const r = await api.toggle_task(noteId, idx).catch(() => null);
   const t = (_agendaTasks || []).find(x => x.note_id === noteId && x.idx === idx);
   if (t) t.done = !t.done;
+  adoptMtime(r);
   if (r && !r.error && activeNote && activeNote.id === noteId) { activeNote.body = r.body; renderContent(); }
   renderAgenda();
 }
@@ -4146,6 +4184,7 @@ function onSwMessage(e) {
   // The service worker flushed queued edits in the background (#4): re-sync the
   // in-memory queue from IndexedDB, refresh the list, and confirm.
   if (e.data.type === 'noodled-synced') {
+    (e.data.saved || []).forEach(s => adoptReplayed(s.note, s.item));
     idb.get('meta', 'queue::' + userScope()).then(rec => {
       saveQueue = (rec && Array.isArray(rec.items)) ? rec.items : [];
       updateOfflineBanner();
@@ -4225,7 +4264,7 @@ async function bulkMove() {
   if (!target) return;
   for (const id of bulkSelected) {
     const note = notes.find(n => n.id === id);
-    if (note) await api.move_note(note.notebook, id, target);
+    if (note) adoptMtime(await api.move_note(note.notebook, id, target));
   }
   bulkSelected.clear();
   toggleBulkMode();
@@ -5439,12 +5478,22 @@ async function queuedSave(notebook, noteId, title, body, base) {
     const result = await api.save_note(notebook, noteId, title, body, { base });
     showSaveIndicator('saved');
     hasUnsavedChanges = false;
+    // This save carried the note's latest full content, so an older queued
+    // offline edit of the same note is superseded: replaying it later would
+    // send a stale base and raise a false conflict over older text.
+    if (result && !result.conflict && !result.error && saveQueue.some(q => q.noteId === noteId)) {
+      saveQueue = saveQueue.filter(q => q.noteId !== noteId);
+      persistSaveQueue();
+    }
     return result;
   } catch (e) {
     // Offline / network error → persist the edit so it survives a reload and
     // flushes on reconnect. Keep only the latest pending edit per note.
     saveQueue = saveQueue.filter(q => q.noteId !== noteId);
-    saveQueue.push({ notebook, noteId, title, body, base, time: Date.now() });
+    const time = Date.now();
+    saveQueue.push({ notebook, noteId, title, body, base, time });
+    // Remember the open editor produced this queued edit (see adoptReplayed).
+    if (activeNote && activeNote.id === noteId) activeNote._queuedAt = time;
     persistSaveQueue();
     registerFlushSync(); // ask the SW to flush when the device reconnects (#4)
     const indicator = document.getElementById('saveIndicator');
@@ -5472,15 +5521,23 @@ async function retrySaveQueue() {
     // Conflict-safe replay (decision #3): send the base the edit was made against
     // instead of a blind force, so a note changed elsewhere isn't silently
     // overwritten. (Legacy items with no base just save, as before.)
-    const r = await api.save_note(item.notebook, item.noteId, item.title, item.body, item.base ? { base: item.base } : {});
-    if (r && r.conflict) {
+    // Serialized with the editor's saves, and the new mtime adopted inside that
+    // turn, so a save typed meanwhile uses the replay's mtime as its base. An
+    // item a newer editor save already superseded is skipped.
+    const r = await serialSave(async () => {
+      if (!saveQueue.includes(item)) return { skipped: true };
+      return adoptReplayed(await api.save_note(item.notebook, item.noteId, item.title, item.body, item.base ? { base: item.base } : {}), item);
+    });
+    if (r && r.skipped) { retrySaveQueue(); return; }
+    if (r && r.conflict && sameContent(r.server, item)) adoptReplayed(r.server, item); // already saved (e.g. by the service worker)
+    else if (r && r.conflict) {
       saveQueue = saveQueue.filter(q => q.noteId !== item.noteId);
       persistSaveQueue();
       try { await selectNote(item.noteId); } catch (e) {}
       showConflict(r.server, { title: item.title, body: item.body });
       return;
     }
-    saveQueue.shift();
+    saveQueue = saveQueue.filter(q => q !== item);
     persistSaveQueue();
     showSaveIndicator('saved');
     if (!saveQueue.length) {
@@ -5491,6 +5548,16 @@ async function retrySaveQueue() {
       retrySaveQueue();
     }
   } catch (e) {}
+}
+// A queued offline edit was saved (by the retry above or the service worker).
+// Take its new mtime, except for an open note whose editor did not produce that
+// edit and shows different text (e.g. an older cached body after an offline
+// reload): adopting there would let the next save silently overwrite the
+// replayed edit, so leave that note's base alone and let the conflict check ask.
+function adoptReplayed(r, item) {
+  if (!r || r.conflict || r.error) return r;
+  if (activeNote && activeNote.id === item.noteId && !(item.time && activeNote._queuedAt === item.time) && currentBody() !== item.body) return r;
+  return adoptMtime(r);
 }
 // Register a one-off Background Sync so the service worker flushes the queue when
 // the device reconnects, even with the app closed (#4). Chromium only; on iOS
@@ -5706,8 +5773,14 @@ function showCommandPalette() {
 
 // ── Conflict resolution (last-write-wins safety net) ─────────
 let _conflictOpen = false;
+// The server already holds exactly this title and body (our own unload or
+// background save got there first), so there is nothing to choose between.
+function sameContent(server, mine) {
+  return !!server && !!mine && server.title === mine.title && server.body === mine.body;
+}
 function showConflict(server, mine) {
   if (!server || _conflictOpen) return;
+  if (sameContent(server, mine)) { adoptMtime(server); return; }
   _conflictOpen = true;
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:460px">
