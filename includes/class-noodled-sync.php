@@ -206,18 +206,22 @@ class Noodled_Sync {
 	// ── Webhook: GitHub push event → WP ──
 
 	public static function handle_webhook( \WP_REST_Request $req ): \WP_REST_Response {
-		// Verify signature
+		// Verify signature. The route is public (auth is the HMAC), so a missing
+		// secret must fail closed — otherwise a forged push payload could write to
+		// any notebook unauthenticated.
 		$cfg    = Noodled_Settings::get();
 		$secret = $cfg['webhook_secret'] ?? '';
 
-		if ( $secret ) {
-			$sig_header = $req->get_header( 'X-Hub-Signature-256' );
-			$payload    = $req->get_body();
-			$expected   = 'sha256=' . hash_hmac( 'sha256', $payload, $secret );
+		if ( ! $secret ) {
+			return new \WP_REST_Response( [ 'error' => 'Webhook secret not configured' ], 403 );
+		}
 
-			if ( ! hash_equals( $expected, $sig_header ?? '' ) ) {
-				return new \WP_REST_Response( [ 'error' => 'Invalid signature' ], 403 );
-			}
+		$sig_header = $req->get_header( 'X-Hub-Signature-256' );
+		$payload    = $req->get_body();
+		$expected   = 'sha256=' . hash_hmac( 'sha256', $payload, $secret );
+
+		if ( ! hash_equals( $expected, $sig_header ?? '' ) ) {
+			return new \WP_REST_Response( [ 'error' => 'Invalid signature' ], 403 );
 		}
 
 		$event = $req->get_header( 'X-GitHub-Event' );

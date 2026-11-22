@@ -10,6 +10,11 @@ built. Suggested order: **B (AI) → A (iOS slice) → D (canvas) → C (plugin 
 
 ## A. Native mobile apps  (effort: High, ~1–2 weeks + ongoing)
 
+> **Scoped:** see `MOBILE-IOS-SCOPE.md` for the detailed iOS 80/20 first-slice plan
+> (Capacitor wrap + APNs push + share extension + universal links), phases, costs,
+> and open decisions. The root `NOODLE_MOBILE_PLAN.md` is superseded (it describes an
+> abandoned from-scratch React Native rebuild).
+
 **Why:** every rival ships native iOS/Android; noodled is PWA-only, and iOS PWA
 has no background sync and gated push. This is the single biggest remaining gap.
 

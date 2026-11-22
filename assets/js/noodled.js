@@ -89,6 +89,9 @@ const api = {
   note_share(noteId, email, canWrite)    { return this._fetch('/notes/' + noteId + '/shares', { method: 'POST', body: JSON.stringify({ email, access: canWrite ? 'write' : 'read' }) }); },
   note_unshare(noteId, email)            { return this._fetch('/notes/' + noteId + '/unshare', { method: 'POST', body: JSON.stringify({ email }) }); },
   get_revisions(noteId)                  { return this._fetch('/notes/' + noteId + '/revisions'); },
+  // AI assistant (server-proxied; keys never reach the browser)
+  ai_summarize(noteId)                   { return this._fetch('/ai/summarize', { method: 'POST', body: JSON.stringify({ note_id: noteId }) }); },
+  ai_ask(q)                              { return this._fetch('/ai/ask', { method: 'POST', body: JSON.stringify({ q }) }); },
   get_tasks()                            { return this._fetch('/tasks'); },
   toggle_task(noteId, idx)               { return this._fetch('/notes/' + noteId + '/task-toggle', { method: 'POST', body: JSON.stringify({ idx }) }); },
   // Reminders (note-attached, per-user). `at` is epoch milliseconds.
@@ -127,6 +130,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }, 3000);
 
   showLoadingSkeleton();
+
+  // Esc in the search box clears it and returns focus to the list
+  document.getElementById('searchInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); clearSearch(); e.target.blur(); }
+  });
 
   // Start the independent reads immediately so they overlap the config round-trip
   // instead of running in series (config -> notebooks -> notes was 3 serial RTTs).
@@ -264,13 +272,13 @@ function renderNotebooks() {
     const kids = childrenOf[nb.id] || [];
     const isCollapsed = collapsed.has(name);
     const caret = kids.length
-      ? `<span class="nb-caret${isCollapsed ? '' : ' open'}" role="button" tabindex="0" aria-label="${escAttr(__( 'Expand or collapse', 'noodled' ))}" aria-expanded="${isCollapsed ? 'false' : 'true'}" onclick="event.stopPropagation();toggleNbCollapse('${esc(name)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleNbCollapse('${esc(name)}')}"><span aria-hidden="true">&#9656;</span></span>`
+      ? `<span class="nb-caret${isCollapsed ? '' : ' open'}" role="button" tabindex="0" data-nb="${escAttr(name)}" aria-label="${escAttr(__( 'Expand or collapse', 'noodled' ))}" aria-expanded="${isCollapsed ? 'false' : 'true'}" onclick="event.stopPropagation();toggleNbCollapse(this.dataset.nb)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleNbCollapse(this.dataset.nb)}"><span aria-hidden="true">&#9656;</span></span>`
       : '<span class="nb-caret-spacer" aria-hidden="true"></span>';
     const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">&#128279;</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
     const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
     /* translators: %s is the notebook name */
     const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
-    let html = `<div class="nb-item${active}" role="button" tabindex="0" style="padding-left:${8 + depth * 14}px" aria-label="${nbAria}" onclick="selectNotebook('${esc(name)}')" oncontextmenu="event.preventDefault(); showNbContext(event, '${esc(name)}')" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, '${esc(name)}')">
+    let html = `<div class="nb-item${active}" role="button" tabindex="0" style="padding-left:${8 + depth * 14}px" data-nb="${escAttr(name)}" aria-label="${nbAria}" onclick="selectNotebook(this.dataset.nb)" oncontextmenu="event.preventDefault(); showNbContext(event, this.dataset.nb)" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, this.dataset.nb)">
       ${caret}<span class="nb-color" style="background:${color}"></span>
       <span class="nb-name">${esc(label)}${shared}${readOnly}</span>
       <span class="count">${nb.count}</span>
@@ -318,6 +326,7 @@ function renderNotebooks() {
 }
 
 async function selectNotebook(name) {
+  if (!(await discardIfFreshEmpty())) await doSave();
   viewingTrash = false;
   viewingStarred = false;
   viewingTasks = false;
@@ -356,7 +365,7 @@ function moveNotebookInto(name) {
       <select id="nbParentSel" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;margin-bottom:12px">${opts}</select>
       <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
-        <button class="btn btn-sm btn-accent" onclick="doMoveNotebook('${esc(name)}')">${esc(__( 'Move', 'noodled' ))}</button>
+        <button class="btn btn-sm btn-accent" data-nb="${escAttr(name)}" onclick="doMoveNotebook(this.dataset.nb)">${esc(__( 'Move', 'noodled' ))}</button>
       </div>
     </div></div>`;
 }
@@ -820,8 +829,8 @@ function noteDrop(e, notebookName) {
 // Per-notebook accent color (owner only).
 function setNotebookColor(name) {
   const el = document.getElementById('modalContainer');
-  const sw = nbColors.concat(['#64748b']).map(c => `<button class="nbc-sw" style="background:${c}" onclick="applyNbColor('${esc(name)}','${c}')" aria-label="${escAttr(c)}"></button>`).join('');
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Notebook color', 'noodled' ))}</h3><div class="nbc-grid">${sw}</div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="applyNbColor('${esc(name)}','')">${esc(__( 'Reset', 'noodled' ))}</button><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
+  const sw = nbColors.concat(['#64748b']).map(c => `<button class="nbc-sw" style="background:${c}" data-nb="${escAttr(name)}" data-color="${c}" onclick="applyNbColor(this.dataset.nb, this.dataset.color)" aria-label="${escAttr(c)}"></button>`).join('');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Notebook color', 'noodled' ))}</h3><div class="nbc-grid">${sw}</div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" data-nb="${escAttr(name)}" onclick="applyNbColor(this.dataset.nb, '')">${esc(__( 'Reset', 'noodled' ))}</button><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
 }
 function applyNbColor(name, color) {
   const nb = notebooks.find(n => n.name === name); if (nb) nb.color = color;
@@ -943,6 +952,9 @@ function renderNoteList() {
   let sharedHeaderDone = false;
   let lastGroup = null;
   const out = [];
+  if (viewingTrash && filteredNotes.length) {
+    out.push(`<div style="padding:8px;border-bottom:1px solid var(--border);text-align:center"><button class="btn btn-sm" style="color:var(--red)" onclick="emptyTrash()">${esc(__( 'Empty Trash', 'noodled' ))}</button></div>`);
+  }
   filteredNotes.forEach(n => {
     if (showSharedDivider && n.shared && !sharedHeaderDone) {
       sharedHeaderDone = true;
@@ -1070,7 +1082,7 @@ async function selectNote(noteId) {
   const item = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
   if (item) item.classList.add('loading');
 
-  await doSave();
+  if (!(await discardIfFreshEmpty())) await doSave();
   try {
     activeNote = await api.get_note(null, noteId);
   } catch (e) {
@@ -1116,10 +1128,35 @@ function focusNoteBody() {
   }
 }
 
+// A quick-added note (date/time default title) abandoned with no content gets
+// deleted outright on switch-away, so misfired "+" taps don't pile up as
+// empty date-titled notes. It becomes a keeper on any edit to title or body.
+let _freshNote = null; // { id, title } until the note earns content
+
+async function discardIfFreshEmpty() {
+  if (!activeNote || !_freshNote || activeNote.id !== _freshNote.id) return false;
+  const title = document.getElementById('titleInput')?.value || activeNote.title;
+  const body = currentBody();
+  if (title !== _freshNote.title || (body || '').trim()) { _freshNote = null; return false; }
+  const id = activeNote.id;
+  const nb = activeNote.notebook;
+  _freshNote = null;
+  activeNote = null;
+  try {
+    await api.delete_note(nb, id);
+    await api.permanent_delete(id);
+  } catch (e) {}
+  notes = notes.filter(n => n.id !== id);
+  filterNotes();
+  loadNotebooks(); // background count refresh
+  return true;
+}
+
 async function createNote() {
-  await doSave();
+  if (!(await discardIfFreshEmpty())) await doSave();
   const nb = activeNotebook || 'General';
   const note = await api.create_note(nb, dateTimeTitle(), '');
+  _freshNote = { id: note.id, title: note.title };
   await loadNotebooks();
   await loadNotes();
   activeNote = note;
@@ -1371,6 +1408,7 @@ function showNoteContext(event, noteId) {
     { label: __( 'History…', 'noodled' ), action: () => openNoteHistory(noteId) },
     { label: __( 'Share with people…', 'noodled' ), action: () => showNoteShareDialog(noteId) },
     { label: __( 'Public link', 'noodled' ), action: () => shareNoteLink(noteId) },
+    { label: __( 'Stop public link', 'noodled' ), action: () => unshareNoteLink(noteId) },
     { sep: true },
     ...moveItems,
     { sep: true },
@@ -1445,6 +1483,7 @@ async function moveNote(noteId, toNotebook) {
 }
 
 async function selectTrash() {
+  if (!(await discardIfFreshEmpty())) await doSave();
   viewingTrash = true;
   viewingStarred = false;
   viewingTasks = false;
@@ -1467,6 +1506,17 @@ async function restoreNote(noteId) {
   await updateTrashCount();
   await loadNotebooks();
   showToast(__( 'Restored', 'noodled' ));
+}
+
+async function emptyTrash() {
+  if (!(await showConfirm(__( 'Permanently delete ALL notes in trash? This cannot be undone.', 'noodled' ), { danger: true, okLabel: __( 'Empty trash', 'noodled' ) }))) return;
+  await api.empty_trash();
+  activeNote = null;
+  renderContent();
+  notes = await api.get_trash();
+  filterNotes();
+  await updateTrashCount();
+  showToast(__( 'Trash emptied', 'noodled' ));
 }
 
 async function permanentDelete(noteId) {
@@ -1503,8 +1553,8 @@ function renderContent() {
   el.innerHTML = `
     <div class="content-toolbar">
       <input class="content-title-input" id="titleInput" value="${escAttr(n.title)}"
-             placeholder="${escAttr(__( 'Note title', 'noodled' ))}" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();focusNoteBody();}">
-      <span class="save-indicator" id="saveIndicator"></span>
+             placeholder="${escAttr(__( 'Note title', 'noodled' ))}" aria-label="${escAttr(__( 'Note title', 'noodled' ))}" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();focusNoteBody();}">
+      <span class="save-indicator" id="saveIndicator" role="status" aria-live="polite"></span>
       <div class="editor-actions">
         ${isCode ? `<input id="codeLangInput" class="code-lang-input" value="${escAttr(codeParts.lang)}"
                placeholder="${escAttr(__( 'language', 'noodled' ))}" oninput="onCodeLangInput()"
@@ -1515,6 +1565,7 @@ function renderContent() {
         <button class="btn btn-sm" onclick="insertHeading()" title="${escAttr(__( 'Heading', 'noodled' ))}" aria-label="${escAttr(__( 'Heading', 'noodled' ))}">H</button>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <button class="btn btn-sm" onclick="showHistory()" title="${escAttr(__( 'Version history', 'noodled' ))}" aria-label="${escAttr(__( 'Version history', 'noodled' ))}"><span aria-hidden="true">&#128336;</span></button>
+        ${(noodledConfig.aiEnabled && !locked) ? `<button class="btn btn-sm" onclick="summarizeNote()" title="${escAttr(__( 'Summarize with AI', 'noodled' ))}" aria-label="${escAttr(__( 'Summarize with AI', 'noodled' ))}"><span aria-hidden="true">&#10024;</span></button>` : ''}
         <button class="btn btn-sm" onclick="copyBody()" title="${escAttr(__( 'Copy', 'noodled' ))}" aria-label="${escAttr(__( 'Copy note', 'noodled' ))}"><span aria-hidden="true">&#128203;</span></button>
         <button class="btn btn-sm" onclick="uploadFiles()" title="${escAttr(__( 'Add files', 'noodled' ))}" aria-label="${escAttr(__( 'Add files', 'noodled' ))}"><span aria-hidden="true">&#128206;</span></button>
         <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="${escAttr(__( 'Dictate', 'noodled' ))}" aria-label="${escAttr(__( 'Dictate', 'noodled' ))}"><span aria-hidden="true">&#127908;</span></button>
@@ -1524,6 +1575,7 @@ function renderContent() {
           <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="${escAttr(__( 'More tools', 'noodled' ))}" aria-label="${escAttr(__( 'More tools', 'noodled' ))}" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
           <div class="toolbar-dropdown" id="editorMenu" role="menu" aria-labelledby="editorMenuBtn">
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? esc(__( 'Preview mode', 'noodled' )) : esc(__( 'Source mode', 'noodled' ))}</div>
+            ${noodledConfig.aiEnabled ? `<div class="dropdown-item" role="menuitem" tabindex="0" onclick="askYourNotes()">${esc(__( 'Ask your notes…', 'noodled' ))}</div>` : ''}
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="${locked ? 'unlockCurrentNote' : 'lockCurrentNote'}()">${locked ? esc(__( 'Unlock note', 'noodled' )) : esc(__( 'Lock note', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleFindReplace()">${esc(__( 'Find & replace', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showTOC()">${esc(__( 'Table of contents', 'noodled' ))}</div>
@@ -1559,7 +1611,7 @@ function renderContent() {
                placeholder="${escAttr(__( 'Paste or type code — every character is kept exactly', 'noodled' ))}"
                oninput="schedSave(); updateWordCount()" onkeydown="codeEditorKey(event)">${escAttr(codeParts.code)}</textarea>`
         : showRawMarkdown
-        ? `<textarea id="noteBodyRaw" class="raw-markdown" oninput="schedSave(); updateWordCount()">${escAttr(n.body || '')}</textarea>`
+        ? `<textarea id="noteBodyRaw" class="raw-markdown" aria-label="${escAttr(__( 'Note body (Markdown source)', 'noodled' ))}" oninput="schedSave(); updateWordCount()">${escAttr(n.body || '')}</textarea>`
         : `<div class="rendered-content" id="noteBody" contenteditable="true"
                role="textbox" aria-multiline="true" aria-label="${escAttr(__( 'Note body', 'noodled' ))}"
                oninput="schedSave(); updateWordCount()" onkeydown="handleContentKey(event)"
@@ -2368,6 +2420,8 @@ async function doSave() {
   const title = document.getElementById('titleInput')?.value || activeNote.title;
   const body = currentBody();
   if (body === null) return; // no editor mounted yet — don't clobber
+  // Any real edit graduates a fresh quick-add note into a keeper
+  if (_freshNote && activeNote.id === _freshNote.id && (title !== _freshNote.title || (body || '').trim())) _freshNote = null;
   activeNote.body = body;
   // Pass the version we last saw so the server can flag a clobber (another
   // device edited this note since we loaded it).
@@ -2413,31 +2467,39 @@ function htmlToMarkdown(el) {
       lines.push('```');
       return;
     }
-    if (tag === 'H1') { lines.push('# ' + node.textContent); return; }
-    if (tag === 'H2') { lines.push('## ' + node.textContent); return; }
-    if (tag === 'H3') { lines.push('### ' + node.textContent); return; }
+    if (tag === 'H1') { lines.push('# ' + inlineHtmlToMd(node)); return; }
+    if (tag === 'H2') { lines.push('## ' + inlineHtmlToMd(node)); return; }
+    if (tag === 'H3') { lines.push('### ' + inlineHtmlToMd(node)); return; }
     if (tag === 'HR') { lines.push('---'); return; }
     if (tag === 'BR') { lines.push(''); return; }
-    if (tag === 'BLOCKQUOTE') { lines.push('> ' + node.textContent); return; }
+    if (tag === 'BLOCKQUOTE') { lines.push('> ' + inlineHtmlToMd(node)); return; }
     if (tag === 'PRE') { lines.push('```'); lines.push(node.textContent); lines.push('```'); return; }
-    if (tag === 'UL' || tag === 'OL') {
-      const isChecklist = node.classList.contains('checklist');
-      let num = 1;
-      for (const li of node.children) {
-        if (li.nodeName !== 'LI') continue;
-        if (isChecklist) {
-          const cb = li.querySelector('input[type="checkbox"]');
-          const checked = cb ? cb.checked : false;
-          lines.push(`- [${checked ? 'x' : ' '}] ${li.textContent.trim()}`);
-        } else if (tag === 'OL') { lines.push(`${num}. ${li.textContent.trim()}`); num++; }
-        else lines.push(`- ${li.textContent.trim()}`);
-      }
-      return;
-    }
+    if (tag === 'UL' || tag === 'OL') { listToMd(node, ''); return; }
     if (tag === 'P') { lines.push(inlineHtmlToMd(node)); return; }
     if (tag === 'IMG') { lines.push(`![${node.getAttribute('alt') || ''}](${node.getAttribute('src') || ''})`); return; }
     if (tag === 'TABLE') { tableToMd(node); return; }
     for (const child of node.childNodes) walk(child);
+  }
+  // Serialize a UL/OL preserving inline formatting (bold/links inside items
+  // were flattened to plain text by textContent) and nested lists (2-space indent).
+  function listToMd(node, indent) {
+    const isChecklist = node.classList.contains('checklist');
+    let num = 1;
+    for (const li of node.children) {
+      if (li.nodeName !== 'LI') continue;
+      const nested = Array.from(li.children).filter(c => c.nodeName === 'UL' || c.nodeName === 'OL');
+      // inlineHtmlToMd serializes the CHILDREN of the node it's given, so feed it
+      // a clone of the li with nested lists and the checkbox stripped out.
+      const clone = li.cloneNode(true);
+      clone.querySelectorAll('ul, ol, input').forEach(x => x.remove());
+      const inline = inlineHtmlToMd(clone).replace(/\n/g, ' ').trim();
+      if (isChecklist) {
+        const cb = li.querySelector('input[type="checkbox"]');
+        lines.push(`${indent}- [${cb && cb.checked ? 'x' : ' '}] ${inline}`);
+      } else if (node.nodeName === 'OL') { lines.push(`${indent}${num}. ${inline}`); num++; }
+      else lines.push(`${indent}- ${inline}`);
+      nested.forEach(n2 => listToMd(n2, indent + '  '));
+    }
   }
   // Serialize a rendered <table> back to a GFM markdown table. Without this,
   // editing any note that contains a table silently destroyed it on save.
@@ -2957,8 +3019,8 @@ function renderMarkdown(text) {
 }
 
 // ── UI helpers ──
-function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escAttr(s) { return (s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 // Keep "2m ago" timestamps honest without a full re-render: re-tick every minute.
 setInterval(() => {
@@ -3352,6 +3414,7 @@ function isStarred(noteId) {
 }
 
 async function showStarred() {
+  if (!(await discardIfFreshEmpty())) await doSave();
   viewingStarred = true;
   viewingTrash = false;
   viewingTasks = false;
@@ -3371,6 +3434,7 @@ async function showStarred() {
 let viewingTasks = false;
 let _agendaTasks = [];
 async function showTasks() {
+  if (!(await discardIfFreshEmpty())) await doSave();
   viewingTasks = true; viewingTrash = false; viewingStarred = false; activeNotebook = null; _activeSmart = null;
   let tasks = [];
   try { tasks = await api.get_tasks(); } catch (e) {}
@@ -4099,9 +4163,36 @@ async function bulkDelete() {
   showToast(__( 'Deleted', 'noodled' ));
 }
 
+// Pick an existing writable notebook from a list (free-text prompts let a typo
+// silently scatter notes into a brand-new notebook).
+function showNotebookPicker(title) {
+  return new Promise(resolve => {
+    const el = document.getElementById('modalContainer');
+    el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:360px"><h3>${esc(title)}</h3>
+      <div style="max-height:300px;overflow-y:auto" id="nbPickList"></div>
+      <div class="modal-buttons" style="margin-top:12px"><button class="btn btn-sm" id="nbPickCancel">${esc(__( 'Cancel', 'noodled' ))}</button></div>
+    </div></div>`;
+    const done = v => { el.innerHTML = ''; resolve(v); };
+    const list = el.querySelector('#nbPickList');
+    notebooks.filter(nb => nb.access !== 'read').forEach(nb => {
+      const div = document.createElement('div');
+      div.className = 'template-item';
+      div.setAttribute('role', 'button');
+      div.setAttribute('tabindex', '0');
+      div.textContent = nb.label || nb.name;
+      div.addEventListener('click', () => done(nb.name));
+      div.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); done(nb.name); } });
+      list.appendChild(div);
+    });
+    el.querySelector('.modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) done(null); });
+    el.querySelector('#nbPickCancel').addEventListener('click', () => done(null));
+  });
+}
+
 async function bulkMove() {
   if (!bulkSelected.size) return;
-  const target = await showPrompt(__( 'Move Notes', 'noodled' ), __( 'Move to notebook:', 'noodled' ));
+  /* translators: %d is the number of selected notes */
+  const target = await showNotebookPicker(sprintf( _n( 'Move %d note to…', 'Move %d notes to…', bulkSelected.size, 'noodled' ), bulkSelected.size ));
   if (!target) return;
   for (const id of bulkSelected) {
     const note = notes.find(n => n.id === id);
@@ -4726,9 +4817,85 @@ async function shareNoteLink(noteId) {
     if (r.error) { showToast(r.error); return; }
     const url = r.url;
     await navigator.clipboard.writeText(url);
-    showToast(__( 'Public link copied!', 'noodled' ));
+    showToast(__( 'Public link copied! Expires in 30 days.', 'noodled' ));
   } catch (e) {
     showToast(__( 'Share failed', 'noodled' ));
+  }
+}
+
+async function unshareNoteLink(noteId) {
+  try {
+    const r = await api._fetch('/notes/' + noteId + '/share', { method: 'DELETE' });
+    if (r.error) { showToast(r.error); return; }
+    showToast(__( 'Public link revoked', 'noodled' ));
+  } catch (e) {
+    showToast(__( 'Could not revoke link', 'noodled' ));
+  }
+}
+
+// ── AI assistant (summarize / ask your notes) ──
+// All inference is server-proxied: the provider key never reaches the browser,
+// and locked notes are never sent (enforced server-side).
+
+function aiModalShell(titleText, innerHtml) {
+  const el = document.getElementById('modalContainer');
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
+    <div class="modal" style="max-width:560px">
+      <h3><span aria-hidden="true">&#10024;</span> ${esc(titleText)}</h3>
+      <div id="aiModalBody" aria-live="polite">${innerHtml}</div>
+      <div style="margin-top:16px;text-align:right"><button class="btn" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>
+    </div>
+  </div>`;
+}
+
+function aiThinkingHtml() {
+  return `<p style="color:var(--text-muted)">${esc(__( 'Thinking…', 'noodled' ))}</p>`;
+}
+function aiErrorHtml(msg) {
+  return `<p style="color:#e06c75">${esc(msg)}</p>`;
+}
+function aiResultHtml(text) {
+  return `<div class="rendered-content" style="max-height:55vh;overflow:auto">${renderMarkdown(text)}</div>`;
+}
+
+async function summarizeNote() {
+  if (!activeNote) return;
+  aiModalShell(__( 'Summary', 'noodled' ), aiThinkingHtml());
+  try {
+    const r = await api.ai_summarize(activeNote.id);
+    const body = document.getElementById('aiModalBody');
+    if (!body) return;
+    body.innerHTML = r.error ? aiErrorHtml(r.error) : aiResultHtml(r.text);
+  } catch (e) {
+    const body = document.getElementById('aiModalBody');
+    if (body) body.innerHTML = aiErrorHtml(__( 'AI request failed.', 'noodled' ));
+  }
+}
+
+function askYourNotes() {
+  aiModalShell(__( 'Ask your notes', 'noodled' ), `
+    <p style="color:var(--text-muted);font-size:13px;margin-top:0">${esc(__( 'Answered only from your notes. Locked notes are never sent.', 'noodled' ))}</p>
+    <div style="display:flex;gap:8px;margin:10px 0">
+      <input id="aiAskInput" type="text" style="flex:1" placeholder="${escAttr(__( 'e.g. What did I decide about the trip?', 'noodled' ))}" aria-label="${escAttr(__( 'Your question', 'noodled' ))}" onkeydown="if(event.key==='Enter'){event.preventDefault();runAsk();}">
+      <button class="btn btn-accent" onclick="runAsk()">${esc(__( 'Ask', 'noodled' ))}</button>
+    </div>
+    <div id="aiAskAnswer"></div>
+  `);
+  setTimeout(() => { const i = document.getElementById('aiAskInput'); if (i) i.focus(); }, 50);
+}
+
+async function runAsk() {
+  const input = document.getElementById('aiAskInput');
+  const ansEl = document.getElementById('aiAskAnswer');
+  if (!input || !ansEl) return;
+  const q = input.value.trim();
+  if (!q) { input.focus(); return; }
+  ansEl.innerHTML = aiThinkingHtml();
+  try {
+    const r = await api.ai_ask(q);
+    ansEl.innerHTML = r.error ? aiErrorHtml(r.error) : aiResultHtml(r.text);
+  } catch (e) {
+    ansEl.innerHTML = aiErrorHtml(__( 'AI request failed.', 'noodled' ));
   }
 }
 
@@ -5183,7 +5350,7 @@ function restoreLastNote() {
   }
 }
 
-// ── Unsaved changes warning ──
+// ── Unsaved changes warning + exit flush ──
 let hasUnsavedChanges = false;
 
 window.addEventListener('beforeunload', e => {
@@ -5191,6 +5358,32 @@ window.addEventListener('beforeunload', e => {
     e.preventDefault();
     e.returnValue = '';
   }
+});
+
+// Best-effort save when the page actually goes away: a keepalive fetch survives
+// unload (sendBeacon can't carry the nonce header). No base_modified — at unload
+// there's nobody left to answer a conflict prompt, so last-write-wins.
+window.addEventListener('pagehide', () => {
+  if (!hasUnsavedChanges || !activeNote || viewingTrash) return;
+  const title = document.getElementById('titleInput')?.value || activeNote.title;
+  const body = currentBody();
+  if (body === null) return;
+  try {
+    fetch(api._base + '/notes/' + activeNote.id, {
+      method: 'PUT',
+      keepalive: true,
+      credentials: 'same-origin',
+      headers: { 'X-WP-Nonce': api._nonce, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body }),
+    });
+    hasUnsavedChanges = false;
+  } catch (e) {}
+});
+
+// Tab switched away (page still alive): run the normal conflict-aware save now
+// instead of waiting out the autosave debounce.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && hasUnsavedChanges) { try { doSave(); } catch (e) {} }
 });
 
 // ── Auto-sync on interval ──
@@ -5346,8 +5539,11 @@ function closeSidebar() {
   document.getElementById('sidebarOverlay')?.classList.remove('show');
 }
 
-function closeNote() {
+async function closeNote() {
   if (typeof dictating !== 'undefined' && dictating) stopDictation();
+  // Mobile back tapped inside the 2s autosave debounce used to drop the edit
+  // (activeNote was nulled before doSave ever ran).
+  if (!(await discardIfFreshEmpty())) await doSave();
   document.querySelector('.col-content')?.classList.remove('open');
   activeNote = null;
   renderNoteList();

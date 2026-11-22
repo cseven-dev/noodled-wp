@@ -211,10 +211,19 @@ class Noodled_REST {
 
 		// Note sharing (public link)
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/share', [
-			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'share_note_link' ], ] + $auth,
+			[ 'methods' => 'POST',   'callback' => [ __CLASS__, 'share_note_link' ], ] + $auth,
+			[ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'unshare_note_link' ], ] + $auth,
 		] );
 		register_rest_route( $ns, '/shared/(?P<token>[a-zA-Z0-9]+)', [
 			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'view_shared_note' ], 'permission_callback' => '__return_true', ],
+		] );
+
+		// AI assistant (summarize a note / ask across your notes). BYO-key, server-proxied.
+		register_rest_route( $ns, '/ai/summarize', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'ai_summarize' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/ai/ask', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'ai_ask' ], ] + $auth,
 		] );
 
 		// Plaud sync
@@ -1225,15 +1234,42 @@ class Noodled_REST {
 		), ARRAY_A );
 		$meta = json_decode( $row['meta_json'] ?? '{}', true ) ?: [];
 
-		if ( empty( $meta['share_token'] ) ) {
-			$meta['share_token'] = wp_generate_password( 16, false );
+		// Mint a token (and 30-day expiry) on first share, or re-mint when the
+		// existing one has lapsed, so a leaked link stops working on its own.
+		$expired = empty( $meta['share_expires'] ) || (int) $meta['share_expires'] < time();
+		if ( empty( $meta['share_token'] ) || $expired ) {
+			$meta['share_token']   = wp_generate_password( 16, false );
+			$meta['share_expires'] = time() + 30 * DAY_IN_SECONDS;
 			$wpdb->update( $wpdb->prefix . 'noodled_notes', [
 				'meta_json' => wp_json_encode( $meta ),
 			], [ 'id' => $note_id ] );
 		}
 
 		$url = rest_url( 'noodled/v1/shared/' . $meta['share_token'] );
-		return new \WP_REST_Response( [ 'url' => $url, 'token' => $meta['share_token'] ] );
+		return new \WP_REST_Response( [ 'url' => $url, 'token' => $meta['share_token'], 'expires' => (int) $meta['share_expires'] ] );
+	}
+
+	/**
+	 * Owner-only: revoke a note's public share link so a leaked URL can be killed.
+	 */
+	public static function unshare_note_link( \WP_REST_Request $req ): \WP_REST_Response {
+		$note_id = (int) $req['id'];
+		if ( ! self::owns_note( $note_id ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Only the owner can revoke a public link', 'noodled' ) ], 403 );
+		}
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT meta_json FROM {$wpdb->prefix}noodled_notes WHERE id = %d", $note_id
+		), ARRAY_A );
+		if ( ! $row ) return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
+
+		$meta = json_decode( $row['meta_json'] ?? '{}', true ) ?: [];
+		unset( $meta['share_token'], $meta['share_expires'] );
+		$wpdb->update( $wpdb->prefix . 'noodled_notes', [
+			'meta_json' => wp_json_encode( $meta ),
+		], [ 'id' => $note_id ] );
+
+		return new \WP_REST_Response( [ 'success' => true ] );
 	}
 
 	public static function view_shared_note( \WP_REST_Request $req ): \WP_REST_Response {
@@ -1246,11 +1282,43 @@ class Noodled_REST {
 
 		if ( ! $row ) return new \WP_REST_Response( [ 'error' => __( 'Note not found or link expired', 'noodled' ) ], 404 );
 
+		// LIKE is a substring scan, so confirm the token matches exactly and is
+		// unexpired before disclosing the body.
+		$meta = json_decode( $row['meta_json'] ?? '{}', true ) ?: [];
+		$valid = ! empty( $meta['share_token'] ) && hash_equals( (string) $meta['share_token'], $token );
+		$live  = ! empty( $meta['share_expires'] ) && (int) $meta['share_expires'] >= time();
+		if ( ! $valid || ! $live ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Note not found or link expired', 'noodled' ) ], 404 );
+		}
+
 		return new \WP_REST_Response( [
 			'title' => $row['title'],
 			'body'  => $row['body'],
 			'modified' => $row['modified_at'],
 		] );
+	}
+
+	// ── AI assistant ──
+
+	public static function ai_summarize( \WP_REST_Request $req ): \WP_REST_Response {
+		$note = self::verify_note_access( (int) $req->get_param( 'note_id' ) );
+		if ( ! $note ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
+		}
+		$r = Noodled_AI::summarize( $note );
+		return new \WP_REST_Response( $r, isset( $r['error'] ) ? 400 : 200 );
+	}
+
+	public static function ai_ask( \WP_REST_Request $req ): \WP_REST_Response {
+		$q = trim( (string) $req->get_param( 'q' ) );
+		if ( $q === '' ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Ask a question first.', 'noodled' ) ], 400 );
+		}
+		$nb_ids   = self::accessible_notebook_ids();
+		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
+		$notes    = Noodled_Notes::corpus( $nb_ids, $note_ids );
+		$r = Noodled_AI::ask( $q, $notes );
+		return new \WP_REST_Response( $r, isset( $r['error'] ) ? 400 : 200 );
 	}
 
 	// ── Plaud ──

@@ -115,6 +115,7 @@ class Noodled_App {
 			'appUrl'    => self::get_app_url(),
 			'brandName' => Noodled_Settings::get_brand_name(),
 			'map'       => Noodled_Settings::get_map_config(),
+			'aiEnabled' => Noodled_AI::is_configured(),
 			'user'      => [
 				'name'  => $current_user['name'],
 				'email' => $current_user['email'],

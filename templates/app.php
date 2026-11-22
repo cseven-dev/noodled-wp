@@ -12,6 +12,7 @@ $noodled_asset = function ( $rel ) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></title>
 <meta name="theme-color" content="#111113">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,12 +43,25 @@ $noodled_og_desc = esc_attr__( 'A fast, private, local-first markdown notes app.
 </script>
 <link rel="icon" type="image/png" sizes="32x32" href="<?php echo esc_url( NOODLED_URL . 'assets/icon-192.png' ); ?>">
 <link rel="manifest" href="<?php echo esc_url( NOODLED_URL . 'assets/manifest.json' ); ?>">
-<!-- Fraunces: noodled display serif, used in the branded menu dashboard -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,900;1,9..144,500&display=swap" rel="stylesheet">
+<!-- Fraunces (noodled display serif) is self-hosted in assets/fonts and declared
+     via @font-face in noodled.css — no third-party Google Fonts request. Preload
+     the normal weight so the branded dashboard headings paint without a flash. -->
+<link rel="preload" href="<?php echo esc_url( NOODLED_URL . 'assets/fonts/fraunces-latin.woff2' ); ?>" as="font" type="font/woff2" crossorigin>
 <link rel="apple-touch-icon" sizes="180x180" href="<?php echo esc_url( NOODLED_URL . 'assets/apple-touch-icon.png' ); ?>">
-<link rel="stylesheet" href="<?php echo esc_url( $noodled_asset( 'assets/css/noodled.css' ) ); ?>">
+<?php $noodled_css = esc_url( $noodled_asset( 'assets/css/noodled.css' ) ); ?>
+<!-- Critical shell CSS: paints the dark default + keeps the sr-only h1/skip-link hidden
+     during the brief window before the full (non-blocking) stylesheet applies. -->
+<style id="noodled-critical">
+:root{--accent:#0078d4}
+html,body{margin:0}
+body{background:#1e1e1e;color:#cccccc;height:100vh;overflow:hidden;display:flex;flex-direction:column;font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:absolute;left:8px;top:-48px;z-index:10001;background:var(--accent);color:#fff;padding:8px 14px;border-radius:0 0 6px 6px}
+.skip-link:focus{top:0}
+</style>
+<!-- Load the full stylesheet without blocking first paint; <noscript> covers no-JS. -->
+<link rel="preload" href="<?php echo $noodled_css; ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="<?php echo $noodled_css; ?>"></noscript>
 <?php $accent = Noodled_Settings::get_accent_color(); if ( $accent && $accent !== '#0078d4' ) : ?>
 <style>:root { --accent: <?php echo esc_attr( $accent ); ?>; --accent-hover: <?php echo esc_attr( $accent ); ?>cc; }</style>
 <?php endif; ?>
@@ -144,7 +158,7 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
     </div>
     <div class="pull-indicator" id="pullIndicator">&#8595; <?php esc_html_e( 'Pull to refresh', 'noodled' ); ?></div>
     <div class="note-list" id="noteList"></div>
-    <div class="note-count" id="noteCount">
+    <div class="note-count" id="noteCount" role="status" aria-live="polite">
       <button class="btn-icon" onclick="toggleBulkMode()" title="<?php esc_attr_e( 'Select multiple', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Select multiple notes', 'noodled' ); ?>" style="font-size:11px;float:right">&#9745;</button>
     </div>
     <div class="bulk-bar" id="bulkBar">

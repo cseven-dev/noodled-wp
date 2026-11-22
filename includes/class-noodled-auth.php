@@ -651,15 +651,22 @@ class Noodled_Auth {
 
 		// Token-only sign-in has no email to scope it, so it's brute-forceable —
 		// rate-limit by IP (the magic link and manual "Already have a PIN" both use this).
-		$rate_key = 'noodled_verify_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
-		$attempts = (int) get_transient( $rate_key );
-		if ( $attempts >= 10 ) {
+		// The per-IP cap alone is defeated by a botnet rotating IPs, so a site-wide
+		// failure cap also guards the 6-digit keyspace within a PIN's 15-min life.
+		// (Under a sustained distributed attack this email-less path degrades; the
+		// email+PIN and passkey sign-ins are unaffected fallbacks.)
+		$rate_key   = 'noodled_verify_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$global_key = 'noodled_verify_global';
+		$attempts   = (int) get_transient( $rate_key );
+		$global     = (int) get_transient( $global_key );
+		if ( $attempts >= 10 || $global >= 50 ) {
 			return new \WP_REST_Response( [ 'error' => __( 'Too many attempts. Try again in a few minutes.', 'noodled' ) ], 429 );
 		}
 		set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
 
 		$user = self::verify_token( $token );
 		if ( ! $user ) {
+			set_transient( $global_key, $global + 1, 15 * MINUTE_IN_SECONDS );
 			return new \WP_REST_Response( [ 'error' => __( 'Invalid or expired PIN', 'noodled' ) ], 401 );
 		}
 		if ( ( $user['role'] ?? '' ) === 'pending' ) {

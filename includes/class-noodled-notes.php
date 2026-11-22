@@ -491,4 +491,21 @@ class Noodled_Notes {
 		foreach ( $rows ?: [] as $r ) $out[] = [ 'id' => (int) $r['id'], 'body' => $r['body'] ?? '' ];
 		return $out;
 	}
+
+	// id+title+body for the AI "ask your notes" context, scoped exactly like
+	// search()/bodies() (never all users' notes). Newest first so the cap keeps
+	// the most recently-touched notes when the corpus is large.
+	public static function corpus( array $notebook_ids = [], array $extra_note_ids = [] ): array {
+		global $wpdb;
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$where    = "deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids))";
+		// Bounded: the AI context is capped at ~60KB in PHP anyway, so newest-first
+		// + LIMIT keeps worst-case memory flat on a large account with identical
+		// output for normal corpora.
+		$rows = $wpdb->get_results( "SELECT id, title, body FROM " . self::table() . " WHERE $where ORDER BY modified_at DESC LIMIT 400", ARRAY_A );
+		$out = [];
+		foreach ( $rows ?: [] as $r ) $out[] = [ 'id' => (int) $r['id'], 'title' => $r['title'] ?? '', 'body' => $r['body'] ?? '' ];
+		return $out;
+	}
 }

@@ -137,6 +137,14 @@ class Noodled_Settings {
 		// not ship the desktop .env that the env-var path reads.
 		if ( isset( $input['plaud_token'] ) ) $clean['plaud_token'] = sanitize_text_field( $input['plaud_token'] );
 
+		// AI assistant (summarize / ask your notes). BYO-key, server-side only.
+		if ( isset( $input['ai_provider'] ) ) {
+			$p = sanitize_key( $input['ai_provider'] );
+			$clean['ai_provider'] = in_array( $p, [ 'anthropic', 'openai', 'google' ], true ) ? $p : 'anthropic';
+		}
+		if ( isset( $input['ai_key'] ) )   $clean['ai_key']   = sanitize_text_field( $input['ai_key'] );
+		if ( isset( $input['ai_model'] ) ) $clean['ai_model'] = sanitize_text_field( $input['ai_model'] );
+
 		// Flush rewrite rules when path changes
 		if ( ( $old['app_path'] ?? 'noodled' ) !== ( $clean['app_path'] ?? 'noodled' ) ) {
 			delete_option( 'rewrite_rules' );
@@ -394,6 +402,29 @@ class Noodled_Settings {
 						<td>
 							<input type="text" id="noodled-gmaps-key" name="<?php echo self::$option_key; ?>[gmaps_key]" value="<?php echo esc_attr( $opts['gmaps_key'] ?? '' ); ?>" class="regular-text" placeholder="AIza...">
 							<p class="description"><?php esc_html_e( 'Only needed when Map is set to Google Maps (enable the Maps Embed API).', 'noodled' ); ?></p>
+						</td>
+					</tr>
+					<?php $ai_provider = $opts['ai_provider'] ?? 'anthropic'; ?>
+					<tr>
+						<th><label for="noodled-ai-provider"><?php esc_html_e( 'AI Assistant', 'noodled' ); ?></label></th>
+						<td>
+							<select id="noodled-ai-provider" name="<?php echo self::$option_key; ?>[ai_provider]">
+								<option value="anthropic" <?php selected( $ai_provider, 'anthropic' ); ?>><?php esc_html_e( 'Claude (Anthropic)', 'noodled' ); ?></option>
+								<option value="openai" <?php selected( $ai_provider, 'openai' ); ?>><?php esc_html_e( 'OpenAI (GPT)', 'noodled' ); ?></option>
+								<option value="google" <?php selected( $ai_provider, 'google' ); ?>><?php esc_html_e( 'Google Gemini', 'noodled' ); ?></option>
+							</select>
+							<p class="description"><?php esc_html_e( 'Powers in-app Summarize and Ask-your-notes. Bring your own API key; it is stored on the server and never sent to the browser. Locked (encrypted) notes are never sent to the AI. Leave the key blank to keep AI off.', 'noodled' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="noodled-ai-key"><?php esc_html_e( 'AI API Key', 'noodled' ); ?></label></th>
+						<td><input type="password" id="noodled-ai-key" name="<?php echo self::$option_key; ?>[ai_key]" value="<?php echo esc_attr( $opts['ai_key'] ?? '' ); ?>" class="regular-text" autocomplete="off"></td>
+					</tr>
+					<tr>
+						<th><label for="noodled-ai-model"><?php esc_html_e( 'AI Model', 'noodled' ); ?></label></th>
+						<td>
+							<input type="text" id="noodled-ai-model" name="<?php echo self::$option_key; ?>[ai_model]" value="<?php echo esc_attr( $opts['ai_model'] ?? '' ); ?>" class="regular-text" placeholder="claude-sonnet-4-6 / gpt-4o-mini / gemini-2.0-flash">
+							<p class="description"><?php esc_html_e( 'Optional. Leave blank to use a sensible default for the selected provider.', 'noodled' ); ?></p>
 						</td>
 					</tr>
 				</table>
