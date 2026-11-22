@@ -53,6 +53,21 @@
   --font-base:    13px;
   --font-md:      14px;
   --font-lg:      16px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-xl: 20px; --r-pill: 999px;
+  --modal-sm: 360px; --modal-md: 480px; --modal-lg: 640px; --modal-gutter: 16px;
+  --font-xl: 18px; --font-2xl: 22px;
+  --font-ui: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --measure: 720px; --tap-min: 44px;
+  --dur-fast: 120ms; --dur-base: 180ms; --dur-slow: 260ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --focus-color: #4da3ff; --focus-width: 2px; --focus-offset: 2px;
+  --accent-text: #4da3ff;
+  --toast-bg: #4ec96b; --toast-fg: #000000; --danger-bg: #c0392b; --danger-fg: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.3); --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 [data-theme="light"] {
   --bg:           #f5f5f5;
@@ -74,6 +89,8 @@
   --editor-border:#bbb;
   --bg-card:      #e8e8ec;
   --accent-glow:  rgba(0, 102, 187, 0.1);
+  --focus-color: #0058a3; --accent-text: #0058a3; --toast-bg: #1a7f37; --toast-fg: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.35); --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.12); --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.18);
 }
 
 /* ================================================================
@@ -370,7 +387,7 @@ body {
   overflow: hidden;
   background: var(--bg-content);
   height: 100%;
-  transition: opacity 0.2s;
+  transition: opacity var(--dur-slow) var(--ease-out);
 }
 
 .content-toolbar {
@@ -503,20 +520,20 @@ body {
   bottom: 16px;
   right: 16px;
   padding: 10px 18px;
-  background: var(--green);
-  color: #000;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
   opacity: 0;
   transform: translateY(12px);
-  transition: all 0.25s ease;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
   pointer-events: none;
   z-index: 200;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .toast.show { opacity: 1; transform: translateY(0); }
-.toast.error { background: var(--red); color: #fff; }
+.toast.error, .toast-item.error { background: var(--danger-bg); color: var(--danger-fg); }
 
 /* ── Toast stack: multiple toasts queue/stack instead of clobbering ── */
 #toastStack {
@@ -525,11 +542,11 @@ body {
   pointer-events: none;
 }
 .toast-item {
-  padding: 10px 18px; background: var(--green); color: #000;
+  padding: 10px 18px; background: var(--toast-bg); color: var(--toast-fg);
   border-radius: 8px; font-size: 13px; font-weight: 500; max-width: 80vw;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   opacity: 0; transform: translateY(12px);
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
 .toast-item.show { opacity: 1; transform: none; }
 @media (max-width: 768px) {
@@ -542,35 +559,40 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: fadeIn 0.15s ease;
+  animation: fadeIn var(--dur-fast) ease;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal {
   background: var(--bg-list);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: var(--r-lg);
+  padding: var(--sp-6);
   min-width: 0;
+  width: 100%;
   /* Never exceed the viewport (with box-sizing the padding is included), so
      modals can't get clipped at the screen edges on a phone. */
-  max-width: min(500px, 94vw);
+  max-width: min(var(--modal-md), calc(100vw - 2 * var(--modal-gutter)));
+  max-height: calc(100vh - 2 * var(--modal-gutter));
+  overflow-y: auto;
   box-sizing: border-box;
-  animation: slideUp 0.2s ease;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: slideUp var(--dur-base) var(--ease-out);
+  box-shadow: var(--shadow-2);
 }
+.modal.modal-sm { max-width: min(var(--modal-sm), calc(100vw - 2 * var(--modal-gutter))); }
+.modal.modal-lg { max-width: min(var(--modal-lg), calc(100vw - 2 * var(--modal-gutter))); }
 @media (max-width: 560px) {
-  .modal { padding: 18px 16px; max-width: 94vw; }
+  .modal { padding: var(--sp-4); }
 }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ── Captain's Log ── */
-.clog-modal { max-width: min(640px, 96vw); display: flex; flex-direction: column; max-height: 86vh; }
+.clog-modal { display: flex; flex-direction: column; max-height: 86vh; }
 .clog-title { font-size: 18px; }
 .clog-sub { font-size: 12.5px; color: var(--text-muted); font-style: italic; line-height: 1.5; margin: -6px 0 12px; }
 .clog-scroll { overflow-y: auto; padding-right: 4px; }
@@ -594,7 +616,7 @@ body {
   .clog-row { flex-direction: column; gap: 1px; }
 }
 
-.modal h3 { font-size: 16px; color: var(--text-bright); margin-bottom: 14px; }
+.modal h3 { font-size: var(--font-lg); color: var(--text-bright); margin-bottom: var(--sp-3); }
 .modal input {
   width: 100%;
   padding: 10px 12px;
@@ -615,7 +637,7 @@ body {
   width: auto; padding: 0; margin: 0; border: none; background: none; border-radius: 0;
   flex: 0 0 auto; box-shadow: none;
 }
-.modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: var(--sp-4); }
 
 /* ── Confirm dialog ── */
 .confirm-overlay {
@@ -633,7 +655,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  max-width: 340px;
+  max-width: min(var(--modal-sm), calc(100vw - 32px));
   text-align: center;
   animation: slideUp 0.2s ease;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
@@ -1208,7 +1230,7 @@ html.theme-switching * {
 .md-panel {
   position: fixed; inset: 0; z-index: 121; display: flex; flex-direction: column;
   background: var(--bg-content); color: var(--text);
-  animation: mdRise 0.26s cubic-bezier(.2,.9,.3,1.05);
+  animation: mdRise var(--dur-slow) var(--ease-out);
 }
 @media (min-width: 769px) {
   .md-panel {
@@ -1655,7 +1677,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   /* Sidebar: slide-in drawer with overlay */
   .col-notebooks {
     position: fixed; left: -260px; top: var(--tbh); bottom: 0; z-index: 60;
-    width: 260px; transition: left 0.25s ease;
+    width: 260px; transition: left var(--dur-slow) var(--ease-out);
     border-right: 1px solid var(--border);
     box-shadow: 4px 0 24px rgba(0,0,0,0.5);
   }
@@ -1690,7 +1712,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
     background: var(--bg-content);
     flex-direction: column;
     transform: translateX(100%);
-    transition: transform 0.25s ease;
+    transition: transform var(--dur-slow) var(--ease-out);
     display: flex;
   }
   .col-content.open { transform: translateX(0); }
@@ -1737,7 +1759,7 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   .col-notebooks .header { padding: 14px 16px 8px; font-size: 11px; }
 
   /* Modal: full width on small screens */
-  .modal { min-width: 0; width: calc(100vw - 32px); max-width: 400px; }
+  .modal { min-width: 0; }
   .modal input { padding: 12px 14px; font-size: 15px; }
   .confirm-box { width: calc(100vw - 48px); }
 
@@ -1967,26 +1989,33 @@ body.editor-narrow .content-body { max-width: 720px; margin-left: auto; margin-r
   @page { margin: 18mm; }
 }
 
+/* Generic keyboard focus ring for anything not styled below. The editor
+   surfaces opt out (the raw editor keeps its own inset ring below). */
+:focus-visible { outline: var(--focus-width) solid var(--focus-color); outline-offset: var(--focus-offset); }
+.rendered-content:focus-visible, .raw-markdown:focus-visible { outline: none; }
+
 /* ── Visible keyboard focus for custom controls (WCAG 2.4.7) ── */
-.raw-markdown:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.raw-markdown:focus { outline: var(--focus-width) solid var(--focus-color); outline-offset: -2px; }
 .btn:focus-visible, .btn-sm:focus-visible, .btn-icon:focus-visible,
 .nb-all:focus-visible, .nb-item:focus-visible, .note-item:focus-visible,
 .tag:focus-visible, .tag-chip:focus-visible, .gal-del:focus-visible,
 .bottom-nav-item:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px;
+  outline: var(--focus-width) solid var(--focus-color); outline-offset: var(--focus-offset); border-radius: 6px;
 }
 /* Menu items receive focus programmatically, so style :focus directly. */
 .ctx-item:focus, .dropdown-item:focus {
-  outline: 2px solid var(--accent); outline-offset: -2px; background: var(--bg-item-hover);
+  outline: var(--focus-width) solid var(--focus-color); outline-offset: -2px; background: var(--bg-item-hover);
 }
 
 /* Stronger, hue-independent focus ring for text fields (was border-colour only). */
 .search-box input:focus, .content-title-input:focus, .find-replace-bar input:focus, #qcInput:focus {
-  box-shadow: 0 0 0 2px var(--accent);
-  border-color: var(--accent);
+  box-shadow: 0 0 0 var(--focus-width) var(--focus-color);
+  border-color: var(--focus-color);
 }
 
 /* Screen-reader-only text + skip link (WCAG 1.3.1 / 2.4.1). */
 .sr-only { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .skip-link { position:absolute; left:8px; top:-48px; z-index:10001; background:var(--accent); color:#fff; padding:8px 14px; border-radius:0 0 6px 6px; transition:top .15s; }
 .skip-link:focus { top:0; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

@@ -354,7 +354,7 @@ function moveNotebookInto(name) {
   const el = document.getElementById('modalContainer');
   /* translators: %s is the notebook name */
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
-    <div class="modal" style="max-width:360px">
+    <div class="modal modal-sm">
       <h3>${esc(sprintf( __( 'Move "%s" into…', 'noodled' ), nb.label || nb.name ))}</h3>
       <select id="nbParentSel" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;margin-bottom:12px">${opts}</select>
       <div class="modal-buttons">
@@ -392,7 +392,7 @@ async function showShareDialog(nb) {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-      <div class="modal" style="min-width:380px">
+      <div class="modal modal-sm">
         <h3>${esc(sprintf( /* translators: %s is the notebook name */ __( 'Share "%s"', 'noodled' ), nb.name ))}</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${esc(__( 'Enter their email to grant access', 'noodled' ))}</p>
         <input id="shareEmail" placeholder="${escAttr(__( 'Email address', 'noodled' ))}" aria-label="${escAttr(__( 'Email address to share with', 'noodled' ))}" autofocus>
@@ -455,7 +455,7 @@ function showNoteShareDialog(noteId) {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-      <div class="modal" style="min-width:400px">
+      <div class="modal">
         <h3>${esc(sprintf( /* translators: %s is the note title */ __( 'Share "%s"', 'noodled' ), title ))}</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${esc(__( 'Give another noodled user access to just this note.', 'noodled' ))}</p>
         <div style="display:flex;gap:8px;align-items:center">
@@ -465,7 +465,7 @@ function showNoteShareDialog(noteId) {
         </div>
         <div id="nShareMsg" style="margin-top:8px;font-size:12px"></div>
         <div id="nShareList" style="margin-top:14px"></div>
-        <div class="modal-buttons" style="margin-top:14px">
+        <div class="modal-buttons">
           <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
         </div>
       </div>
@@ -546,10 +546,10 @@ function showWhatsNew(v) {
   /* translators: %s is the new version number */
   const title = sprintf( __( "What's new in v%s", 'noodled' ), v );
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wnTitle" style="max-width:520px">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wnTitle">
       <h3 id="wnTitle">${esc(title)}</h3>
       <div class="whats-new" style="max-height:60vh;overflow-y:auto;font-size:14px;line-height:1.5">${notes}</div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-accent" id="wnClose" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Got it', 'noodled' ))}</button>
       </div>
     </div></div>`;
@@ -582,7 +582,7 @@ function maybeOnboarding() {
     if (!el) return;
     localStorage.setItem('noodled_onboarded', '1');
     const brand = (typeof noodledConfig !== 'undefined' && noodledConfig.brandName) || 'noodled';
-    el.innerHTML = `<div class="modal-overlay"><div class="modal onboard" role="dialog" aria-modal="true" aria-labelledby="obTitle" style="max-width:440px">
+    el.innerHTML = `<div class="modal-overlay"><div class="modal onboard" role="dialog" aria-modal="true" aria-labelledby="obTitle">
       <h3 id="obTitle">${esc(sprintf( /* translators: %s is the app/brand name */ __( 'Welcome to %s 🍜', 'noodled' ), brand ))}</h3>
       <p style="font-size:13px;color:var(--text-muted);line-height:1.5">${esc(__( "A few places to know, then you're off:", 'noodled' ))}</p>
       <ul class="onboard-tips">
@@ -855,7 +855,7 @@ function noteDrop(e, notebookName) {
 function setNotebookColor(name) {
   const el = document.getElementById('modalContainer');
   const sw = nbColors.concat(['#64748b']).map(c => `<button class="nbc-sw" style="background:${c}" data-nb="${escAttr(name)}" data-color="${c}" onclick="applyNbColor(this.dataset.nb, this.dataset.color)" aria-label="${escAttr(c)}"></button>`).join('');
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Notebook color', 'noodled' ))}</h3><div class="nbc-grid">${sw}</div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" data-nb="${escAttr(name)}" onclick="applyNbColor(this.dataset.nb, '')">${esc(__( 'Reset', 'noodled' ))}</button><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Notebook color', 'noodled' ))}</h3><div class="nbc-grid">${sw}</div><div class="modal-buttons"><button class="btn btn-sm" data-nb="${escAttr(name)}" onclick="applyNbColor(this.dataset.nb, '')">${esc(__( 'Reset', 'noodled' ))}</button><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
 }
 function applyNbColor(name, color) {
   const nb = notebooks.find(n => n.name === name); if (nb) nb.color = color;
@@ -2019,6 +2019,17 @@ function closeMenuDashboard() {
 }
 function menuDashEsc(e) {
   if (e.key === 'Escape') { closeMenuDashboard(); return; }
+  // Keep Tab inside the panel (same trap as setupModalA11y).
+  if (e.key === 'Tab') {
+    const panel = document.querySelector('#menuDashboard .md-panel');
+    if (!panel) return;
+    const f = [...panel.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el => el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    return;
+  }
   // Arrow-key navigation between the (visible) option cards.
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
   const active = document.activeElement;
@@ -2137,14 +2148,14 @@ function promptPassphrase(mode) {
     const el = document.getElementById('modalContainer');
     if (!el) { resolve(null); return; }
     const create = mode === 'create';
-    el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:380px">
+    el.innerHTML = `<div class="modal-overlay"><div class="modal modal-sm">
       <h3>${esc(create ? __( 'Set a protection passphrase', 'noodled' ) : __( 'Enter passphrase', 'noodled' ))}</h3>
       ${create ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5">${esc(__( 'Locked notes are encrypted on your device. If you forget this passphrase, those notes cannot be recovered by anyone, including the site admin.', 'noodled' ))}</p>` : ''}
       ${create ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5">${esc(__( 'Earlier unlocked versions are removed from version history.', 'noodled' ))}</p>` : ''}
       <input type="password" id="ppass1" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Passphrase', 'noodled' ))}">
       ${create ? `<input type="password" id="ppass2" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Confirm passphrase', 'noodled' ))}">` : ''}
       <div id="pperr" style="color:#e11;font-size:12px;margin-top:6px;min-height:14px"></div>
-      <div class="modal-buttons" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" id="ppcancel">${esc(__( 'Cancel', 'noodled' ))}</button>
         <button class="btn btn-sm btn-accent" id="ppok">${esc(create ? __( 'Set', 'noodled' ) : __( 'Unlock', 'noodled' ))}</button>
       </div></div></div>`;
@@ -2207,7 +2218,7 @@ function buildClipBookmarklet(token, endpoint) {
 function showWebClipper() {
   const el = document.getElementById('modalContainer');
   if (!el) return;
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''"><div class="modal" style="max-width:480px"><h3>${esc(__( 'Web clipper', 'noodled' ))}</h3><p style="font-size:13px;color:var(--text-muted)">${esc(__( 'Loading…', 'noodled' ))}</p></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''"><div class="modal"><h3>${esc(__( 'Web clipper', 'noodled' ))}</h3><p style="font-size:13px;color:var(--text-muted)">${esc(__( 'Loading…', 'noodled' ))}</p></div></div>`;
   api.clip_setup().then(cfg => {
     const bm = buildClipBookmarklet(cfg.token, cfg.endpoint);
     const modal = el.querySelector('.modal');
@@ -2219,7 +2230,7 @@ function showWebClipper() {
       <p style="font-size:12px;color:var(--text-muted)">${esc(__( 'On mobile (no bookmarks bar), copy the code below and make a new bookmark with it as the address:', 'noodled' ))}</p>
       <textarea id="clipBmCode" readonly spellcheck="false" style="width:100%;height:64px;font-family:monospace;font-size:11px" onclick="this.select()"></textarea>
       <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">${esc(__( 'Want a desktop drop folder too? The same token powers the noodled_dropbox watcher — drop a file in the folder and it becomes a note. Run the watcher script on your computer and paste this token into its config.', 'noodled' ))}</p>
-      <div class="modal-buttons" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="regenClipToken()">${esc(__( 'Reset token', 'noodled' ))}</button>
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button>
       </div>`;
@@ -2313,7 +2324,7 @@ function showCaptainsLog() {
     `<div class="clog-row"><span class="clog-v">${esc(s.v)}</span><span class="clog-rt"><span class="clog-rdate">${esc(s.date)}</span> ${esc(s.text)}</span></div>`
   ).join('');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal clog-modal">
+    <div class="modal modal-lg clog-modal">
       <h3 class="clog-title">🚀🍜 ${esc(sprintf( /* translators: %s is the brand name */ __( "%s — Captain's Log", 'noodled' ), brand ))}</h3>
       <p class="clog-sub">${esc(sprintf( /* translators: %s is the version number */ __( "Captain's Log, Stardate %s. The voyage so far: 150-plus releases in under a fortnight, not one of them sober about ramen.", 'noodled' ), ver ))}</p>
       <div class="clog-scroll">
@@ -2323,7 +2334,7 @@ function showCaptainsLog() {
           <div class="clog-rows">${rows}</div>
         </details>
       </div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm btn-accent" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Engage', 'noodled' ))}</button>
       </div>
     </div>
@@ -2428,8 +2439,22 @@ function toggleEditorMenu() {
   document.getElementById('editorMenuBtn')?.setAttribute('aria-expanded', open ? 'true' : 'false');
   if (open) {
     armDropdownMenu(menu);
+    document.addEventListener('keydown', editorMenuKeydown, true);
     setTimeout(() => document.addEventListener('click', () => { menu.classList.remove('show'); document.getElementById('editorMenuBtn')?.setAttribute('aria-expanded', 'false'); }, { once: true }), 10);
+  } else {
+    document.removeEventListener('keydown', editorMenuKeydown, true);
   }
+}
+// Esc closes the editor menu and puts focus back on its button.
+function editorMenuKeydown(e) {
+  if (e.key !== 'Escape') return;
+  document.removeEventListener('keydown', editorMenuKeydown, true);
+  const menu = document.getElementById('editorMenu');
+  if (!menu || !menu.classList.contains('show')) return;
+  e.preventDefault(); e.stopPropagation();
+  menu.classList.remove('show');
+  const btn = document.getElementById('editorMenuBtn');
+  if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
 }
 
 async function deleteCurrentNote() {
@@ -2810,10 +2835,10 @@ function manageUsers() {
   const menu = document.getElementById('appMenu'); if (menu) menu.classList.remove('show');
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal mu-modal" style="max-width:min(540px,94vw)">
+    <div class="modal modal-lg mu-modal">
       <h3>${esc(__( 'People', 'noodled' ))}</h3>
       <div id="muBody" style="max-height:64vh;overflow:auto;margin-top:8px">${esc(__( 'Loading…', 'noodled' ))}</div>
-      <div class="modal-buttons" style="margin-top:12px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div></div>`;
@@ -2944,7 +2969,7 @@ function handleGlobalKey(e) {
 function showQuickOpen() {
   const el = document.getElementById('modalContainer');
   const allNotes = notes;
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal" style="min-width:400px"><h3>${esc(__( 'Quick Open', 'noodled' ))}</h3><input id="qoInput" placeholder="${escAttr(__( 'Type to search notes...', 'noodled' ))}" aria-label="${escAttr(__( 'Search notes to open', 'noodled' ))}" autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Quick Open', 'noodled' ))}</h3><input id="qoInput" placeholder="${escAttr(__( 'Type to search notes...', 'noodled' ))}" aria-label="${escAttr(__( 'Search notes to open', 'noodled' ))}" autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
   let qoHighlight = 0, qoResults = [];
   function qoFilter() {
     const q = document.getElementById('qoInput').value.toLowerCase();
@@ -2970,7 +2995,7 @@ function showQuickOpen() {
 // ── Shortcuts help ──
 function showShortcutsHelp() {
   const el = document.getElementById('modalContainer');
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Keyboard Shortcuts', 'noodled' ))}</h3><div class="shortcuts-grid"><kbd>Ctrl+N</kbd> <span>${esc(__( 'New note', 'noodled' ))}</span><kbd>Ctrl+S</kbd> <span>${esc(__( 'Force save', 'noodled' ))}</span><kbd>Ctrl+P</kbd> <span>${esc(__( 'Quick open', 'noodled' ))}</span><kbd>Ctrl+Shift+F</kbd> <span>${esc(__( 'Focus search', 'noodled' ))}</span><kbd>Ctrl+B</kbd> <span>${esc(__( 'Bold', 'noodled' ))}</span><kbd>Ctrl+I</kbd> <span>${esc(__( 'Italic', 'noodled' ))}</span><kbd>?</kbd> <span>${esc(__( 'This help', 'noodled' ))}</span></div><div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal modal-sm"><h3>${esc(__( 'Keyboard Shortcuts', 'noodled' ))}</h3><div class="shortcuts-grid"><kbd>Ctrl+N</kbd> <span>${esc(__( 'New note', 'noodled' ))}</span><kbd>Ctrl+S</kbd> <span>${esc(__( 'Force save', 'noodled' ))}</span><kbd>Ctrl+P</kbd> <span>${esc(__( 'Quick open', 'noodled' ))}</span><kbd>Ctrl+Shift+F</kbd> <span>${esc(__( 'Focus search', 'noodled' ))}</span><kbd>Ctrl+B</kbd> <span>${esc(__( 'Bold', 'noodled' ))}</span><kbd>Ctrl+I</kbd> <span>${esc(__( 'Italic', 'noodled' ))}</span><kbd>?</kbd> <span>${esc(__( 'This help', 'noodled' ))}</span></div><div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
 }
 
 // ── Markdown renderer ──
@@ -3182,7 +3207,7 @@ function setStatus(msg) {
 function showPrompt(title, label, defaultVal = '') {
   return new Promise(resolve => {
     const el = document.getElementById('modalContainer');
-    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal"><h3>${esc(title)}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${esc(label)}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">${esc(__( 'Cancel', 'noodled' ))}</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">${esc(__( 'OK', 'noodled' ))}</button></div></div></div>`;
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';resolve_modal(null);}"><div class="modal modal-sm"><h3>${esc(title)}</h3><label for="modalInput" style="font-size:12px;color:var(--text-muted)">${esc(label)}</label><input id="modalInput" value="${escAttr(defaultVal)}" autofocus><div class="modal-buttons"><button class="btn btn-sm" onclick="resolve_modal(null)">${esc(__( 'Cancel', 'noodled' ))}</button><button class="btn btn-sm btn-accent" onclick="resolve_modal(document.getElementById('modalInput').value)">${esc(__( 'OK', 'noodled' ))}</button></div></div></div>`;
     window.resolve_modal = (val) => { el.innerHTML = ''; resolve(val); };
     const inp = document.getElementById('modalInput');
     inp.focus();
@@ -3222,8 +3247,20 @@ function showConfirm(message, opts = {}) {
 }
 
 // ── Context menu ──
+// Esc closes the context menu and returns focus to what had it before.
+let _ctxReturnFocus = null;
+function ctxMenuKeydown(e) {
+  if (e.key !== 'Escape') return;
+  e.preventDefault(); e.stopPropagation();
+  const back = _ctxReturnFocus;
+  closeContextMenu();
+  if (back && typeof back.focus === 'function') { try { back.focus(); } catch (_) {} }
+}
+
 function showContextMenu(event, items) {
   closeContextMenu();
+  _ctxReturnFocus = document.activeElement;
+  document.addEventListener('keydown', ctxMenuKeydown, true);
   const el = document.getElementById('ctxContainer');
   const menu = document.createElement('div');
   menu.className = 'ctx-menu';
@@ -3246,7 +3283,11 @@ function showContextMenu(event, items) {
   document.addEventListener('click', closeContextMenu, { once: true });
 }
 
-function closeContextMenu() { document.getElementById('ctxContainer').innerHTML = ''; }
+function closeContextMenu() {
+  document.getElementById('ctxContainer').innerHTML = '';
+  document.removeEventListener('keydown', ctxMenuKeydown, true);
+  _ctxReturnFocus = null;
+}
 document.addEventListener('scroll', closeContextMenu, true);
 
 // ── Offline indicator ──
@@ -3698,7 +3739,7 @@ function createSmartNotebook() {
   const el = document.getElementById('modalContainer');
   const inStyle = 'width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;box-sizing:border-box';
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
-    <div class="modal" style="max-width:420px">
+    <div class="modal">
       <h3>${esc(__( 'New smart notebook', 'noodled' ))}</h3>
       <label for="snName" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'Name', 'noodled' ))}</label>
       <input id="snName" style="${inStyle};margin-bottom:10px" placeholder="${escAttr(__( 'e.g. Open tasks', 'noodled' ))}">
@@ -3790,7 +3831,7 @@ function renderGraph(nodes, edges, dropped) {
   const W = 800, H = 600;
   const el = document.getElementById('modalContainer');
   if (!nodes.length) {
-    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''"><div class="modal" style="max-width:380px"><h3>${esc(__( 'Link graph', 'noodled' ))}</h3><p style="font-size:13px;color:var(--text-muted)">${esc(__( 'No links between notes yet. Connect notes with [[wiki-links]] and they will appear here.', 'noodled' ))}</p><div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
+    el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''"><div class="modal modal-sm"><h3>${esc(__( 'Link graph', 'noodled' ))}</h3><p style="font-size:13px;color:var(--text-muted)">${esc(__( 'No links between notes yet. Connect notes with [[wiki-links]] and they will appear here.', 'noodled' ))}</p><div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div></div></div>`;
     return;
   }
   layoutGraph(nodes, edges, W, H);
@@ -3946,7 +3987,7 @@ async function showHistory() {
   };
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:500px">
+    <div class="modal">
       <h3>${esc(__( 'Note History', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
         ${history.map((h, i) => `<div class="history-item" role="button" tabindex="0" onclick="showHistoryDiff(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHistoryDiff(${i});}" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
@@ -3954,7 +3995,7 @@ async function showHistory() {
           <div style="font-size:11px;color:var(--text);margin-top:4px">${esc((h.body || '').substring(0, 100))}...</div>
         </div>`).join('')}
       </div>
-      <div class="modal-buttons" style="margin-top:12px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
@@ -4018,11 +4059,11 @@ function showHistoryDiff(index) {
     : `<div class="diff-line diff-ctx">${esc(__( 'No differences.', 'noodled' ))}</div>`;
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:560px">
+    <div class="modal modal-lg">
       <h3>${esc(__( 'Changes since this version', 'noodled' ))}</h3>
       <div style="font-size:12px;color:var(--text-muted);margin:-4px 0 10px">${relativeTime(h.time)} &middot; <span style="color:var(--green,#34d399)">+${adds}</span> / <span style="color:var(--red,#f87171)">&minus;${dels}</span></div>
       <div class="diff-view">${diffHtml}</div>
-      <div class="modal-buttons" style="margin-top:12px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="showHistory()">${esc(__( 'Back', 'noodled' ))}</button>
         <button class="btn btn-sm btn-accent" onclick="restoreHistory(${index})">${esc(__( 'Restore this version', 'noodled' ))}</button>
       </div>
@@ -4213,9 +4254,9 @@ async function bulkDelete() {
 function showNotebookPicker(title) {
   return new Promise(resolve => {
     const el = document.getElementById('modalContainer');
-    el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:360px"><h3>${esc(title)}</h3>
+    el.innerHTML = `<div class="modal-overlay"><div class="modal modal-sm"><h3>${esc(title)}</h3>
       <div style="max-height:300px;overflow-y:auto" id="nbPickList"></div>
-      <div class="modal-buttons" style="margin-top:12px"><button class="btn btn-sm" id="nbPickCancel">${esc(__( 'Cancel', 'noodled' ))}</button></div>
+      <div class="modal-buttons"><button class="btn btn-sm" id="nbPickCancel">${esc(__( 'Cancel', 'noodled' ))}</button></div>
     </div></div>`;
     const done = v => { el.innerHTML = ''; resolve(v); };
     const list = el.querySelector('#nbPickList');
@@ -4325,11 +4366,11 @@ async function showTagCloud() {
   if (!tags.length) { showToast(__( 'No tags found', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>${esc(__( 'Tags', 'noodled' ))}</h3>
+    <div class="modal modal-sm"><h3>${esc(__( 'Tags', 'noodled' ))}</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:300px;overflow-y:auto">
         ${tags.map(t => `<span class="tag-chip" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the tag name */ __( 'Filter by tag %s', 'noodled' ), t ))}" onclick="document.getElementById('modalContainer').innerHTML=''; document.getElementById('searchInput').value='#${t}'; onSearch();">#${esc(t)}</span>`).join('')}
       </div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
@@ -4348,11 +4389,11 @@ function showTemplates() {
   const templates = config.templates || defaultTemplates;
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>${esc(__( 'New from Template', 'noodled' ))}</h3>
+    <div class="modal modal-sm"><h3>${esc(__( 'New from Template', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
         ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the template name */ __( 'Create note from %s template', 'noodled' ), t.name ))}" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="${escAttr(__( 'Delete template', 'noodled' ))}" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
       </div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
@@ -4412,14 +4453,14 @@ function updateFocusDisplay() {
 function showFocusOptions() {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>${esc(__( 'Focus Timer', 'noodled' ))}</h3>
+    <div class="modal modal-sm"><h3>${esc(__( 'Focus Timer', 'noodled' ))}</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(15)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 15 ))}</button>
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(25)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 25 ))}</button>
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(45)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 45 ))}</button>
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''; startFocusTimer(60)">${esc(sprintf( /* translators: %d is the number of minutes */ __( '%d min', 'noodled' ), 60 ))}</button>
       </div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
@@ -4466,7 +4507,7 @@ async function showLinkGraph() {
 
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:500px"><h3>${esc(__( 'Note Links', 'noodled' ))}</h3>
+    <div class="modal"><h3>${esc(__( 'Note Links', 'noodled' ))}</h3>
       <div style="max-height:350px;overflow-y:auto;font-size:13px">
         ${connected.length ? connected.map(([title, targets]) =>
           `<div style="margin-bottom:12px"><strong>${esc(title)}</strong><div style="padding-left:16px;color:var(--text-muted)">${targets.map(t => {
@@ -4476,7 +4517,7 @@ async function showLinkGraph() {
         ).join('') : '<div style="color:var(--text-muted)">' + esc(__( 'No wiki-links found. Use [[Note Title]] to link notes.', 'noodled' )) + '</div>'}
         ${orphans.length ? `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px"><div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">${esc(sprintf( /* translators: %d is the number of unlinked notes */ _n( '%d unlinked note', '%d unlinked notes', orphans.length, 'noodled' ), orphans.length ))}</div></div>` : ''}
       </div>
-      <div class="modal-buttons" style="margin-top:12px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
@@ -4494,7 +4535,7 @@ function showColorPicker(noteId) {
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         ${noteColors.map((c, i) => `<div role="button" tabindex="0" aria-label="${escAttr(noteColorNames[i])}" onclick="setNoteColor(${noteId},'${c}');document.getElementById('modalContainer').innerHTML='';" style="width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid var(--border);${c ? 'background:' + c : 'background:var(--bg-input)'}" title="${escAttr(noteColorNames[i])}"></div>`).join('')}
       </div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
@@ -4594,7 +4635,7 @@ function renderCalendar(days) {
   }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
-    <div class="modal cal-modal" style="max-width:340px">
+    <div class="modal modal-sm cal-modal">
       <div class="cal-nav">
         <button class="btn btn-sm" onclick="calShift(-1)" aria-label="${escAttr(__( 'Previous month', 'noodled' ))}"><span aria-hidden="true">&lsaquo;</span></button>
         <h3 style="margin:0;font-size:15px">${esc(monthLabel)}</h3>
@@ -4603,7 +4644,7 @@ function renderCalendar(days) {
       <div style="font-size:11px;color:var(--text-muted);text-align:center;margin:-2px 0 8px">${esc(__( 'Tap a day to open its journal. Dots mark days with notes.', 'noodled' ))}</div>
       <div class="cal-grid cal-dow">${dowHeaders}</div>
       <div class="cal-grid">${cells}</div>
-      <div class="modal-buttons" style="margin-top:10px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
         <button class="btn btn-sm btn-accent" onclick="document.getElementById('modalContainer').innerHTML='';openDailyJournal()">${esc(__( "Today's journal", 'noodled' ))}</button>
       </div>
@@ -4826,11 +4867,11 @@ function showTOC() {
   if (!headings.length) { showToast(__( 'No headings found', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal"><h3>${esc(__( 'Table of Contents', 'noodled' ))}</h3>
+    <div class="modal modal-sm"><h3>${esc(__( 'Table of Contents', 'noodled' ))}</h3>
       <div style="max-height:350px;overflow-y:auto">
         ${headings.map(h => `<div class="toc-item" role="button" tabindex="0" style="padding-left:${(h.level - 1) * 16}px" onclick="jumpToHeading(${h.line});document.getElementById('modalContainer').innerHTML='';">${esc(h.text)}</div>`).join('')}
       </div>
-      <div class="modal-buttons" style="margin-top:12px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
@@ -4885,7 +4926,7 @@ async function unshareNoteLink(noteId) {
 function aiModalShell(titleText, innerHtml) {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:560px">
+    <div class="modal modal-lg">
       <h3><span aria-hidden="true">&#10024;</span> ${esc(titleText)}</h3>
       <div id="aiModalBody" aria-live="polite">${innerHtml}</div>
       <div style="margin-top:16px;text-align:right"><button class="btn" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>
@@ -4998,14 +5039,14 @@ function openMapNav(lat, lng) {
     `<a class="map-nav-app" href="${href}" target="_blank" rel="noopener noreferrer" onclick="closeMapNav()"><span class="mn-icon" aria-hidden="true">${icon}</span>${esc(label)}</a>`;
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){closeMapNav();}">
-    <div class="modal map-nav-modal">
+    <div class="modal modal-sm map-nav-modal">
       <h3>${esc(__( 'Open in…', 'noodled' ))}</h3>
       <div class="map-nav-list">
         ${app(apple,  '🍎', __( 'Apple Maps', 'noodled' ))}
         ${app(google, '🗺️', __( 'Google Maps', 'noodled' ))}
         ${app(waze,   '🚗', __( 'Waze', 'noodled' ))}
       </div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="closeMapNav()">${esc(__( 'Cancel', 'noodled' ))}</button>
       </div>
     </div>
@@ -5076,7 +5117,7 @@ async function showStats() {
 
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:450px"><h3>${esc(__( 'Statistics', 'noodled' ))}</h3>
+    <div class="modal"><h3>${esc(__( 'Statistics', 'noodled' ))}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="stat-card"><div class="stat-num">${totalNotes}</div><div class="stat-label">${esc(__( 'Notes', 'noodled' ))}</div></div>
         <div class="stat-card"><div class="stat-num">${totalWords.toLocaleString()}</div><div class="stat-label">${esc(__( 'Words', 'noodled' ))}</div></div>
@@ -5087,7 +5128,7 @@ async function showStats() {
       ${Object.entries(nbCounts).map(([name, count]) => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>${esc(name)}</span><span style="color:var(--text-muted)">${count}</span></div>`).join('')}
       <div style="font-size:12px;color:var(--text-muted);margin:12px 0 6px">${esc(__( 'Activity (14 days)', 'noodled' ))}</div>
       <div style="display:flex;gap:3px;flex-wrap:wrap">${heatmap}</div>
-      <div class="modal-buttons" style="margin-top:14px">
+      <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
       </div>
     </div>
@@ -5760,10 +5801,10 @@ function showConflict(server, mine) {
   if (sameContent(server, mine)) { adoptMtime(server); return; }
   _conflictOpen = true;
   const el = document.getElementById('modalContainer');
-  el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:460px">
+  el.innerHTML = `<div class="modal-overlay"><div class="modal">
     <h3>${esc(__( 'This note changed elsewhere', 'noodled' ))}</h3>
     <p style="font-size:13px;color:var(--text-muted);line-height:1.5">${sprintf( /* translators: %s is the note title */ __( 'Another device or tab saved "%s" after you opened it. Which version do you want to keep?', 'noodled' ), '<b>' + esc(server.title || '') + '</b>' )}</p>
-    <div class="modal-buttons" style="flex-wrap:wrap">
+    <div style="flex-wrap:wrap" class="modal-buttons">
       <button class="btn btn-sm" id="cfTheirs">${esc(__( 'Load theirs', 'noodled' ))}</button>
       <button class="btn btn-sm" id="cfBoth">${esc(__( 'Keep both', 'noodled' ))}</button>
       <button class="btn btn-sm btn-accent" id="cfMine">${esc(__( 'Keep mine', 'noodled' ))}</button>
@@ -6208,14 +6249,14 @@ function showReadingPrefs() {
   const p = (config.editor_prefs = config.editor_prefs || {});
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="min-width:320px"><h3>${esc(__( 'Reading preferences', 'noodled' ))}</h3>
+    <div class="modal modal-sm"><h3>${esc(__( 'Reading preferences', 'noodled' ))}</h3>
       <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">${esc(__( 'Font size', 'noodled' ))}</label>
       <input type="range" id="rpSize" aria-label="${escAttr(__( 'Font size', 'noodled' ))}" min="13" max="22" step="1" value="${p.size || 16}" style="width:100%">
       <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">${esc(__( 'Line height', 'noodled' ))}</label>
       <input type="range" id="rpLh" aria-label="${escAttr(__( 'Line height', 'noodled' ))}" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
       <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> ${esc(__( 'Serif body font', 'noodled' ))}</label>
       <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpNarrow" ${p.narrow ? 'checked' : ''}> ${esc(__( 'Narrow reading column', 'noodled' ))}</label>
-      <div class="modal-buttons" style="margin-top:16px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button></div>
+      <div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button></div>
     </div></div>`;
   const upd = () => {
     p.size = +document.getElementById('rpSize').value;
@@ -6237,14 +6278,14 @@ function manageTags() {
   notes.forEach(n => ((n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []).forEach(t => { const k = t.trim().slice(1); counts[k] = (counts[k] || 0) + 1; }));
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="min-width:360px"><h3>${esc(__( 'Manage tags', 'noodled' ))}</h3>
+    <div class="modal modal-sm"><h3>${esc(__( 'Manage tags', 'noodled' ))}</h3>
       <div style="max-height:50vh;overflow:auto">${tags.length ? tags.map(t => `
         <div class="mt-row" style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)">
           <span style="flex:1">#${esc(t)} <span style="color:var(--text-muted);font-size:11px">${counts[t] || 0}</span></span>
           <button class="btn btn-sm" onclick="renameTag('${esc(t)}')">${esc(__( 'Rename', 'noodled' ))}</button>
           <button class="btn btn-sm" style="color:var(--red)" onclick="deleteTag('${esc(t)}')">${esc(__( 'Delete', 'noodled' ))}</button>
         </div>`).join('') : '<p style="color:var(--text-muted);font-size:13px">' + esc(__( 'No tags yet.', 'noodled' )) + '</p>'}</div>
-      <div class="modal-buttons" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>
+      <div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>
     </div></div>`;
 }
 function _tagRe(tag) { return new RegExp('(^|\\s)#' + tag.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&') + '(?![\\w-])', 'g'); }
