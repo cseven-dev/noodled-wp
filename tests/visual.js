@@ -203,8 +203,8 @@ function handleApi(route, req, theme) {
   return json({});
 }
 
-function renderTemplate() {
-  return execFileSync(PHP, [path.join(__dirname, 'visual-render.php'), ORIGIN], { encoding: 'utf8' });
+function renderTemplate(which = 'app') {
+  return execFileSync(PHP, [path.join(__dirname, 'visual-render.php'), ORIGIN, which], { encoding: 'utf8' });
 }
 
 const MIME = { '.js': 'application/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2' };
@@ -330,6 +330,41 @@ async function main() {
       }
       const actual = await page.evaluate(() => document.documentElement.getAttribute('data-theme')).catch(() => '?');
       if (actual !== theme) problems.push(where + ': data-theme is "' + actual + '"');
+      for (const e of new Set(errors)) problems.push(where + ': console ' + e);
+      await context.close();
+    }
+  }
+  // The PIN login page (templates/login.php): follows the OS colour scheme, not data-theme.
+  const loginHtml = renderTemplate('login');
+  for (const phone of [false, true]) {
+    for (const scheme of ['dark', 'light']) {
+      const where = 'login-' + (phone ? 'phone' : 'desktop') + '/' + scheme;
+      const context = await browser.newContext({
+        ...(phone ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }),
+        colorScheme: scheme,
+      });
+      await context.route('**/*', (route) => {
+        const u = new URL(route.request().url());
+        if (u.origin !== ORIGIN) { blocked.add(u.origin); return route.abort(); }
+        if (u.pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: loginHtml });
+        if (u.pathname.startsWith(PLUGIN)) {
+          const file = path.join(ROOT, u.pathname.slice(PLUGIN.length));
+          if (!file.startsWith(ROOT) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: '' });
+          return route.fulfill({ contentType: MIME[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
+        }
+        blocked.add(u.origin + u.pathname);
+        return route.abort();
+      });
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+      page.on('console', msg => { if (msg.type() === 'error' || msg.type() === 'warning') errors.push(msg.type() + ': ' + msg.text()); });
+      try {
+        await page.goto(ORIGIN + '/');
+        await page.waitForSelector('.login-card');
+        await page.evaluate(() => document.fonts.ready);
+        await shot(page, `login-${phone ? 'phone' : 'desktop'}-${scheme}`);
+      } catch (e) { problems.push(where + ': ' + e.message.split('\n')[0]); }
       for (const e of new Set(errors)) problems.push(where + ': console ' + e);
       await context.close();
     }

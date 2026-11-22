@@ -2161,7 +2161,7 @@ function promptPassphrase(mode) {
       ${create ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5">${esc(__( 'Earlier unlocked versions are removed from version history.', 'noodled' ))}</p>` : ''}
       <input type="password" id="ppass1" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Passphrase', 'noodled' ))}">
       ${create ? `<input type="password" id="ppass2" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Confirm passphrase', 'noodled' ))}">` : ''}
-      <div id="pperr" style="color:#e11;font-size:12px;margin-top:6px;min-height:14px"></div>
+      <div id="pperr" style="color:var(--red);font-size:12px;margin-top:6px;min-height:14px"></div>
       <div class="modal-buttons">
         <button class="btn btn-sm" id="ppcancel">${esc(__( 'Cancel', 'noodled' ))}</button>
         <button class="btn btn-sm btn-accent" id="ppok">${esc(create ? __( 'Set', 'noodled' ) : __( 'Unlock', 'noodled' ))}</button>
@@ -4955,7 +4955,7 @@ function aiThinkingHtml() {
   return `<p style="color:var(--text-muted)">${esc(__( 'Thinking…', 'noodled' ))}</p>`;
 }
 function aiErrorHtml(msg) {
-  return `<p style="color:#e06c75">${esc(msg)}</p>`;
+  return `<p style="color:var(--red)">${esc(msg)}</p>`;
 }
 function aiResultHtml(text) {
   return `<div class="rendered-content" style="max-height:55vh;overflow:auto">${renderMarkdown(text)}</div>`;

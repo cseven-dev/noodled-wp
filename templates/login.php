@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></title>
 <meta name="theme-color" content="#111113">
@@ -25,6 +25,32 @@
   --border: #2a2a35;
   --green: #34d399;
   --red: #f87171;
+  --r-md: 8px;
+  --r-lg: 12px;
+}
+/* Light variant: the app's light-theme colours. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f5f5;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+    --text: #222222;
+    --text-muted: #5c5c5c;
+    --text-bright: #000000;
+    --accent-hover: #005fa3;
+    --accent-glow: rgba(0, 102, 187, 0.1);
+    --border: #cccccc;
+    --green: #1a7f37;
+    --red: #c0392b;
+  }
+}
+/* Fraunces wordmark, self-hosted like the app (assets/css/noodled.css). */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(<?php echo esc_url( NOODLED_URL . 'assets/fonts/fraunces-latin.woff2' ); ?>) format('woff2');
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -69,10 +95,11 @@ body::before {
 }
 
 .brand-logo {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
   font-size: 56px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-bright);
-  letter-spacing: -2.5px;
+  letter-spacing: -1.5px;
   line-height: 1;
   margin-bottom: 12px;
 }
@@ -91,7 +118,7 @@ body::before {
 .login-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 36px;
   width: 380px;
   max-width: 90vw;
@@ -115,7 +142,7 @@ body::before {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--bg-input);
   color: var(--text-bright);
   font-size: 14px;
@@ -135,7 +162,7 @@ body::before {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--accent);
   color: #fff;
   font-size: 14px;

@@ -13,7 +13,7 @@ $noodled_icon = function ( $n ) { return '<svg class="ic" aria-hidden="true" foc
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title><?php echo esc_html( Noodled_Settings::get_brand_name() ); ?></title>
 <meta name="theme-color" content="#111113">

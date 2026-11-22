@@ -296,13 +296,14 @@ class Noodled_App {
 <style>
 .n-login-overlay{display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center}
 .n-login-overlay.show{display:flex}
-.n-login-box{background:#1a1a1f;border:1px solid #2a2a35;border-radius:16px;padding:36px;width:380px;max-width:90vw;color:#b0b0b8}
+.n-login-box{background:#1a1a1f;border:1px solid #2a2a35;border-radius:12px;padding:36px;width:380px;max-width:90vw;color:#b0b0b8}
 .n-login-box h3{color:#e8e8ef;margin:0 0 4px;font-size:16px}
 .n-login-box .sub{color:#b9b9c6;font-size:12px;margin-bottom:20px}
-.n-login-input{width:100%;padding:12px 16px;border:1px solid #2a2a35;border-radius:10px;background:#252530;color:#e8e8ef;font-size:16px;outline:none;margin-bottom:10px;box-sizing:border-box}
+.n-login-input{width:100%;padding:12px 16px;border:1px solid #2a2a35;border-radius:8px;background:#252530;color:#e8e8ef;font-size:16px;outline:none;margin-bottom:10px;box-sizing:border-box}
 .n-login-input:focus{border-color:{$accent};box-shadow:0 0 0 3px rgba(0,120,212,0.15)}
-.n-login-btn{width:100%;padding:12px;border:none;border-radius:10px;background:{$accent};color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.n-login-btn{width:100%;padding:12px;border:none;border-radius:8px;background:{$accent};color:#fff;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.2px;transition:filter 0.15s,transform 0.1s}
 .n-login-btn:hover{filter:brightness(1.1)}
+.n-login-btn:active{transform:scale(0.98)}
 .n-login-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .n-login-btn:disabled{opacity:0.5}
 .n-login-msg{margin-top:12px;font-size:13px;text-align:center;min-height:20px}
@@ -377,7 +378,7 @@ HTML;
 <!-- Noodled "Get a noodle" — inline form styles -->
 <style>
 .ngn-form{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;max-width:540px;margin:0 auto}
-.ngn-input{flex:1 1 180px;min-width:0;padding:13px 16px;border:1px solid rgba(0,0,0,0.16);border-radius:10px;background:#fff;color:#1A1A1A;font-size:16px;font-family:inherit;outline:none}
+.ngn-input{flex:1 1 180px;min-width:0;padding:13px 16px;border:1px solid rgba(0,0,0,0.16);border-radius:8px;background:#fff;color:#1A1A1A;font-size:16px;font-family:inherit;outline:none}
 .ngn-input::placeholder{color:#767676}
 .ngn-input:focus{border-color:{$accent};box-shadow:0 0 0 3px rgba(0,120,212,0.16)}
 .ngn-form .btn{flex:0 0 auto}
