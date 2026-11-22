@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>noodled round-trip harness</title>
+</head>
+<body>
+<!-- Minimal stand-in for templates/app.php: only the element ids the app script
+     touches at boot and while opening a note. Served by tests/roundtrip.test.js. -->
+<div class="splash" id="splash"></div>
+<div id="offlineBanner"></div>
+<input type="file" id="filesInput" style="display:none">
+<input type="file" id="enexImportInput" style="display:none">
+<div id="focusTimer"><span id="focusTime">25:00</span></div>
+<span id="status"></span>
+<div id="syncPill"></div>
+<button id="newNoteBtn"></button><button id="addFilesBtn"></button>
+<button id="syncPullBtn"></button><button id="plaudSyncBtn"></button>
+<button id="appMenuBtn"></button><button id="themeBtn"></button>
+<div id="nbAll"></div><div id="nbList"></div><div id="smartList"></div>
+<div id="nbTasks"><span id="taskCount"></span></div>
+<div id="nbCalendar"></div><div id="nbGraph"></div><div id="nbStarred"></div>
+<div id="nbTrash"><span id="trashCount">0</span></div>
+<input type="text" id="searchInput"><button id="searchClear" hidden></button>
+<button id="searchScopeBtn"></button><button id="sortBtn"></button>
+<div id="listFilters"><button id="fcAtt"></button><button id="fcTasks"></button></div>
+<div id="pullIndicator"></div>
+<div id="noteList"></div>
+<div id="noteCount"></div>
+<div id="bulkBar"><span id="bulkCount">0</span></div>
+<main id="colContent"><div id="emptyState"></div></main>
+<nav id="bottomNav"><button id="quickAddBtn"></button></nav>
+<div id="splitView"></div>
+<div id="quickCapture"><input type="text" id="qcInput"></div>
+<div id="sidebarOverlay"></div>
+<div id="toast"></div>
+<div id="modalContainer"></div>
+<div id="ctxContainer"></div>
+<input type="file" id="quickFilesInput" style="display:none">
+<div id="quickAddContainer"></div>
+<div id="menuDashboard"></div>
+<script>
+// Same shape as the config object and wp.i18n floor shim in templates/app.php.
+const noodledConfig = { apiBase: '/wp-json/noodled/v1', nonce: 'test', version: 'test', brandName: 'noodled', aiEnabled: false, appUrl: '/', user: {}, map: {} };
+window.wp = window.wp || {};
+window.wp.i18n = window.wp.i18n || {
+  __: (t) => t, _x: (t) => t, _n: (s, p, n) => (n === 1 ? s : p), _nx: (s, p, n) => (n === 1 ? s : p),
+  sprintf: (f, ...a) => { let i = 0; return String(f).replace(/%(\d+\$)?[sd]/g, () => a[i++]); },
+  setLocaleData: () => {}, isRTL: () => false
+};
+window.__pageErrors = [];
+window.addEventListener('error', e => window.__pageErrors.push(String(e.message)));
+window.addEventListener('unhandledrejection', e => window.__pageErrors.push('unhandled rejection: ' + String(e.reason && e.reason.message || e.reason)));
+</script>
+<script defer src="/noodled.js"></script>
+</body>
+</html>
