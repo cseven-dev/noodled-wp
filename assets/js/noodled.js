@@ -1853,7 +1853,7 @@ function handleContentKey(e) {
         lineText = anchor.textContent || '';
         replaceNode = anchor;
       }
-      const m = lineText.match(/^(\d+)\.\s+(.+)$/);
+      const m = lineText.match(/^(\d{1,3})\.\s+(.+)$/);
       if (m && replaceNode) {
         e.preventDefault();
         const startNum = parseInt(m[1], 10) || 1;
@@ -2539,7 +2539,16 @@ function htmlToMarkdown(el) {
       return;
     }
     if (tag === 'PRE') { lines.push('```'); lines.push(node.textContent); lines.push('```'); return; }
-    if (tag === 'UL' || tag === 'OL') { listToMd(node, ''); return; }
+    if (tag === 'UL' || tag === 'OL') {
+      // Two lists of the same kind stay separate: keep a blank line between them
+      // (adjacent same-kind list lines are merged into one list on render).
+      const listKind = el => el.nodeName === 'OL' ? 'ol' : el.nodeName === 'UL' ? (el.classList.contains('checklist') ? 'check' : 'ul') : '';
+      let prev = node.previousSibling;
+      while (prev && prev.nodeType === 3 && !prev.textContent.trim()) prev = prev.previousSibling;
+      if (prev && listKind(prev) && listKind(prev) === listKind(node) && lines.length && lines[lines.length - 1] !== '') lines.push('');
+      listToMd(node, '');
+      return;
+    }
     if (tag === 'P') { lines.push(inlineHtmlToMd(node)); return; }
     if (tag === 'IMG') { lines.push(`![${node.getAttribute('alt') || ''}](${node.getAttribute('src') || ''})`); return; }
     if (tag === 'TABLE') { tableToMd(node); return; }
@@ -2549,6 +2558,7 @@ function htmlToMarkdown(el) {
   // were flattened to plain text by textContent) and nested lists (2-space indent).
   function listToMd(node, indent) {
     const isChecklist = node.classList.contains('checklist');
+    const bullet = node.getAttribute('data-bullet') || '-';
     const start = parseInt(node.getAttribute('start'), 10);
     let num = isNaN(start) ? 1 : start;
     for (const li of node.children) {
@@ -2561,9 +2571,9 @@ function htmlToMarkdown(el) {
       const inline = inlineHtmlToMd(clone).replace(/\n/g, ' ').trim();
       if (isChecklist) {
         const cb = li.querySelector('input[type="checkbox"]');
-        lines.push(`${indent}- [${cb && cb.checked ? 'x' : ' '}] ${inline}`);
+        lines.push(`${indent}${bullet} [${cb && cb.checked ? 'x' : ' '}] ${inline}`);
       } else if (node.nodeName === 'OL') { lines.push(`${indent}${num}. ${inline}`); num++; }
-      else lines.push(`${indent}- ${inline}`);
+      else lines.push(`${indent}${bullet} ${inline}`);
       nested.forEach(n2 => listToMd(n2, indent + '  '));
     }
   }
@@ -2883,9 +2893,9 @@ async function toggleCheck(checkIndex) {
     const lines = (activeNote.body || '').split('\n');
     let count = 0;
     for (let i = 0; i < lines.length; i++) {
-      if (/^-\s+\[[ xX]\]/.test(lines[i].trim())) {
+      if (/^\s*[-*+]\s+\[[ xX]\]/.test(lines[i])) {
         if (count === checkIndex) {
-          lines[i] = /- \[ \]/.test(lines[i]) ? lines[i].replace('- [ ]', '- [x]') : lines[i].replace(/- \[[xX]\]/, '- [ ]');
+          lines[i] = /^\s*[-*+]\s+\[ \]/.test(lines[i]) ? lines[i].replace(/^(\s*[-*+]\s+)\[ \]/, '$1[x]') : lines[i].replace(/^(\s*[-*+]\s+)\[[xX]\]/, '$1[ ]');
           break;
         }
         count++;
@@ -2970,13 +2980,14 @@ function renderMarkdown(text) {
   // Put the list at the right nesting level for an item indented by `indent`
   // columns (tab = 4), opening/closing levels as needed. Deeper than the current
   // level = child of the previous item (any amount: 2 spaces, 4 spaces or a tab).
-  function openListLevel(type, indent, start) {
+  function openListLevel(type, indent, start, marker) {
     while (listStack.length > 1 && indent < listStack[listStack.length - 1].indent) { const l = listStack.pop(); out.push(listCloseTag(l.type) + '</li>'); }
     const top = listStack[listStack.length - 1];
     if (top && indent > top.indent) out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, '');
     else if (top && top.type === type) return;
     else if (top) { listStack.pop(); out.push(listCloseTag(top.type)); }
-    out.push(type === 'check' ? '<ul class="checklist">' : (type === 'ol' && start !== 1) ? `<ol start="${start}">` : `<${type}>`);
+    const bulletAttr = type !== 'ol' && marker && marker !== '-' ? ` data-bullet="${marker}"` : '';
+    out.push(type === 'check' ? `<ul class="checklist"${bulletAttr}>` : (type === 'ol' && start !== 1) ? `<ol start="${start}">` : `<${type}${bulletAttr}>`);
     listStack.push({ type, indent });
   }
   function escLine(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -3019,26 +3030,26 @@ function renderMarkdown(text) {
     if (inCodeBlock) { codeBuffer.push(raw); continue; }
     const trimmed = raw.trim();
     if (trimmed === '') { closeList(); out.push('<br>'); continue; }
-    if (/^-{3,}$/.test(trimmed) || /^\*{3,}$/.test(trimmed)) { closeList(); out.push('<hr>'); continue; }
+    if (/^-{3,}$/.test(trimmed) || /^\*{3,}$/.test(trimmed) || /^\*(\s*\*){2,}$/.test(trimmed)) { closeList(); out.push('<hr>'); continue; }
     const hMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
     if (hMatch) { closeList(); out.push(`<h${hMatch[1].length}>${inlineFormat(escLine(hMatch[2]))}</h${hMatch[1].length}>`); continue; }
     const listIndent = raw.match(/^[ \t]*/)[0].replace(/\t/g, '    ').length;
-    const checkMatch = trimmed.match(/^-\s+\[([ xX])\]\s*(.*)$/);
+    const checkMatch = trimmed.match(/^([-*+])\s+\[([ xX])\]\s*(.*)$/);
     if (checkMatch) {
-      openListLevel('check', listIndent, 1);
-      const checked = checkMatch[1].toLowerCase() === 'x';
+      openListLevel('check', listIndent, 1, checkMatch[1]);
+      const checked = checkMatch[2].toLowerCase() === 'x';
       const checkIdx = out.filter(l => l.includes('type="checkbox"')).length;
       // preventDefault stops the browser's native toggle so toggleCheck() is the
       // single source of truth — otherwise the native flip + the markdown flip
       // cancel out and the change never persists.
       // Let the checkbox flip natively; toggleCheck just serializes the new DOM
       // state. (No preventDefault + no markdown re-toggle = no double-toggle.)
-      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[2].trim() || __( 'Checklist item', 'noodled' ))}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[2]))}</span></li>`);
+      out.push(`<li><input type="checkbox" ${checked ? 'checked' : ''} aria-label="${escAttr(checkMatch[3].trim() || __( 'Checklist item', 'noodled' ))}" contenteditable="false" onmousedown="event.stopPropagation(); event.stopImmediatePropagation();" onclick="event.stopPropagation(); toggleCheck(${checkIdx})"><span class="${checked ? 'check-done' : ''}">${inlineFormat(escLine(checkMatch[3]))}</span></li>`);
       continue;
     }
-    const bulletMatch = trimmed.match(/^-\s+(.+)$/);
-    if (bulletMatch) { openListLevel('ul', listIndent, 1); out.push(`<li>${inlineFormat(escLine(bulletMatch[1]))}</li>`); continue; }
-    const numMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    const bulletMatch = trimmed.match(/^([-*+])\s+(.+)$/);
+    if (bulletMatch) { openListLevel('ul', listIndent, 1, bulletMatch[1]); out.push(`<li>${inlineFormat(escLine(bulletMatch[2]))}</li>`); continue; }
+    const numMatch = trimmed.match(/^(\d{1,3})\.\s+(.+)$/);
     if (numMatch) { openListLevel('ol', listIndent, parseInt(numMatch[1], 10)); out.push(`<li>${inlineFormat(escLine(numMatch[2]))}</li>`); continue; }
     // Callouts: > [!type] Title  (use [!type]- for a collapsible one). Consumes
     // following > lines as the body.
