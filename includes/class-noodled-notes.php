@@ -389,7 +389,7 @@ class Noodled_Notes {
 		// Remove the old-folder GitHub file so it doesn't orphan and re-import as a
 		// duplicate, and clear the sha so the note re-pushes cleanly to its new path.
 		if ( (int) $note['notebook_id'] !== $notebook_id && ! empty( $note['sha'] ) && $old_nb && class_exists( 'Noodled_Sync' ) ) {
-			Noodled_Sync::delete_from_github( $old_nb['name'], (string) $note['title'], (string) $note['sha'] );
+			Noodled_Sync::delete_from_github( $old_nb['name'], (string) $note['title'], (string) $note['sha'], (string) ( $note['gh_path'] ?? '' ) );
 		}
 
 		// Snapshot before a move (which can force-rename the title on a clash) so the

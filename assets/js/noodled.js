@@ -2418,9 +2418,6 @@ async function deleteCurrentNote() {
   await loadNotes();
   updateTrashCount();
   showUndoToast(__( 'Note moved to trash', 'noodled' ), () => undoDelete(deletedId));
-  // Push to GitHub so delete syncs across devices — fire-and-forget so the UI
-  // doesn't block on the (multi-second) shell-out.
-  api.git_push().catch(() => {});
 }
 
 function toggleMarkdownView() {
@@ -3362,12 +3359,40 @@ async function syncPull() {
       await loadNotebooks();
       await loadNotes();
       updateTrashCount();
+      checkBackupStatus();
     }
   } catch (e) {
     showToast(__( 'Sync failed', 'noodled' ));
   }
   btn.disabled = false;
   btn.textContent = __( 'Sync', 'noodled' );
+}
+
+// Admins only (sync/status sends `unsynced` to admins alone): say when notes are
+// not on GitHub yet, list the failing ones with their error, offer a retry.
+async function checkBackupStatus() {
+  let s;
+  try { s = await api.git_status(); } catch (e) { return; }
+  if (!s || !(s.unsynced > 0)) return;
+  /* translators: %d is the number of notes */
+  let msg = sprintf( _n( '%d note is not backed up to GitHub yet.', '%d notes are not backed up to GitHub yet.', s.unsynced, 'noodled' ), s.unsynced );
+  const failed = (s.failed || []).map(f =>
+    /* translators: 1: note title, 2: notebook name, 3: error message from GitHub */
+    sprintf( __( '%1$s (%2$s): %3$s', 'noodled' ), f.title || __( 'Untitled Note', 'noodled' ), f.notebook || '', f.error || '' ));
+  if (failed.length) msg += ' ' + __( 'Failed:', 'noodled' ) + ' ' + failed.join('; ');
+  if (!(await showConfirm(msg, { okLabel: __( 'Retry now', 'noodled' ) }))) return;
+  try {
+    const r = await api.git_push();
+    if (r && r.error) {
+      /* translators: %s is the error message */
+      showToast(sprintf( __( 'Sync failed: %s', 'noodled' ), r.error ));
+      return;
+    }
+    /* translators: 1: notes pushed now, 2: notes still waiting */
+    showToast(sprintf( __( 'Backed up %1$d, %2$d still waiting', 'noodled' ), (r && r.pushed) || 0, (r && r.remaining) || 0 ));
+  } catch (e) {
+    showToast(__( 'Sync failed', 'noodled' ));
+  }
 }
 
 // ── Plaud sync ──

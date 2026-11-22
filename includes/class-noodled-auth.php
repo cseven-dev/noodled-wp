@@ -570,7 +570,8 @@ class Noodled_Auth {
 		// Noodled_Notes::create() ensures the 'My Notes' notebook exists owned by
 		// this user, then creates the welcome note inside it.
 		/* translators: %s is the brand name; title of the welcome note. */
-		Noodled_Notes::create( 'My Notes', sprintf( __( 'Welcome to %s', 'noodled' ), $brand ), $body, $user_id );
+		$note = Noodled_Notes::create( 'My Notes', sprintf( __( 'Welcome to %s', 'noodled' ), $brand ), $body, $user_id );
+		if ( ! empty( $note['id'] ) ) Noodled_Sync::queue_push( (int) $note['id'] ); // only an admin's is backed up
 	}
 
 	/** Approve a pending user: promote to member, grant default notebook, email a login PIN. */

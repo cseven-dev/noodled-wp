@@ -133,10 +133,8 @@ class Noodled_Plaud {
 			if ( $wpdb->insert_id ) {
 				$downloaded++;
 
-				// Push to GitHub if configured
-				if ( Noodled_GitHub::is_configured() ) {
-					Noodled_Sync::push_note( (int) $wpdb->insert_id );
-				}
+				// Back up to GitHub (queue_push checks config and notebook owner)
+				Noodled_Sync::queue_push( (int) $wpdb->insert_id );
 			}
 		}
 

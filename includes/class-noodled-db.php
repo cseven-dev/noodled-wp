@@ -33,6 +33,10 @@ CREATE TABLE {$wpdb->prefix}noodled_notes (
   source varchar(50) NOT NULL DEFAULT '',
   pinned tinyint(1) NOT NULL DEFAULT 0,
   sha varchar(40) NOT NULL DEFAULT '',
+  gh_path varchar(700) NOT NULL DEFAULT '',
+  push_pending tinyint(1) NOT NULL DEFAULT 0,
+  push_attempts smallint(5) unsigned NOT NULL DEFAULT 0,
+  push_error varchar(255) NOT NULL DEFAULT '',
   meta_json text,
   created_at datetime NOT NULL,
   modified_at datetime NOT NULL,
@@ -45,6 +49,7 @@ CREATE TABLE {$wpdb->prefix}noodled_notes (
   KEY idx_deleted_from (deleted_from),
   KEY idx_list (notebook_id, deleted_at, pinned, modified_at),
   KEY idx_browse (deleted_at, pinned, modified_at),
+  KEY idx_push (push_pending),
   FULLTEXT KEY idx_search (title, body)
 ) ENGINE=InnoDB $charset;
 

@@ -126,6 +126,13 @@ function noodled_init() {
 			update_option( 'noodled_sessions_migrated', 1 );
 		}
 
+		// Queue every admin note that was never backed up to GitHub (needs the
+		// push_* columns, added by install() above); cron then pushes them. The
+		// flag is only set once the UPDATE has actually run.
+		if ( ! get_option( 'noodled_push_reconciled' ) && Noodled_Sync::queue_unsynced() ) {
+			update_option( 'noodled_push_reconciled', 1 );
+		}
+
 		Noodled_Settings::init();
 		Noodled_App::init();
 		Noodled_REST::init();
@@ -232,6 +239,17 @@ function noodled_run_push_check() {
 		if ( $delivered > 0 ) {
 			$wpdb->update( $r, [ 'sent' => 1 ], [ 'id' => (int) $row['id'] ] );
 		}
+	}
+}
+
+/**
+ * Same 5-minute tick: retry GitHub backups that are still pending (failed or
+ * queued beyond what a request pushed on shutdown). Bounded by drain()'s budget.
+ */
+add_action( 'noodled_push_check', 'noodled_run_sync_drain' );
+function noodled_run_sync_drain() {
+	if ( Noodled_GitHub::is_configured() ) {
+		Noodled_Sync::drain();
 	}
 }
 

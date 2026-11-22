@@ -92,6 +92,7 @@ class Noodled_Evernote {
 			}
 		}
 
+		Noodled_Sync::queue_push( $note_id );
 		return true;
 	}
 

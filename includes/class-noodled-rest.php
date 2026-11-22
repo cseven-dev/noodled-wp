@@ -477,7 +477,17 @@ class Noodled_REST {
 		$old = $req->get_param( 'old_name' );
 		$new = $req->get_param( 'new_name' );
 		if ( ! $old || ! $new ) return new \WP_REST_Response( [ 'error' => __( 'Names required', 'noodled' ) ], 400 );
-		return new \WP_REST_Response( Noodled_Notebooks::rename( $old, $new, self::current_user_id() ) );
+		$result = Noodled_Notebooks::rename( $old, $new, self::current_user_id() );
+		if ( ! isset( $result['error'] ) ) {
+			// Its notes now belong under the new folder name on GitHub: re-push them
+			// (queue_push skips non-admin notebooks; cron handles the bulk).
+			global $wpdb;
+			$ids = $wpdb->get_col( $wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}noodled_notes WHERE notebook_id = %d AND deleted_at IS NULL", (int) $result['id']
+			) );
+			foreach ( $ids ?: [] as $nid ) Noodled_Sync::queue_push( (int) $nid );
+		}
+		return new \WP_REST_Response( $result );
 	}
 
 	public static function set_notebook_color( \WP_REST_Request $req ): \WP_REST_Response {
@@ -631,7 +641,10 @@ class Noodled_REST {
 			$title  = $parsed['title'] ?: pathinfo( $name, PATHINFO_FILENAME );
 			$body   = $parsed['body'] ?: '';
 			$res    = Noodled_Notes::create( $folder, $title, $body, $uid );
-			if ( empty( $res['error'] ) ) $imported++;
+			if ( empty( $res['error'] ) ) {
+				$imported++;
+				Noodled_Sync::queue_push( (int) $res['id'] );
+			}
 		}
 		$zip->close();
 		return new \WP_REST_Response( [ 'imported' => $imported ] );
@@ -692,10 +705,10 @@ class Noodled_REST {
 		$title    = $req->get_param( 'title' ) ?: __( 'Untitled Note', 'noodled' );
 		$body     = $req->get_param( 'body' ) ?: '';
 		$result   = Noodled_Notes::create( $notebook, $title, $body, $uid );
-		// GitHub sync is an admin-only desktop<->web pipeline; regular users'
-		// notes are never pushed to the shared repo.
-		if ( ! isset( $result['error'] ) && Noodled_GitHub::is_configured() && current_user_can( 'manage_options' ) ) {
-			Noodled_Sync::push_note( $result['id'] );
+		// GitHub sync is an admin-only desktop<->web pipeline: queue_push only
+		// backs up notes in admin-owned notebooks, never members' notes.
+		if ( ! isset( $result['error'] ) ) {
+			Noodled_Sync::queue_push( (int) $result['id'] );
 		}
 		return new \WP_REST_Response( $result );
 	}
@@ -724,8 +737,8 @@ class Noodled_REST {
 		if ( $req->get_param( 'title' ) !== null ) $data['title'] = $req->get_param( 'title' );
 		if ( $req->get_param( 'body' ) !== null )  $data['body']  = $req->get_param( 'body' );
 		$result = Noodled_Notes::update( (int) $req['id'], $data );
-		if ( ! isset( $result['error'] ) && Noodled_GitHub::is_configured() && current_user_can( 'manage_options' ) ) {
-			Noodled_Sync::push_note( (int) $req['id'] );
+		if ( ! isset( $result['error'] ) ) {
+			Noodled_Sync::queue_push( (int) $req['id'] );
 		}
 		return new \WP_REST_Response( $result );
 	}
@@ -751,7 +764,9 @@ class Noodled_REST {
 		if ( ! self::verify_note_write( $id ) ) {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
-		return new \WP_REST_Response( Noodled_Notes::toggle_task( $id, (int) $req->get_param( 'idx' ) ) );
+		$result = Noodled_Notes::toggle_task( $id, (int) $req->get_param( 'idx' ) );
+		if ( ! isset( $result['error'] ) ) Noodled_Sync::queue_push( $id );
+		return new \WP_REST_Response( $result );
 	}
 
 	/* ── Web push ── */
@@ -849,10 +864,15 @@ class Noodled_REST {
 			if ( $note && $note['notebook'] ) {
 				global $wpdb;
 				$row = $wpdb->get_row( $wpdb->prepare(
-					"SELECT sha FROM {$wpdb->prefix}noodled_notes WHERE id = %d", (int) $req['id']
+					"SELECT sha, gh_path FROM {$wpdb->prefix}noodled_notes WHERE id = %d", (int) $req['id']
 				), ARRAY_A );
 				if ( $row && $row['sha'] ) {
-					Noodled_Sync::delete_from_github( $note['notebook'], $note['title'], $row['sha'] );
+					$gone = Noodled_Sync::delete_from_github( $note['notebook'], $note['title'], $row['sha'], (string) $row['gh_path'] );
+					// The file is gone: forget its sha so restoring the note re-uploads it
+					// (push_note would otherwise see "already in sync").
+					if ( ! empty( $gone['success'] ) ) {
+						$wpdb->update( "{$wpdb->prefix}noodled_notes", [ 'sha' => '' ], [ 'id' => (int) $req['id'] ] );
+					}
 				}
 			}
 		}
@@ -866,14 +886,18 @@ class Noodled_REST {
 		}
 		$to = $req->get_param( 'notebook' );
 		if ( ! $to ) return new \WP_REST_Response( [ 'error' => __( 'Target notebook required', 'noodled' ) ], 400 );
-		return new \WP_REST_Response( Noodled_Notes::move( (int) $req['id'], $to, self::current_user_id() ) );
+		$result = Noodled_Notes::move( (int) $req['id'], $to, self::current_user_id() );
+		if ( ! isset( $result['error'] ) ) Noodled_Sync::queue_push( (int) $req['id'] );
+		return new \WP_REST_Response( $result );
 	}
 
 	public static function pin_note( \WP_REST_Request $req ): \WP_REST_Response {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
-		return new \WP_REST_Response( Noodled_Notes::toggle_pin( (int) $req['id'] ) );
+		$result = Noodled_Notes::toggle_pin( (int) $req['id'] );
+		if ( ! isset( $result['error'] ) ) Noodled_Sync::queue_push( (int) $req['id'] );
+		return new \WP_REST_Response( $result );
 	}
 
 	// ── Trash ──
@@ -898,7 +922,9 @@ class Noodled_REST {
 		if ( ! self::verify_note_manage( (int) $req['id'] ) ) {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
-		return new \WP_REST_Response( Noodled_Notes::restore( (int) $req['id'], self::current_user_id() ) );
+		$result = Noodled_Notes::restore( (int) $req['id'], self::current_user_id() );
+		if ( ! isset( $result['error'] ) ) Noodled_Sync::queue_push( (int) $req['id'] );
+		return new \WP_REST_Response( $result );
 	}
 
 	public static function permanent_delete( \WP_REST_Request $req ): \WP_REST_Response {
@@ -1083,7 +1109,7 @@ class Noodled_REST {
 			return new \WP_REST_Response( [ 'error' => $result['error'] ], 500 );
 		}
 		if ( class_exists( 'Noodled_Sync' ) && ! empty( $result['id'] ) ) {
-			Noodled_Sync::push_note( (int) $result['id'] );
+			Noodled_Sync::queue_push( (int) $result['id'] );
 		}
 		return new \WP_REST_Response( [ 'ok' => true, 'id' => $result['id'] ?? 0 ] );
 	}
@@ -1131,7 +1157,7 @@ class Noodled_REST {
 			$body   = wp_check_invalid_utf8( $raw, true );
 			$result = Noodled_Notes::create( $notebook, $base, $body, $uid );
 			if ( isset( $result['error'] ) ) return new \WP_REST_Response( [ 'error' => $result['error'] ], 500 );
-			if ( class_exists( 'Noodled_Sync' ) && ! empty( $result['id'] ) ) Noodled_Sync::push_note( (int) $result['id'] );
+			if ( class_exists( 'Noodled_Sync' ) && ! empty( $result['id'] ) ) Noodled_Sync::queue_push( (int) $result['id'] );
 			return new \WP_REST_Response( [ 'ok' => true, 'id' => $result['id'] ?? 0, 'attached' => false ] );
 		}
 
@@ -1146,7 +1172,7 @@ class Noodled_REST {
 			if ( $note_id ) Noodled_Notes::permanent_delete( $note_id );
 			return new \WP_REST_Response( [ 'error' => $att['error'] ], 422 );
 		}
-		if ( class_exists( 'Noodled_Sync' ) && $note_id ) Noodled_Sync::push_note( $note_id );
+		if ( class_exists( 'Noodled_Sync' ) && $note_id ) Noodled_Sync::queue_push( $note_id );
 		return new \WP_REST_Response( [ 'ok' => true, 'id' => $note_id, 'attached' => true ] );
 	}
 
@@ -1168,29 +1194,30 @@ class Noodled_REST {
 			$out['repo']      = $cfg['github_repo'] ?: $empty;
 			$out['branch']    = $cfg['github_branch'] ?: $empty;
 			$out['has_token'] = ! empty( $cfg['github_token'] );
+			// Backup health: notes not on GitHub yet, and why the failing ones fail.
+			$out['unsynced']  = Noodled_Sync::unsynced_count();
+			$out['failed']    = Noodled_Sync::failed_pushes();
 		}
 		return new \WP_REST_Response( $out );
 	}
 
+	// "Push all": queue every note in an admin-owned notebook (members' notes are
+	// never backed up), push a first batch now and leave the rest to cron.
 	public static function sync_push(): \WP_REST_Response {
 		if ( ! Noodled_GitHub::is_configured() ) {
 			return new \WP_REST_Response( [ 'error' => __( 'GitHub not configured', 'noodled' ) ] );
 		}
 
-		global $wpdb;
-		$notes = $wpdb->get_results(
-			"SELECT id FROM {$wpdb->prefix}noodled_notes WHERE deleted_at IS NULL",
-			ARRAY_A
-		);
-
-		$pushed = 0;
-		foreach ( $notes as $n ) {
-			$result = Noodled_Sync::push_note( (int) $n['id'] );
-			if ( ! isset( $result['error'] ) ) $pushed++;
-		}
+		$queued = Noodled_Sync::queue_all();
+		$result = Noodled_Sync::drain();
 
 		update_option( 'noodled_last_sync', current_time( 'mysql', true ) );
-		return new \WP_REST_Response( [ 'success' => true, 'pushed' => $pushed ] );
+		return new \WP_REST_Response( [
+			'success'   => true,
+			'queued'    => $queued,
+			'pushed'    => $result['pushed'],
+			'remaining' => $result['remaining'],
+		] );
 	}
 
 	public static function sync_pull(): \WP_REST_Response {
