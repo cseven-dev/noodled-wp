@@ -649,6 +649,26 @@ class Noodled_REST {
 
 		while ( ob_get_level() ) { ob_end_clean(); }
 		$mime = $att['mime_type'] ?: 'application/octet-stream';
+		// ?thumb=1: a 160px JPEG for the note list, cached next to the original
+		// (the original is never touched). If resizing fails, serve the original.
+		$thumb = $req->get_param( 'thumb' ) && preg_match( '#^image/(jpeg|png|webp|gif)$#', $mime );
+		if ( $thumb ) {
+			$t = $path . '.thumb.jpg';
+			if ( ! is_file( $t ) ) {
+				$ed = wp_get_image_editor( $path );
+				if ( ! is_wp_error( $ed ) ) {
+					$ed->resize( 160, 160, true );
+					$ed->set_quality( 75 );
+					$ed->save( $t, 'image/jpeg' );
+				}
+			}
+			if ( is_file( $t ) ) {
+				$path = $t;
+				$mime = 'image/jpeg';
+			} else {
+				$thumb = false;
+			}
+		}
 		// Any type that can run script when rendered inline gets sandboxed.
 		$risky  = ( stripos( $mime, 'html' ) !== false || stripos( $mime, 'svg' ) !== false
 			|| stripos( $mime, 'xml' ) !== false || stripos( $mime, 'text/' ) === 0 );
@@ -664,7 +684,7 @@ class Noodled_REST {
 		// Attachments are immutable (stored under a random subfolder, never rewritten),
 		// so cache aggressively per the access-checked URL. Private = caches only in
 		// the user's browser, never a shared proxy. Conditional 304 skips the readfile.
-		$etag = '"' . md5( $att['id'] . '-' . $size . '-' . $mtime ) . '"';
+		$etag = '"' . md5( $att['id'] . '-' . $size . '-' . $mtime . ( $thumb ? '-thumb' : '' ) ) . '"';
 		$inm  = isset( $_SERVER['HTTP_IF_NONE_MATCH'] ) ? trim( wp_unslash( $_SERVER['HTTP_IF_NONE_MATCH'] ) ) : '';
 		header( 'Cache-Control: private, max-age=31536000, immutable' );
 		header( 'ETag: ' . $etag );

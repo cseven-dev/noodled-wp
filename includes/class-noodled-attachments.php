@@ -220,6 +220,10 @@ class Noodled_Attachments {
 			if ( file_exists( $filepath ) ) {
 				unlink( $filepath );
 			}
+			// The cached list thumbnail made by the file proxy (?thumb=1).
+			if ( file_exists( $filepath . '.thumb.jpg' ) ) {
+				unlink( $filepath . '.thumb.jpg' );
+			}
 			$wpdb->delete( self::table(), [ 'id' => $id ] );
 		}
 

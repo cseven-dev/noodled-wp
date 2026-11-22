@@ -1008,6 +1008,9 @@ function emptyListHtml(query) {
   if (viewingTrash) {
     return `<div class="empty-state list-empty"><div class="empty-icon" aria-hidden="true">${icon('trash-2', 'ic-lg')}</div><div class="empty-title">${esc(__( 'Trash is empty', 'noodled' ))}</div><div class="empty-sub">${esc(__( 'Deleted notes show up here.', 'noodled' ))}</div></div>`;
   }
+  if (viewingStarred) {
+    return `<div class="empty-state list-empty"><div class="empty-icon" aria-hidden="true">${icon('star', 'ic-lg')}</div><div class="empty-title">${esc(__( 'No starred notes yet', 'noodled' ))}</div><div class="empty-sub">${esc(__( 'Star a note from its menu to keep it here.', 'noodled' ))}</div></div>`;
+  }
   const where = activeNotebook
     /* translators: %s is the notebook name */
     ? sprintf( __( 'No notes in %s yet', 'noodled' ), activeNotebook )
@@ -1080,8 +1083,10 @@ function renderNoteItem(n) {
     // (a button can't contain interactive descendants); the checkbox is the control.
     /* translators: %s is the note title */
     const rowRole = bulkMode ? '' : `role="button" tabindex="0" aria-label="${escAttr(sprintf( __( 'Open note: %s', 'noodled' ), n.title || __( 'Untitled', 'noodled' ) ))}"`;
+    // First image attachment as a small thumbnail (server sends 0 for locked notes).
+    const thumb = n.thumb ? `<img class="note-thumb" src="${escAttr(api._base)}/file/${parseInt(n.thumb, 10)}?thumb=1" alt="" loading="lazy" decoding="async" width="44" height="44">` : '';
     return `
-      <div class="note-item ${isActive ? 'active' : ''}" data-note-id="${n.id}" style="${colorStyle}"
+      <div class="note-item ${isActive ? 'active' : ''}${thumb ? ' has-thumb' : ''}" data-note-id="${n.id}" style="${colorStyle}"
            ${rowRole}
            ${bulkMode ? '' : `draggable="true" ondragstart="noteDragStart(event, ${n.id})" ondragend="noteDragEnd()"`}
            onclick="${bulkMode ? `toggleBulkSelect(${n.id}, event)` : `handleNoteTap(event, ${n.id})`}"
@@ -1095,6 +1100,7 @@ function renderNoteItem(n) {
           ${taskBadge}
         </div>
         <div class="preview">${highlightMatch(preview, searchQuery)}</div>
+        ${thumb}
       </div>
     `;
   }
@@ -1563,7 +1569,8 @@ async function updateTrashCount() {
 function renderContent() {
   const el = document.getElementById('colContent');
   if (!activeNote) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">' + icon('file-text', 'ic-lg') + '</div><div>' + esc(__( 'Select a note or create a new one', 'noodled' )) + '</div></div>';
+    // Same markup as #emptyState in templates/app.php.
+    el.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-icon" aria-hidden="true">' + icon('file-text', 'ic-lg') + '</div><div class="empty-title">' + esc(__( 'No note selected', 'noodled' )) + '</div><div class="empty-sub">' + esc(__( 'Pick a note from the list or create a new one', 'noodled' )) + '</div></div>';
     return;
   }
 
@@ -5621,7 +5628,7 @@ function showLoadingSkeleton() {
   const nb = document.getElementById('nbList');
   const nl = document.getElementById('noteList');
   if (nb) nb.innerHTML = Array(4).fill('<div class="skeleton skeleton-line"></div>').join('');
-  if (nl) nl.innerHTML = Array(5).fill('<div style="padding:10px 12px"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line" style="width:40%"></div><div class="skeleton skeleton-line" style="width:80%"></div></div>').join('');
+  if (nl) renderNoteListSkeleton();
 }
 
 // ── Logout ──

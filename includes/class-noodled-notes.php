@@ -37,6 +37,8 @@ class Noodled_Notes {
 			// Full-second version stamp for the save-conflict check (update_note).
 			'mtime'    => $r['modified_at'] ? (string) $r['modified_at'] : '',
 			'att'      => isset( $r['att_count'] ) ? (int) $r['att_count'] : 0,
+			// First image attachment for the list thumbnail; locked notes never get one.
+			'thumb'    => ( isset( $r['img_id'] ) && ! str_starts_with( $body, 'noodled:enc:v1:' ) ) ? (int) $r['img_id'] : 0,
 			'preview'  => self::preview_of( $body ),
 			'tasks'    => self::task_counts( $body ),
 			// 'failed' once a GitHub push of this note has failed (cleared on success).
@@ -99,10 +101,11 @@ class Noodled_Notes {
 		$nb = $wpdb->prefix . 'noodled_notebooks';
 		// One LEFT JOIN for the notebook name and one aggregated JOIN for the
 		// attachment count, instead of an N+1 lookup per note plus a correlated
-		// COUNT subquery per row.
+		// COUNT subquery per row. img_id (first non-SVG image) feeds the list
+		// thumbnail; no LIKE patterns, because a literal % would break prepare().
 		$join = "LEFT JOIN {$nb} n ON n.id = t.notebook_id "
-		      . "LEFT JOIN ( SELECT note_id, COUNT(*) AS cnt FROM {$at} GROUP BY note_id ) ac ON ac.note_id = t.id";
-		$cols = "t.*, n.name AS nb_name, COALESCE( ac.cnt, 0 ) AS att_count";
+		      . "LEFT JOIN ( SELECT note_id, COUNT(*) AS cnt, MIN(CASE WHEN LEFT(mime_type, 6) = 'image/' AND LOCATE('svg', mime_type) = 0 THEN id END) AS img_id FROM {$at} GROUP BY note_id ) ac ON ac.note_id = t.id";
+		$cols = "t.*, n.name AS nb_name, COALESCE( ac.cnt, 0 ) AS att_count, ac.img_id";
 		$order = "ORDER BY t.pinned DESC, t.modified_at DESC, t.created_at DESC";
 
 		if ( $notebook_id ) {

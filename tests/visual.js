@@ -116,7 +116,7 @@ const NOTEBOOKS = [
 
 const NOTE_ROWS = [
   { id: SHOWCASE_ID, notebook: 'Home', title: 'Kitchen renovation plan', body: SHOWCASE, days: 0, pinned: true },
-  { id: 102, notebook: 'Home', title: 'Paint colours', body: 'Living room: Hale Navy. Hallway: Revere Pewter, eggshell finish. Trim stays Chantilly Lace.', days: 2 },
+  { id: 102, notebook: 'Home', title: 'Paint colours', body: 'Living room: Hale Navy. Hallway: Revere Pewter, eggshell finish. Trim stays Chantilly Lace.', days: 2, image: 501 },
   { id: 103, notebook: 'Work', title: 'Q4 planning meeting', body: 'Attendees: Priya, Marco, Jen.\n\n- [x] Share the draft roadmap\n- [ ] Follow up on hiring budget\n- [ ] Book the offsite venue', days: 1 },
   { id: 104, notebook: 'Work', title: 'Onboarding checklist for new hires', body: 'Laptop, accounts, buddy assignment, first-week reading list, and a lunch on day one.', days: 9 },
   { id: 105, notebook: 'General', title: 'Books to read', body: 'The Overstory, Piranesi, A Psalm for the Wild-Built, The Ministry for the Future.', days: 16 },
@@ -134,6 +134,29 @@ const STARRED = [103];
 NOTE_ROWS.forEach(r => { r.modified_at = stamp(r.days, 9 + (r.id % 8)); r.created_at = stamp(r.days + 3, 9); });
 NOTEBOOKS.forEach(nb => { nb.count = NOTE_ROWS.filter(r => r.notebook === nb.name).length; });
 
+// A small generated PNG (a paint-swatch gradient) served for /file/<id>, so the
+// note-list thumbnail has something to show. Built with zlib, no image library.
+function makePng(w, h, pixel) {
+  const zlib = require('zlib');
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
+    return Buffer.concat([len, td, c]);
+  };
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y++) {
+    raw[y * (w * 3 + 1)] = 0;
+    for (let x = 0; x < w; x++) pixel(x, y).forEach((v, i) => { raw[y * (w * 3 + 1) + 1 + x * 3 + i] = v; });
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+const SWATCH_PNG = makePng(160, 160, (x, y) => x < 80 ? [31, 58, 96] : [Math.round(150 + y / 3), Math.round(150 + y / 3), 160]);
+
 function taskCounts(body) {
   const m = body.match(/^\s*[-*+]\s+\[[ xX]\]/gm) || [];
   const done = (body.match(/^\s*[-*+]\s+\[[xX]\]/gm) || []).length;
@@ -143,7 +166,7 @@ function formatNote(r, withBody = true) {
   const out = {
     id: r.id, slug: 'n' + r.id, notebook: r.notebook, title: r.title, source: '', pinned: !!r.pinned,
     created: r.created_at.slice(0, 16), modified: r.modified_at.slice(0, 16), mtime: r.modified_at,
-    att: 0, preview: r.body.split('\n').map(l => l.replace(/^\s*(#+|>|[-*+](\s+\[[ xX]\])?|\d+\.|\|)\s*/, '')).join(' ').replace(/[*`|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160), tasks: taskCounts(r.body),
+    att: r.image ? 1 : 0, thumb: r.image || 0, preview: r.body.split('\n').map(l => l.replace(/^\s*(#+|>|[-*+](\s+\[[ xX]\])?|\d+\.|\|)\s*/, '')).join(' ').replace(/[*`|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160), tasks: taskCounts(r.body),
   };
   if (withBody) out.body = r.body;
   return out;
@@ -164,8 +187,11 @@ function handleApi(route, req, theme) {
     }
     if ((m = p.match(/^\/notes\/(\d+)$/))) {
       const r = NOTE_ROWS.find(x => x.id === +m[1]);
-      return r ? json({ ...formatNote(r), attachments: [] }) : route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+      const attachments = r && r.image ? [{ id: r.image, filename: 'swatch.png', url: ORIGIN + '/wp-json/noodled/v1/file/' + r.image, mime: 'image/png', size: SWATCH_PNG.length, alt: '', exif: null }] : [];
+      return r ? json({ ...formatNote(r), attachments }) : route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
     }
+    // The file proxy (thumbnails included): one generated image for every id.
+    if (/^\/file\/\d+$/.test(p)) return route.fulfill({ contentType: 'image/png', body: SWATCH_PNG });
     if (p === '/bodies') return json(NOTE_ROWS.map(r => ({ id: r.id, body: r.body })));
     if (p === '/trash/count') return json(0);
     if (p === '/search') {
@@ -272,6 +298,13 @@ async function main() {
       await page.waitForFunction(() => document.querySelectorAll('.note-item').length === 0);
       await page.waitForTimeout(500);
       await shot(page, `desktop-search-empty-${t}`);
+      await page.evaluate(() => clearSearch());
+      await page.evaluate(() => { config.starred = []; return showStarred(); });
+      await page.waitForFunction(() => document.querySelectorAll('.note-item').length === 0);
+      await shot(page, `desktop-starred-empty-${t}`);
+      // The boot-time loading skeleton, drawn on demand.
+      await page.evaluate(() => showLoadingSkeleton());
+      await shot(page, `desktop-loading-${t}`);
     } },
     { phone: true, run: async (page, t) => {
       await shot(page, `phone-list-${t}`);

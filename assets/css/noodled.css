@@ -343,6 +343,23 @@ body {
   overflow: hidden;
   line-height: 1.35;
 }
+.note-item:hover:not(.active) { box-shadow: inset 3px 0 0 var(--accent); }
+/* Rows with an image attachment: text left, 44px thumbnail right. */
+.note-item.has-thumb {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  column-gap: var(--sp-3);
+}
+.note-item.has-thumb .preview { -webkit-line-clamp: 1; }
+.note-thumb {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  width: 44px; height: 44px;
+  border-radius: var(--r-md);
+  object-fit: cover;
+  background: var(--bg-item-hover);
+}
 
 /* Delete button revealed on swipe */
 .note-item-actions {
