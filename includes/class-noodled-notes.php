@@ -508,6 +508,32 @@ class Noodled_Notes {
 		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
 	}
 
+	// Title index of every note the user can open (all notebooks, not just the
+	// open one), for wiki-link resolution and the quick switcher. Scoped exactly
+	// like search(); empty scope matches nothing. Never ships bodies.
+	public static function titles( array $notebook_ids = [], array $extra_note_ids = [] ): array {
+		global $wpdb;
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$t        = self::table();
+		$nb       = $wpdb->prefix . 'noodled_notebooks';
+		$rows = $wpdb->get_results(
+			"SELECT t.id, t.title, t.modified_at, t.pinned, n.name AS nb_name FROM {$t} t LEFT JOIN {$nb} n ON n.id = t.notebook_id WHERE t.deleted_at IS NULL AND (t.notebook_id IN ($ids) OR t.id IN ($note_ids)) ORDER BY t.modified_at DESC",
+			ARRAY_A
+		);
+		$out = [];
+		foreach ( $rows ?: [] as $r ) {
+			$out[] = [
+				'id'       => (int) $r['id'],
+				'title'    => (string) $r['title'],
+				'notebook' => (string) ( $r['nb_name'] ?? '' ),
+				'modified' => $r['modified_at'] ? substr( $r['modified_at'], 0, 16 ) : '',
+				'pinned'   => (bool) $r['pinned'],
+			];
+		}
+		return $out;
+	}
+
 	// Lightweight id→body list for client features that scan all note content
 	// (search, tag cloud, link graph, stats). Fetched lazily so the note list
 	// itself stays body-free for fast first paint.

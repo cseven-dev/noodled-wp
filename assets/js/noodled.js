@@ -62,6 +62,7 @@ const api = {
   search(query)                          { return this._fetch('/search?q=' + encodeURIComponent(query)); },
   get_backlinks(title)                   { return this._fetch('/backlinks?title=' + encodeURIComponent(title)); },
   get_bodies()                           { return this._fetch('/bodies'); },
+  get_titles()                           { return this._fetch('/titles'); },
   save_attachment(nb, noteId, name, b64) { return this._fetch('/attachments', { method: 'POST', body: JSON.stringify({ note_id: noteId, filename: name, data: b64 }) }); },
   delete_attachment(id)                  { return this._fetch('/attachments/' + id, { method: 'DELETE' }); },
   reorder_attachments(noteId, ids)       { return this._fetch('/attachments/reorder', { method: 'POST', body: JSON.stringify({ note_id: noteId, ids }) }); },
@@ -112,6 +113,9 @@ let bulkMode = false;
 let bulkSelected = new Set();
 let readingMode = false;
 let viewingStarred = false;
+// Title index of every note the user can open, across all notebooks (/titles).
+// null until loaded; `notes` only holds the open notebook.
+let noteIndex = null;
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -637,6 +641,24 @@ async function loadNotes() {
     else throw e;
   }
   filterNotes();
+  loadNoteIndex();
+}
+// Refresh the cross-notebook title index after a list load, debounced so a
+// burst of loadNotes() calls makes one request. Errors keep the old index.
+let _noteIndexTimer = null;
+function loadNoteIndex() {
+  clearTimeout(_noteIndexTimer);
+  _noteIndexTimer = setTimeout(() => {
+    api.get_titles().then(r => { noteIndex = Array.isArray(r) ? r : null; }).catch(() => {});
+  }, 300);
+}
+// A note by exact title (case-insensitive, trimmed): the loaded list first,
+// then the cross-notebook index.
+function findNoteByTitle(t) {
+  const k = String(t || '').trim().toLowerCase();
+  if (!k) return null;
+  const hit = n => n && (n.title || '').trim().toLowerCase() === k;
+  return notes.find(hit) || (noteIndex || []).find(hit) || null;
 }
 // Per-user, per-notebook list cache in IndexedDB (localStorage mirrored as the
 // fallback for private mode). Body-free — the offline body cache is Phase 1.
@@ -1684,7 +1706,7 @@ async function resolveTransclusions(root) {
     for (const el of blocks) {
       el.setAttribute('data-resolved', '1');
       const title = el.getAttribute('data-embed') || '';
-      const note = (notes || []).find(n => (n.title || '').toLowerCase() === title.toLowerCase());
+      const note = findNoteByTitle(title);
       if (!note) { el.innerHTML = `<div class="transclude-head">${esc(title)}</div><div class="transclude-missing">${esc(__( 'Note not found', 'noodled' ))}</div>`; continue; }
       if (seen.has(note.id)) { el.innerHTML = `<div class="transclude-head">${esc(title)}</div><div class="transclude-missing">${esc(__( 'Already shown above', 'noodled' ))}</div>`; continue; }
       seen.add(note.id);
@@ -1772,11 +1794,59 @@ async function saveTitleOnly() {
   const cb = currentBody();
   const body = cb === null ? (activeNote.body || '') : cb;
   const n = activeNote;
+  const oldTitle = n.title || '';
   const result = await saveOpenNote(n, title, body);
   if (result && !result.error && !result.conflict) {
     await loadNotebooks();
     await loadNotes();
+    if (oldTitle.trim() && oldTitle.trim().toLowerCase() !== (result.title || title).trim().toLowerCase()) {
+      await updateLinksAfterRename(n.id, oldTitle.trim(), (result.title || title).trim());
+    }
   }
+}
+
+// After a rename, offer to point [[Old]] / ![[Old]] links in other notes at the
+// new title. Each note is fetched fresh and saved with its own base, so a note
+// changed elsewhere (conflict) or one the user cannot write (403) is skipped.
+async function updateLinksAfterRename(noteId, oldTitle, newTitle) {
+  let hits = [];
+  try { hits = await api.get_backlinks(oldTitle); } catch (e) { return; }
+  hits = (Array.isArray(hits) ? hits : []).filter(h => h && h.id !== noteId);
+  if (!hits.length) return;
+  /* translators: %d is the number of notes that link to the renamed note */
+  if (!(await showConfirm(sprintf( _n( 'Update %d link to use the new title?', 'Update %d links to use the new title?', hits.length, 'noodled' ), hits.length )))) return;
+  const re = new RegExp('(!?)\\[\\[' + oldTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\]\\]', 'gi');
+  let ok = 0, skipped = 0;
+  for (const h of hits) {
+    try {
+      const fresh = await api.get_note(null, h.id);
+      const body = (fresh.body || '').replace(re, (m, bang) => bang + '[[' + newTitle + ']]');
+      if (body === (fresh.body || '')) continue;
+      const r = await api.save_note(fresh.notebook, fresh.id, fresh.title, body, { base: fresh.mtime });
+      if (r && !r.error && !r.conflict) ok++; else skipped++;
+    } catch (e) { skipped++; }
+  }
+  if (ok) await loadNotes();
+  if (!ok && !skipped) return;
+  showToast(skipped
+    /* translators: %1$d is the number of notes updated, %2$d is the number skipped (changed elsewhere or read-only) */
+    ? sprintf( _n( 'Updated links in %1$d note, skipped %2$d', 'Updated links in %1$d notes, skipped %2$d', ok, 'noodled' ), ok, skipped )
+    /* translators: %d is the number of notes updated */
+    : sprintf( _n( 'Updated links in %d note', 'Updated links in %d notes', ok, 'noodled' ), ok ));
+}
+
+// A broken [[link]] was clicked: offer to create the missing note.
+async function createLinkedNote(t) {
+  t = String(t || '').trim();
+  if (!t) return;
+  /* translators: %s is the title of the note to create */
+  if (!(await showConfirm(sprintf( __( 'Create a note called "%s"?', 'noodled' ), t )))) return;
+  const nb = (activeNote && activeNote.notebook) || activeNotebook || 'General';
+  let note;
+  try { note = await api.create_note(nb, t, ''); } catch (e) { showToast(__( 'Could not create the note', 'noodled' )); return; }
+  if (!note || note.error || !note.id) { showToast(__( 'Could not create the note', 'noodled' )); return; }
+  await loadNotes();
+  await selectNote(note.id);
 }
 
 // ── Keyboard handling in contenteditable ──
@@ -2963,40 +3033,13 @@ function handleGlobalKey(e) {
   if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K') && !e.shiftKey) { e.preventDefault(); showCommandPalette(); return; }
   if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); document.getElementById('searchInput').focus(); return; }
-  if (e.ctrlKey && e.key === 'p') { e.preventDefault(); showQuickOpen(); return; }
+  if (e.ctrlKey && e.key === 'p') { e.preventDefault(); showCommandPalette(); return; }
   if (e.ctrlKey && e.key === 'j') { e.preventDefault(); openDailyJournal(); return; }
   if (e.ctrlKey && e.key === 'e') { e.preventDefault(); showRecentSwitcher(); return; }
   if (e.ctrlKey && e.key === '.') { e.preventDefault(); toggleQuickCapture(); return; }
   if (e.ctrlKey && e.key === 'h') { e.preventDefault(); toggleFindReplace(); return; }
   if (e.key === 'Escape' && readingMode) { toggleReadingMode(); return; }
   if (e.key === '?' && !isEditable) { e.preventDefault(); showShortcutsHelp(); return; }
-}
-
-// ── Quick-open ──
-function showQuickOpen() {
-  const el = document.getElementById('modalContainer');
-  const allNotes = notes;
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}"><div class="modal"><h3>${esc(__( 'Quick Open', 'noodled' ))}</h3><input id="qoInput" placeholder="${escAttr(__( 'Type to search notes...', 'noodled' ))}" aria-label="${escAttr(__( 'Search notes to open', 'noodled' ))}" autofocus><div class="quick-open-list" id="qoList"></div></div></div>`;
-  let qoHighlight = 0, qoResults = [];
-  function qoFilter() {
-    const q = document.getElementById('qoInput').value.toLowerCase();
-    qoResults = allNotes.filter(n => n.title.toLowerCase().includes(q)).slice(0, 10);
-    qoHighlight = 0; qoRender();
-  }
-  function qoRender() {
-    const list = document.getElementById('qoList');
-    if (!qoResults.length) { list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:12px">' + esc(__( 'No matches', 'noodled' )) + '</div>'; return; }
-    list.innerHTML = qoResults.map((n, i) => `<div class="quick-open-item ${i === qoHighlight ? 'highlight' : ''}" onclick="selectNote(${n.id}); document.getElementById('modalContainer').innerHTML='';"><span>${esc(n.title)}</span><span class="qo-notebook">${esc(n.notebook)}</span></div>`).join('');
-  }
-  const inp = document.getElementById('qoInput');
-  inp.addEventListener('input', qoFilter);
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); qoHighlight = Math.min(qoHighlight + 1, qoResults.length - 1); qoRender(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); qoHighlight = Math.max(qoHighlight - 1, 0); qoRender(); }
-    else if (e.key === 'Enter' && qoResults.length) { e.preventDefault(); selectNote(qoResults[qoHighlight].id); document.getElementById('modalContainer').innerHTML = ''; }
-    else if (e.key === 'Escape') { document.getElementById('modalContainer').innerHTML = ''; }
-  });
-  qoFilter(); inp.focus();
 }
 
 // ── Shortcuts help ──
@@ -3043,9 +3086,11 @@ function renderMarkdown(text) {
     return s
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => `<img src="${safeUrl(url)}" alt="${attrText(alt)}">`)
       .replace(/\[\[([^\]]+)\]\]/g, (match, title) => {
-        const target = notes.find(n => n.title.toLowerCase() === title.toLowerCase().trim());
+        // The line is already escLine'd: undo that for the lookup and the data-title.
+        const raw = title.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+        const target = findNoteByTitle(raw);
         if (target) return `<a href="#" class="wikilink" title="${escAttr((target.preview || target.title || '').slice(0, 140))}" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
-        return `<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), title.trim() ))}" onclick="event.preventDefault()">${esc(title)}</a>`;
+        return `<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), title.trim() ))}" data-title="${escAttr(raw)}" onclick="event.preventDefault(); createLinkedNote(this.dataset.title)">${esc(title)}</a>`;
       })
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${txt}</a>`)
       // Autolink bare URLs (not already inside a markdown link's href/text).
@@ -5220,11 +5265,10 @@ async function renderBacklinks() {
   if (!el || !Array.isArray(backlinks) || !backlinks.length) return;
   const links = backlinks
     .filter(n => n.id !== note.id)
-    .map(n => `<a href="#" class="backlink" onclick="event.preventDefault();selectNote(${n.id})">${esc(n.title)}</a>`)
-    .join(', ');
+    .map(n => `<li><a href="#" class="backlink" onclick="event.preventDefault();selectNote(${n.id})">${esc(n.title)}</a></li>`)
+    .join('');
   if (links) {
-    /* translators: %s is a comma-separated list of note links */
-    el.innerHTML += `<div class="backlinks-line">${sprintf( __( 'Linked from: %s', 'noodled' ), links )}</div>`;
+    el.innerHTML += `<section class="backlinks" aria-label="${escAttr(__( 'Linked from', 'noodled' ))}"><h2 class="backlinks-h">${icon('link')} ${esc(__( 'Linked from', 'noodled' ))}</h2><ul class="backlinks-list">${links}</ul></section>`;
   }
 }
 
@@ -5742,6 +5786,8 @@ function showCommandPalette() {
     { icon: icon('book-open'), label: __( 'Daily journal', 'noodled' ), run: () => openDailyJournal() },
     { icon: icon('zap'), label: __( 'Quick capture', 'noodled' ), run: () => toggleQuickCapture() },
     { icon: icon('timer'), label: __( 'Focus timer', 'noodled' ), run: () => showFocusOptions() },
+    { icon: icon('tags'), label: __( 'Browse tags', 'noodled' ), run: () => showTagCloud() },
+    { icon: icon('scissors'), label: __( 'Web clipper', 'noodled' ), run: () => showWebClipper() },
     { icon: icon('refresh-cw'), label: __( 'Sync now', 'noodled' ), run: () => syncPull() },
     { icon: icon('sun-moon'), label: __( 'Toggle theme', 'noodled' ), run: () => toggleTheme() },
     { icon: icon('download'), label: __( 'Download everything (zip)', 'noodled' ), run: () => exportBackup() },
@@ -5749,6 +5795,8 @@ function showCommandPalette() {
     { icon: icon('keyboard'), label: __( 'Keyboard shortcuts', 'noodled' ), run: () => showShortcutsHelp() },
   ];
   if (owner) cmds.splice(3, 0, { icon: icon('users'), label: __( 'Manage people', 'noodled' ), run: () => manageUsers() });
+  if (activeNote) cmds.push({ icon: icon('history'), label: __( 'Version history', 'noodled' ), run: () => showHistory() });
+  if (noodledConfig.aiEnabled) cmds.push({ icon: icon('sparkles'), label: __( 'Ask your notes', 'noodled' ), run: () => askYourNotes() });
 
   el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp">
     <input id="cmdpInput" placeholder="${escAttr(__( 'Type a command or note…', 'noodled' ))}" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="cmdpList" aria-activedescendant="" aria-label="${escAttr(__( 'Command palette', 'noodled' ))}">
@@ -5761,23 +5809,36 @@ function showCommandPalette() {
     const q = input.value.trim();
     let cm = cmds.map(c => ({ type: 'cmd', item: c, score: q ? fuzzyScore(q, c.label) : 1 })).filter(x => x.score > 0);
     cm.sort((a, b) => b.score - a.score);
-    let nm = [];
-    if (q) nm = notes.map(n => ({ type: 'note', item: n, score: fuzzyScore(q, n.title) }))
-      .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 6);
-    results = q ? [...cm.slice(0, 8), ...nm] : cm;
+    if (!q) {
+      // Empty query: recently opened notes first, then every command.
+      const byId = id => notes.find(n => n.id === id) || (noteIndex || []).find(n => n.id === id);
+      const recent = _recentViewed.filter(id => !activeNote || id !== activeNote.id).map(byId).filter(Boolean).slice(0, 6)
+        .map(n => ({ type: 'note', item: n }));
+      results = [...recent, ...cm];
+    } else {
+      // Notes across every notebook (title index), then notebooks, then commands.
+      const nm = (noteIndex || notes).map(n => ({ type: 'note', item: n, score: fuzzyScore(q, n.title) }))
+        .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+      const bm = (notebooks || []).map(nb => ({ type: 'nb', item: nb, score: fuzzyScore(q, nb.label || nb.name) }))
+        .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 4);
+      results = [...nm, ...bm, ...cm.slice(0, 8)];
+    }
     hi = 0; render();
   }
   function render() {
     list.innerHTML = results.length ? results.map((r, i) => {
-      const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}` : `${icon('file-text')} ${esc(r.item.title)}`;
-      const sub = r.type === 'note' ? `<span class="cmdp-sub">${esc(r.item.notebook || '')}</span>` : '';
+      const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}`
+        : r.type === 'nb' ? `${icon('notebook')} ${esc(r.item.label || r.item.name)}`
+        : `${icon('file-text')} ${esc(r.item.title)}`;
+      const sub = r.type === 'note' ? `<span class="cmdp-sub">${esc(r.item.notebook || '')}</span>`
+        : r.type === 'nb' ? `<span class="cmdp-sub">${esc(__( 'Notebook', 'noodled' ))}</span>` : '';
       return `<div class="cmdp-i ${i === hi ? 'on' : ''}" data-i="${i}" id="cmdp-opt-${i}" role="option" aria-selected="${i === hi ? 'true' : 'false'}">${label}${sub}</div>`;
     }).join('') : '<div class="cmdp-empty">' + esc(__( 'No matches', 'noodled' )) + '</div>';
     const on = list.querySelector('.cmdp-i.on');
     if (on) on.scrollIntoView({ block: 'nearest' });
     input.setAttribute('aria-activedescendant', results.length ? 'cmdp-opt-' + hi : '');
   }
-  function run(r) { document.getElementById('modalContainer').innerHTML = ''; if (!r) return; if (r.type === 'cmd') r.item.run(); else selectNote(r.item.id); }
+  function run(r) { document.getElementById('modalContainer').innerHTML = ''; if (!r) return; if (r.type === 'cmd') r.item.run(); else if (r.type === 'nb') selectNotebook(r.item.name); else selectNote(r.item.id); }
 
   input.addEventListener('input', build);
   input.addEventListener('keydown', e => {
@@ -6496,7 +6557,8 @@ function editorAutocomplete() {
   let m;
   if ((m = before.match(/\[\[([^\]]*)$/))) {
     const q = m[1].toLowerCase();
-    const matches = notes.map(n => n.title).filter(t => t && t.toLowerCase().includes(q)).slice(0, 6);
+    const titles = [...new Set([...notes, ...(noteIndex || [])].map(n => n.title).filter(Boolean))];
+    const matches = titles.filter(t => t.toLowerCase().includes(q)).slice(0, 6);
     showAutocomplete('link', m[1], matches, r);
   } else if ((m = before.match(/(?:^|\s)#([a-zA-Z][\w-]*)$/))) {
     const q = m[1].toLowerCase();

@@ -64,6 +64,9 @@ const CODE = '```js\nfunction f(a, b) {\n  // compare <a> & "b"\n  if (a < b) {\
 const CASES = [
   ['headings with inline formatting', '# Title with **bold**\n## Sub with *italic*\n### Third with [a link](https://example.com/page)'],
   // Accepted normalization: the blank line right after a heading is dropped.
+  // The link target lives in another notebook: only the cross-notebook title
+  // index (noteIndex) knows it, so it must resolve and not render as broken.
+  ['wiki link to a note only in the title index', 'See [[Elsewhere Note]] for details.', { index: [{ id: 950, title: 'Elsewhere Note', notebook: 'Work', modified: '', pinned: false }], noBroken: true }],
   ['heading followed by blank line', '# Title\n\nFirst paragraph.\n\n## Section\n\nSecond paragraph.', { expect: '# Title\nFirst paragraph.\n\n## Section\nSecond paragraph.' }],
   ['paragraphs with inline formatting', 'Plain **bold** and *italic* and `inline code` here.\n\nA [link](https://example.com/a?b=1&c=2) and ***bold italic*** too.'],
   ['strikethrough', 'Some ~~struck out~~ words.'],
@@ -204,17 +207,19 @@ async function main() {
     .then(() => true, () => false);
   await page.waitForTimeout(300);
 
-  async function roundTrip(md, map) {
-    return page.evaluate(async ({ md, others, map }) => {
+  async function roundTrip(md, map, index) {
+    return page.evaluate(async ({ md, others, map, index }) => {
       noodledConfig.map = map;
       showRawMarkdown = false;
       notes = others.map(n => ({ ...n }));
+      noteIndex = index;
       activeNote = { id: 900, title: 'Round trip', body: md, notebook: 'General', modified: '', attachments: [], tags: [] };
       renderContent();
       await new Promise(r => setTimeout(r, 30));
+      const broken = document.querySelectorAll('#noteBody .wikilink.broken').length;
       const body = currentBody();
-      return body === null ? { body: md, skipped: true } : { body, skipped: false };
-    }, { md, others: OTHER_NOTES, map: map || {} });
+      return body === null ? { body: md, skipped: true, broken } : { body, skipped: false, broken };
+    }, { md, others: OTHER_NOTES, map: map || {}, index: index || null });
   }
 
   let failed = 0, known = 0, passed = 0;
@@ -225,8 +230,8 @@ async function main() {
   for (const [name, md, opts = {}] of CASES) {
     let first, second, err = null;
     try {
-      first = await roundTrip(md, opts.map);
-      second = await roundTrip(first.body, opts.map);
+      first = await roundTrip(md, opts.map, opts.index);
+      second = await roundTrip(first.body, opts.map, opts.index);
     } catch (e) { err = e.message.split('\n')[0]; }
     const problems = [];
     if (err) problems.push('threw: ' + err);
@@ -234,6 +239,7 @@ async function main() {
       const a = normalize(opts.expect !== undefined ? opts.expect : md), b = normalize(first.body), c = normalize(second.body);
       if (b !== a) problems.push(['round trip changed the markdown', a, b]);
       if (c !== b) problems.push(['second round trip differs from first (not idempotent)', b, c]);
+      if (opts.noBroken && (first.broken || second.broken)) problems.push('a wiki link rendered as broken');
     }
     const isKnown = Object.prototype.hasOwnProperty.call(KNOWN_FAILURES, name);
     const note = (!err && first.skipped) ? ' (no editor mounted, save skipped, body untouched)' : '';

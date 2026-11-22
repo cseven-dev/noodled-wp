@@ -59,6 +59,8 @@ const fake = {
   offline: false,    // abort PUTs like a dropped connection
   searchResults: null,
   revisions: {},     // note id -> GET /notes/{id}/revisions response
+  racy: new Set(),   // ids another device re-saves right after each GET /notes/{id}
+  readOnly: new Set(), // ids whose PUT answers 403 (no write access)
   stamp() {
     const d = new Date(Date.UTC(2026, 10, 22, 13, 45, 0) + this.clock * 1000);
     return d.toISOString().slice(0, 19).replace('T', ' ');
@@ -75,6 +77,7 @@ const fake = {
   },
   reset(rows) {
     this.rows = {}; this.saves = []; this.putDelay = 0; this.offline = false; this.searchResults = null;
+    this.racy = new Set(); this.readOnly = new Set();
     for (const r of rows) this.rows[r.id] = { pinned: false, notebook: 'General', created_at: '2026-11-01 09:00:00', ...r };
   },
   // Same rule as Noodled_REST::update_note.
@@ -101,14 +104,24 @@ async function handleApi(route, req) {
   try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
   const json = (o) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(o) });
   let m;
-  if (method === 'GET' && p === '/notes') return json(Object.values(fake.rows).map(r => fake.format(r, false)));
+  if (method === 'GET' && p === '/notes') {
+    const nb = u.searchParams.get('notebook');
+    return json(Object.values(fake.rows).filter(r => !nb || r.notebook === nb).map(r => fake.format(r, false)));
+  }
   if (method === 'GET' && (m = p.match(/^\/notes\/(\d+)$/))) {
     const r = fake.rows[+m[1]];
-    return r ? json({ ...fake.format(r), attachments: [] }) : route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    if (!r) return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    const out = { ...fake.format(r), attachments: [] };
+    if (fake.racy.has(r.id)) { r.body = 'edited on another device'; r.modified_at = fake.tick(); }
+    return json(out);
   }
   if (method === 'PUT' && (m = p.match(/^\/notes\/(\d+)$/))) {
     if (fake.offline) return route.abort('internetdisconnected');
     const id = +m[1];
+    if (fake.readOnly.has(id)) {
+      fake.saves.push({ id, payload: body, response: { status: 403 } });
+      return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Access denied' }) });
+    }
     if (fake.putDelay) await new Promise(r => setTimeout(r, fake.putDelay));
     const res = fake.update(id, body);
     fake.saves.push({ id, payload: body, response: res });
@@ -136,6 +149,13 @@ async function handleApi(route, req) {
   if (method === 'GET' && (m = p.match(/^\/notes\/(\d+)\/revisions$/))) return json(fake.revisions[+m[1]] || []);
   if (method === 'GET' && p === '/search') return json(fake.searchResults || []);
   if (method === 'GET' && p === '/bodies') return json(Object.values(fake.rows).map(r => ({ id: r.id, body: r.body })));
+  // Same shape as Noodled_Notes::titles(): every note, all notebooks, no bodies.
+  if (method === 'GET' && p === '/titles') return json(Object.values(fake.rows).map(r => ({ id: r.id, title: r.title, notebook: r.notebook, modified: r.modified_at.slice(0, 16), pinned: !!r.pinned })));
+  // Same rule as Noodled_Notes::backlinks(): body contains [[title]] (case-insensitive, like the LIKE).
+  if (method === 'GET' && p === '/backlinks') {
+    const t = ('[[' + (u.searchParams.get('title') || '').trim() + ']]').toLowerCase();
+    return json(Object.values(fake.rows).filter(r => r.body.toLowerCase().includes(t)).map(r => fake.format(r, false)));
+  }
   return json([]);
 }
 
@@ -479,6 +499,65 @@ async function main() {
     check(st.body === oldBody && st.mtime === fake.rows[1].modified_at, 'open note did not adopt the restored version');
     check(await ev(() => document.querySelector('#modalContainer .modal') === null), 'history modal not closed');
     fake.revisions = {};
+  });
+
+  // 9. the switcher searches the cross-notebook title index, not just the open notebook.
+  await group('9 command palette finds a note outside the open notebook (title index)', async check => {
+    fake.reset([
+      { id: 21, title: 'Shopping list', body: 'eggs', notebook: 'General', modified_at: '2026-11-20 10:00:00' },
+      { id: 22, title: 'Zebra facts', body: 'stripes', notebook: 'Work', modified_at: '2026-11-21 10:00:00' },
+    ]);
+    const st = await ev(async () => {
+      document.getElementById('modalContainer').innerHTML = ''; _conflictOpen = false; activeNote = null;
+      activeNotebook = 'General'; searchScope = 'notebook'; document.getElementById('searchInput').value = '';
+      await loadNotes();
+      await new Promise(r => setTimeout(r, 500)); // the 300ms-debounced /titles call
+      const inList = notes.some(n => n.id === 22);
+      showCommandPalette();
+      const inp = document.getElementById('cmdpInput');
+      inp.value = 'zebra'; inp.dispatchEvent(new Event('input'));
+      const first = document.querySelector('#cmdpList .cmdp-i');
+      const out = { inList, index: (noteIndex || []).length, first: first ? first.textContent : '' };
+      inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await new Promise(r => setTimeout(r, 200));
+      out.opened = activeNote && activeNote.id;
+      activeNotebook = null;
+      return out;
+    });
+    check(st.inList === false, 'note 22 should not be in the open notebook list');
+    check(st.index === 2, 'title index has ' + st.index + ' rows, want 2');
+    check(st.first.includes('Zebra facts') && st.first.includes('Work'), 'first palette row: ' + JSON.stringify(st.first));
+    check(st.opened === 22, 'Enter opened ' + st.opened + ', want 22');
+  });
+
+  // 10. a rename rewrites [[Old]] links elsewhere with each note's own base; conflicts and 403s are skipped.
+  await group('10 rename updates backlinks with base_modified; a note changed elsewhere or read-only is left alone', async check => {
+    freshNote();
+    const row = (id, title, body, notebook) => ({ id, title, body, notebook, pinned: false, created_at: '2026-11-01 09:00:00', modified_at: '2026-11-19 08:00:00' });
+    fake.rows[31] = row(31, 'Linker', 'See [[Alpha]] and ![[alpha]] here', 'Work');
+    fake.rows[32] = row(32, 'Racy', 'Also [[Alpha]]', 'Work');
+    fake.rows[33] = row(33, 'Shared to me', 'Read [[Alpha]]', 'Shared');
+    fake.racy.add(32); fake.readOnly.add(33);
+    await ev(() => __t.open(1));
+    await ev(() => { const st = document.getElementById('toastStack'); if (st) st.innerHTML = ''; });
+    const before = fake.saves.length;
+    const asked = await ev(async () => {
+      const realConfirm = showConfirm; let msg = '';
+      showConfirm = async (m) => { msg = m; return true; };
+      try { document.getElementById('titleInput').value = 'Beta'; await saveTitleOnly(); } finally { showConfirm = realConfirm; }
+      return msg;
+    });
+    check(asked.includes('3 links'), 'confirm text: ' + JSON.stringify(asked));
+    const s31 = fake.saves.slice(before).find(x => x.id === 31);
+    check(s31 && s31.payload.base_modified === '2026-11-19 08:00:00', 'linker save base ' + (s31 && s31.payload.base_modified));
+    check(fake.rows[31].body === 'See [[Beta]] and ![[Beta]] here', 'linker body: ' + JSON.stringify(fake.rows[31].body));
+    const s32 = fake.saves.slice(before).find(x => x.id === 32);
+    check(s32 && s32.response.conflict === true, 'racy note save was not a conflict');
+    check(fake.rows[32].body === 'edited on another device', 'racy note was overwritten: ' + JSON.stringify(fake.rows[32].body));
+    check(fake.rows[33].body === 'Read [[Alpha]]', 'read-only note changed');
+    check(fake.rows[1].title === 'Beta', 'renamed note title ' + fake.rows[1].title);
+    const toast = await ev(() => (document.getElementById('toastStack') || document.body).textContent);
+    check(/skipped 2/.test(toast), 'toast did not report 2 skipped: ' + JSON.stringify(toast.slice(0, 200)));
   });
 
   const harnessErrors = await page.evaluate(() => window.__pageErrors.slice());

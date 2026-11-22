@@ -194,6 +194,12 @@ function handleApi(route, req, theme) {
     if (/^\/file\/\d+$/.test(p)) return route.fulfill({ contentType: 'image/png', body: SWATCH_PNG });
     if (p === '/bodies') return json(NOTE_ROWS.map(r => ({ id: r.id, body: r.body })));
     if (p === '/trash/count') return json(0);
+    // Cross-notebook title index (Noodled_Notes::titles shape, no bodies).
+    if (p === '/titles') return json(NOTE_ROWS.map(r => ({ id: r.id, title: r.title, notebook: r.notebook, modified: r.modified_at.slice(0, 16), pinned: !!r.pinned })));
+    if (p === '/backlinks') {
+      const t = ('[[' + (u.searchParams.get('title') || '') + ']]').toLowerCase();
+      return json(NOTE_ROWS.filter(r => r.body.toLowerCase().includes(t)).map(r => formatNote(r, false)));
+    }
     if (p === '/search') {
       const q = (u.searchParams.get('q') || '').toLowerCase();
       return json(NOTE_ROWS.filter(r => (r.title + ' ' + r.body).toLowerCase().includes(q)).map(r => formatNote(r, false)));
@@ -285,7 +291,18 @@ async function main() {
       await page.keyboard.press('Control+k');
       await page.waitForSelector('#modalContainer .modal-overlay');
       await shot(page, `desktop-palette-${t}`);
+      // A typed query searches notes in every notebook, then notebooks, then commands.
+      await page.evaluate(() => selectNotebook('Work'));
+      await page.keyboard.press('Control+k');
+      await page.waitForSelector('#cmdpInput');
+      await page.fill('#cmdpInput', 'pla');
+      await shot(page, `desktop-palette-query-${t}`);
       await closeModal(page);
+      await page.evaluate(() => selectNotebook(null));
+      // "Linked from" section in the editor footer (Paint colours is linked from the showcase).
+      await page.evaluate(() => selectNote(102));
+      await page.waitForSelector('#editorFooter .backlinks');
+      await shot(page, `desktop-backlinks-${t}`);
       page.evaluate(() => { createNotebook(); });
       await page.waitForSelector('#modalContainer .modal-overlay');
       await shot(page, `desktop-popup-${t}`);
@@ -313,6 +330,11 @@ async function main() {
       page.evaluate(() => { createNotebook(); });
       await page.waitForSelector('#modalContainer .modal-overlay');
       await shot(page, `phone-popup-${t}`);
+      await closeModal(page);
+      await page.evaluate(() => showCommandPalette());
+      await page.waitForSelector('#cmdpInput');
+      await page.fill('#cmdpInput', 'pla');
+      await shot(page, `phone-palette-query-${t}`);
     } },
   ];
 
