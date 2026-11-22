@@ -291,4 +291,70 @@ class Noodled_Attachments {
 		global $wpdb;
 		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT note_id FROM " . self::table() . " WHERE id = %d", $id ) );
 	}
+
+	/* ── PDF text (search) ──
+	 * The browser extracts a PDF's text (pdf.js) and posts it here. It is stored
+	 * server side only (text_content) and never returned to the client except as
+	 * a short search snippet. The caller checks write access and the lock first.
+	 */
+
+	const TEXT_CAP = 500000;
+
+	/** Store extracted text for a PDF attachment. Returns [ 'ok' => true ] or [ 'error' ]. */
+	public static function set_text( int $id, string $text ): array {
+		global $wpdb;
+		$mime = $wpdb->get_var( $wpdb->prepare( "SELECT mime_type FROM " . self::table() . " WHERE id = %d", $id ) );
+		if ( $mime === null ) return [ 'error' => __( 'Attachment not found', 'noodled' ) ];
+		if ( $mime !== 'application/pdf' ) return [ 'error' => __( 'Only PDF text can be stored.', 'noodled' ) ];
+		$text = mb_substr( wp_check_invalid_utf8( $text ), 0, self::TEXT_CAP );
+		$wpdb->update( self::table(), [ 'text_content' => $text ], [ 'id' => $id ] );
+		return [ 'ok' => true ];
+	}
+
+	// SQL for "attachment a on note n, inside the scope pair, not trashed, not locked".
+	private static function scoped_join( array $notebook_ids, array $extra_note_ids ): string {
+		global $wpdb;
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		return "FROM " . self::table() . " a JOIN {$wpdb->prefix}noodled_notes n ON n.id = a.note_id"
+			. " WHERE n.deleted_at IS NULL AND (n.notebook_id IN ($ids) OR n.id IN ($note_ids))"
+			. " AND (n.body IS NULL OR LEFT(n.body, 15) <> 'noodled:enc:v1:')";
+	}
+
+	/** PDFs in scope whose text has not been extracted yet: [ id, note_id, filename ]. */
+	public static function unindexed( array $notebook_ids, array $extra_note_ids ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			"SELECT a.id, a.note_id, a.filename " . self::scoped_join( $notebook_ids, $extra_note_ids )
+			. " AND a.mime_type = 'application/pdf' AND a.text_content IS NULL ORDER BY a.id ASC",
+			ARRAY_A
+		);
+		return array_map( static fn( $r ) => [ 'id' => (int) $r['id'], 'note_id' => (int) $r['note_id'], 'filename' => (string) $r['filename'] ], $rows ?: [] );
+	}
+
+	/**
+	 * Attachments in scope whose stored text contains $q (at most 50, newest note
+	 * first): [ note_id, attachment_id, filename, snippet ], the snippet being
+	 * about 120 characters around the first match.
+	 */
+	public static function search_text( string $q, array $notebook_ids, array $extra_note_ids ): array {
+		global $wpdb;
+		$q = trim( $q );
+		if ( mb_strlen( $q ) < 3 ) return [];
+		$like = '%' . $wpdb->esc_like( $q ) . '%';
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT a.id, a.note_id, a.filename, SUBSTRING(a.text_content, GREATEST(1, LOCATE(%s, a.text_content) - 50), 120) AS snippet "
+			. self::scoped_join( $notebook_ids, $extra_note_ids )
+			. " AND a.text_content LIKE %s ORDER BY n.modified_at DESC, a.id ASC LIMIT 50",
+			$q, $like
+		), ARRAY_A );
+		return array_map( static function ( $r ) {
+			return [
+				'note_id'       => (int) $r['note_id'],
+				'attachment_id' => (int) $r['id'],
+				'filename'      => (string) $r['filename'],
+				'snippet'       => trim( preg_replace( '/\s+/u', ' ', (string) $r['snippet'] ) ),
+			];
+		}, $rows ?: [] );
+	}
 }

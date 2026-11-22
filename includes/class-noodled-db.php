@@ -126,6 +126,7 @@ CREATE TABLE {$wpdb->prefix}noodled_attachments (
   exif longtext,
   alt varchar(500) NOT NULL DEFAULT '',
   sort_order int(11) NOT NULL DEFAULT 0,
+  text_content longtext,
   created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_note (note_id)

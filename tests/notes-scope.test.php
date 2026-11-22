@@ -29,7 +29,11 @@ class Noodled_Notebooks {
 	public static function get_by_id( int $id ): ?array { return [ 'id' => $id, 'name' => $GLOBALS['wpdb']->notebooks[ $id ] ?? '' ]; }
 }
 class Noodled_Attachments {
+	// PDF-text hits search() merges in; the real scoping is covered by tests/attachments-text.test.php.
+	public static $hits = [];
+	public static $calls = [];
 	public static function delete_for_note( int $id ): void {}
+	public static function search_text( string $q, array $nbs, array $ids ): array { self::$calls[] = $q; return self::$hits; }
 }
 
 // ── Fake $wpdb: notes + notebooks tables ──
@@ -81,6 +85,7 @@ class FakeWpdb {
 				'regexp'   => '/^ AND body REGEXP ' . $str . '/s',
 				'match'    => '/^ AND MATCH\(title, body\) AGAINST\(' . $str . ' IN BOOLEAN MODE\)/s',
 				'like'     => '/^ AND \(title LIKE ' . $str . ' OR body LIKE ' . $str . '\)/s',
+				'ids'      => '/^ AND id IN \(([\d,]+)\)/',
 			];
 			while ( $rest !== '' ) {
 				$hit = false;
@@ -96,6 +101,7 @@ class FakeWpdb {
 							case 'regexp':   return (bool) preg_match( '/' . str_replace( '/', '\/', $v ) . '/i', $n['body'] );
 							case 'match':    $w = trim( $v, '*' ); return stripos( $n['title'] . ' ' . $n['body'], $w ) !== false;
 							case 'like':     $w = stripcslashes( trim( $v, '%' ) ); return stripos( $n['title'], $w ) !== false || stripos( $n['body'], $w ) !== false;
+							case 'ids':      return in_array( (int) $n['id'], array_map( 'intval', explode( ',', $v ) ), true );
 						}
 						return false;
 					} );
@@ -142,6 +148,8 @@ function same( $want, $got, string $msg ): void { ok( $want === $got, $msg . ' (
 function scenario( string $name, callable $fn ): void {
 	global $results, $fails;
 	$GLOBALS['wpdb'] = new FakeWpdb();
+	Noodled_Attachments::$hits = [];
+	Noodled_Attachments::$calls = [];
 	account();
 	$fails = [];
 	try { $fn(); } catch ( Throwable $e ) { $fails[] = 'exception: ' . $e->getMessage() . ' @' . $e->getLine(); }
@@ -280,6 +288,32 @@ scenario( 'search: trashed notes never match a filter', function () {
 	$GLOBALS['wpdb']->notes[2]['body'] = 'gone #mine';
 	$ids = array_column( Noodled_Notes::search( '', [ 10 ], [], [ 'tag' => 'mine' ] ), 'id' );
 	same( [ 1 ], $ids, 'trashed note 2 excluded' );
+} );
+
+// ── search(): PDF attachment-text hits merged in ──
+
+scenario( 'search: notes that only match through a PDF are added after the text matches, inside the scope', function () {
+	note( 8, 10, 'Scan of the deed', 'see attached' );
+	note( 9, 10, 'Pump manual', 'the pump' );
+	// Hits as search_text returns them; 4 is outside the scope pair and must not
+	// come back even if a hit names it, 9 already matches by text.
+	Noodled_Attachments::$hits = [
+		[ 'note_id' => 8, 'attachment_id' => 1, 'filename' => 'deed.pdf', 'snippet' => 'the pump room' ],
+		[ 'note_id' => 9, 'attachment_id' => 2, 'filename' => 'manual.pdf', 'snippet' => 'pump' ],
+		[ 'note_id' => 4, 'attachment_id' => 3, 'filename' => 'x.pdf', 'snippet' => 'pump' ],
+		[ 'note_id' => 2, 'attachment_id' => 4, 'filename' => 'y.pdf', 'snippet' => 'pump' ],
+	];
+	$rows = Noodled_Notes::search( 'pump', [ 10 ], [] );
+	same( [ 9, 8 ], array_column( $rows, 'id' ), 'ids' );
+	same( [ 'pump' ], Noodled_Attachments::$calls, 'search_text called with the query' );
+	ok( str_contains( last_query(), 'deleted_at IS NULL AND (notebook_id IN (10) OR id IN (0)) AND id IN (8,4,2)' ), 'merge query keeps the scope: ' . last_query() );
+	ok( ! isset( $rows[1]['body'] ), 'merged rows carry a body' );
+} );
+
+scenario( 'search: no PDF merge when a filter is set', function () {
+	Noodled_Attachments::$hits = [ [ 'note_id' => 3, 'attachment_id' => 1, 'filename' => 'a.pdf', 'snippet' => 'x' ] ];
+	Noodled_Notes::search( 'family', [ 10, 20 ], [], [ 'notebook' => 'Mine' ] );
+	same( [], Noodled_Attachments::$calls, 'search_text calls' );
 } );
 
 // ── Summary ──

@@ -131,6 +131,16 @@ class Noodled_REST {
 		register_rest_route( $ns, '/attachments/(?P<id>\d+)/alt', [
 			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_attachment_alt' ], ] + $auth,
 		] );
+		// PDF search: text extracted in the browser, stored server side only.
+		register_rest_route( $ns, '/attachments/(?P<id>\d+)/text', [
+			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'set_attachment_text' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/attachments/unindexed', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'unindexed_attachments' ], ] + $auth,
+		] );
+		register_rest_route( $ns, '/search/files', [
+			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'search_files' ], ] + $auth,
+		] );
 
 		// Per-user Evernote import (each user imports their own .enex from the app)
 		register_rest_route( $ns, '/import/evernote', [
@@ -951,6 +961,44 @@ class Noodled_REST {
 		}
 		Noodled_Attachments::set_alt( $id, (string) $req->get_param( 'alt' ) );
 		return new \WP_REST_Response( true );
+	}
+
+	// Store a PDF's extracted text: write access to its note, PDF only, never on a locked note.
+	public static function set_attachment_text( \WP_REST_Request $req ): \WP_REST_Response {
+		$id      = (int) $req['id'];
+		$note_id = Noodled_Attachments::note_id_of( $id );
+		$note    = $note_id ? self::verify_note_write( $note_id ) : null;
+		if ( ! $note ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
+		}
+		if ( str_starts_with( (string) ( $note['body'] ?? '' ), 'noodled:enc:v1:' ) ) {
+			return new \WP_REST_Response( [ 'error' => __( 'Locked notes are not indexed.', 'noodled' ) ], 400 );
+		}
+		$r = Noodled_Attachments::set_text( $id, (string) $req->get_param( 'text' ) );
+		return new \WP_REST_Response( $r, isset( $r['error'] ) ? 400 : 200 );
+	}
+
+	// PDFs not yet indexed, in notes the caller can write (scope pair, then a per-row write check).
+	public static function unindexed_attachments(): \WP_REST_Response {
+		$nb_ids   = self::accessible_notebook_ids();
+		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
+		$out      = [];
+		$can      = [];
+		foreach ( Noodled_Attachments::unindexed( $nb_ids, $note_ids ) as $a ) {
+			$nid = $a['note_id'];
+			if ( ! isset( $can[ $nid ] ) ) $can[ $nid ] = (bool) self::verify_note_write( $nid );
+			if ( $can[ $nid ] ) $out[] = $a;
+		}
+		return new \WP_REST_Response( $out );
+	}
+
+	// Attachment-text hits with a snippet, same scope pair as search().
+	public static function search_files( \WP_REST_Request $req ): \WP_REST_Response {
+		$q = trim( (string) $req->get_param( 'q' ) );
+		if ( mb_strlen( $q ) < 3 ) return new \WP_REST_Response( [] );
+		$nb_ids   = self::accessible_notebook_ids();
+		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
+		return new \WP_REST_Response( Noodled_Attachments::search_text( $q, $nb_ids, $note_ids ) );
 	}
 
 	// ── Config (per-user) ──

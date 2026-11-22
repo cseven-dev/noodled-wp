@@ -2060,3 +2060,13 @@ body.editor-serif .rendered-content, body.editor-serif .raw-markdown { font-fami
 .ai-sources ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .ai-sources a { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; color: var(--text); text-decoration: none; }
 .ai-sources a:hover, .ai-sources a:focus-visible { border-color: var(--accent); color: var(--accent); }
+/* PDF search: the "In file.pdf" hit line on a note row, and the backfill popup */
+.note-item .file-hit { grid-column: 1; display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: var(--font-xs); color: var(--text-muted); line-height: 1.35; min-width: 0; }
+.note-item .file-hit svg { flex: none; align-self: center; width: 12px; height: 12px; color: var(--accent); }
+.note-item .file-hit .fh-name { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; }
+.note-item .file-hit .fh-snip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-backfill .pdf-bf-status { margin: 0 0 10px; color: var(--text); }
+.pdf-backfill .pdf-bf-bar { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.pdf-backfill .pdf-bf-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.pdf-backfill .pdf-bf-note { margin: 12px 0 0; font-size: var(--font-xs); color: var(--text-muted); }
+.pdf-backfill .pdf-bf-actions { margin-top: 16px; text-align: right; }

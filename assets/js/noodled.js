@@ -67,6 +67,9 @@ const api = {
   delete_attachment(id)                  { return this._fetch('/attachments/' + id, { method: 'DELETE' }); },
   reorder_attachments(noteId, ids)       { return this._fetch('/attachments/reorder', { method: 'POST', body: JSON.stringify({ note_id: noteId, ids }) }); },
   set_attachment_alt(id, alt)            { return this._fetch('/attachments/' + id + '/alt', { method: 'POST', body: JSON.stringify({ alt }) }); },
+  set_attachment_text(id, text)          { return this._fetch('/attachments/' + id + '/text', { method: 'POST', body: JSON.stringify({ text }) }); },
+  unindexed_attachments()                { return this._fetch('/attachments/unindexed'); },
+  search_files(q)                        { return this._fetch('/search/files?q=' + encodeURIComponent(q)); },
   import_evernote(formData)              { return fetch(this._base + '/import/evernote', { method: 'POST', headers: { 'X-WP-Nonce': this._nonce }, credentials: 'same-origin', body: formData }).then(r => r.json()); },
   admin_users()                          { return this._fetch('/admin/users'); },
   admin_invite(email, name, role, drop)  { return this._fetch('/admin/users', { method: 'POST', body: JSON.stringify({ email, name, role, drop }) }); },
@@ -807,6 +810,7 @@ function filterNotes() {
     if (['notebook', 'modified', 'tag'].includes(f.key) && !(f.key in sent)) sent[f.key] = f.value; else rest.push(f);
   });
   const days = parseInt(sent.modified, 10) || 0;
+  queueFileSearch(free);
   if (q && searchScope === 'all' && activeNotebook && !viewingTrash && (free.length >= 2 || sent.notebook || sent.tag || days)) {
     api.search(free, { notebook: sent.notebook, tag: sent.tag, days }).then(results => {
       if (searchQuery.trim() !== q) return; // a newer keystroke superseded this
@@ -827,6 +831,7 @@ function filterNotes() {
       const hay = ((n.title || '') + ' ' + (n.body || n.preview || '') + ' ' + (n.notebook || '')).toLowerCase();
       return toks.every(t => hay.includes(t));
     });
+    filteredNotes = filteredNotes.concat(fileHitNotes(filteredNotes, parsed.filters));
   } else {
     filteredNotes = [...notes];
   }
@@ -835,6 +840,44 @@ function filterNotes() {
   if (free) titleMatchesFirst(free);
   partitionSharedLast();
   renderNoteList();
+}
+
+// PDF search: notes whose attachment text matches the free text (3+ characters),
+// from GET /search/files, debounced. _fileHits maps note id to its first hit
+// ({ filename, snippet }) for the query in _fileHitsQ.
+let _fileHits = {}, _fileHitsQ = '', _fileSearchTimer = null;
+function queueFileSearch(free) {
+  clearTimeout(_fileSearchTimer);
+  if (free.length < 3 || viewingTrash) { _fileHits = {}; _fileHitsQ = ''; return; }
+  if (_fileHitsQ === free) return; // already have this query's hits
+  _fileSearchTimer = setTimeout(async () => {
+    let hits;
+    try { hits = await api.search_files(free); } catch (e) { return; }
+    if (searchFree.trim() !== free) return; // a newer keystroke superseded this
+    const map = {};
+    (Array.isArray(hits) ? hits : []).forEach(h => { if (h && h.note_id && !map[h.note_id]) map[h.note_id] = h; });
+    _fileHits = map; _fileHitsQ = free;
+    const extra = fileHitNotes(filteredNotes, parseSearchQuery(document.getElementById('searchInput').value).filters);
+    if (extra.length) { filteredNotes = filteredNotes.concat(applyListFilters(extra)); renderNoteList(); }
+    else if (Object.keys(map).length) renderNoteList();
+  }, 350);
+}
+// Notes in the loaded list that only match through a PDF, not already shown.
+function fileHitNotes(shown, filters) {
+  if (!_fileHitsQ || _fileHitsQ !== searchFree.trim()) return [];
+  const have = new Set(shown.map(n => n.id));
+  return notes.filter(n => _fileHits[n.id] && !have.has(n.id) && matchFilters(n, filters));
+}
+function fileHitHtml(n) {
+  const free = searchFree.trim();
+  const h = (free.length >= 3 && _fileHitsQ === free) ? _fileHits[n.id] : null;
+  if (!h) return '';
+  // The snippet is one line: start it shortly before the match so the match shows.
+  let snip = h.snippet || '';
+  const at = snip.toLowerCase().indexOf(free);
+  if (at > 24) snip = '…' + snip.slice(at - 16).replace(/^\S{0,15}\s/, '');
+  /* translators: %s is the attached file name */
+  return `<div class="file-hit">${icon('paperclip')}<span class="fh-name">${esc(sprintf( __( 'In %s', 'noodled' ), h.filename || '' ))}</span><span class="fh-snip">${highlightMatch(snip, free)}</span></div>`;
 }
 
 // Split a search string into free text and filter tokens. Keys kept as filters:
@@ -1241,6 +1284,7 @@ function renderNoteItem(n) {
           ${taskBadge}
         </div>
         <div class="preview">${highlightMatch(preview, searchFree.trim())}</div>
+        ${fileHitHtml(n)}
         ${thumb}
       </div>
     `;
@@ -2568,6 +2612,7 @@ function renderMenuDashboard() {
     { title: __( 'Data & sync', 'noodled' ), items: [
       { icon: icon('refresh-cw'), label: __( 'Sync now', 'noodled' ), fn: 'syncPull', desc: __( "Push and pull with GitHub now. Don't wait for the clock.", 'noodled' ) },
       { icon: icon('inbox'), label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote', desc: __( "Bring the old shoebox over. We'll unpack the .enex.", 'noodled' ) },
+      { icon: icon('search'), label: __( 'Make PDFs searchable', 'noodled' ), fn: 'makePdfsSearchable', desc: __( 'Read the text inside your PDFs so search can find them. Scanned pages without text are skipped.', 'noodled' ) },
       { icon: icon('download'), label: __( 'Download everything (zip)', 'noodled' ), fn: 'exportBackup', desc: __( 'Zip the whole lot up. Belt, meet suspenders.', 'noodled' ) },
       { icon: icon('upload'), label: __( 'Import backup', 'noodled' ), fn: 'importBackup', desc: __( 'Put a backup back. No questions asked.', 'noodled' ) },
     ] },
@@ -2897,6 +2942,7 @@ async function attachFile(file) {
       if (activeNote === note) { renderAttachmentGallery(); syncAttBadge(); }
       /* translators: %s is the attached file name */
       showToast(sprintf( __( 'Attached: %s', 'noodled' ), result.filename ));
+      if (result.mime === 'application/pdf' && !String(note.body || '').startsWith(NOTE_ENC_PREFIX)) indexPdfInBackground(result.id, f);
     } else {
       if (i >= 0) note.attachments.splice(i, 1);
       if (activeNote === note) renderAttachmentGallery();
@@ -6350,6 +6396,107 @@ function calloutHtml(type, title, bodyParts, collapsible, src) {
 // Integrity hash: when bumping a version, update the URL AND its sha384 hash
 // together (every file of that lib), or the browser will refuse to load it.
 const _libs = {};
+// ── PDF text extraction (pdf.js, pinned + SRI, loaded only when needed) ──
+// Text only, no OCR. The text is posted to the server for search and never shown.
+const PDFJS = {
+  lib:    { url: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js', integrity: 'sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e' },
+  worker: { url: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js', integrity: 'sha384-SnzOobpRMLXZ52iJvZm/C0fYw0OQemTXzTjIsdsfMcrCtCEe9qgzxTd3RSklO5x2' },
+};
+const PDF_TEXT_CAP = 500000, PDF_PAGE_CAP = 200;
+let _pdfWorkerUrl = null;
+async function extractPdfText(blob) {
+  await loadLib('pdfjs', [PDFJS.lib]);
+  const lib = window.pdfjsLib;
+  if (!lib) throw new Error('pdf.js did not load');
+  if (!_pdfWorkerUrl) {
+    const r = await fetch(PDFJS.worker.url, { integrity: PDFJS.worker.integrity, mode: 'cors', credentials: 'omit' });
+    if (!r.ok) throw new Error('pdf.js worker ' + r.status);
+    _pdfWorkerUrl = URL.createObjectURL(await r.blob());
+  }
+  lib.GlobalWorkerOptions.workerSrc = _pdfWorkerUrl;
+  // isEvalSupported: false closes the font-code path of CVE-2024-4367 in pdf.js < 4.2.67.
+  const doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
+  try {
+    const parts = [];
+    let len = 0;
+    const pages = Math.min(doc.numPages, PDF_PAGE_CAP);
+    for (let i = 1; i <= pages && len < PDF_TEXT_CAP; i++) {
+      const page = await doc.getPage(i);
+      const tc = await page.getTextContent();
+      const t = tc.items.map(it => it.str || '').join(' ').replace(/\s+/g, ' ').trim();
+      if (t) { parts.push(t); len += t.length + 1; }
+      page.cleanup();
+    }
+    return parts.join('\n').slice(0, PDF_TEXT_CAP);
+  } finally {
+    doc.destroy();
+  }
+}
+
+// After an upload: extract and store quietly. Any failure is ignored; the
+// upload itself already succeeded and "Make PDFs searchable" can retry later.
+function indexPdfInBackground(id, blob) {
+  extractPdfText(blob).then(text => api.set_attachment_text(id, text)).catch(() => {});
+}
+
+// Backfill: extract every PDF in notes you can edit that has no stored text yet.
+let _pdfBackfill = null;
+async function makePdfsSearchable() {
+  const mc = document.getElementById('modalContainer');
+  const run = { cancelled: false };
+  if (_pdfBackfill) _pdfBackfill.cancelled = true;
+  _pdfBackfill = run;
+  mc.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){cancelPdfBackfill();}">
+    <div class="modal modal-sm pdf-backfill" role="dialog" aria-modal="true" aria-labelledby="pdfBfTitle">
+      <h3 id="pdfBfTitle">${icon('search')} ${esc(__( 'Make PDFs searchable', 'noodled' ))}</h3>
+      <p class="pdf-bf-status" id="pdfBfStatus" aria-live="polite">${esc(__( 'Looking for PDFs…', 'noodled' ))}</p>
+      <div class="pdf-bf-bar" aria-hidden="true"><span id="pdfBfBar"></span></div>
+      <p class="pdf-bf-note">${esc(__( 'Text is read in this browser. Scanned pages without text cannot be searched.', 'noodled' ))}</p>
+      <div class="pdf-bf-actions"><button class="btn" id="pdfBfBtn" onclick="stopPdfBackfill()">${esc(__( 'Cancel', 'noodled' ))}</button></div>
+    </div>
+  </div>`;
+  const status = (t) => { const el = document.getElementById('pdfBfStatus'); if (el) el.textContent = t; };
+  const bar = (p) => { const el = document.getElementById('pdfBfBar'); if (el) el.style.width = Math.round(p * 100) + '%'; };
+  const finish = (t) => {
+    status(t); if (_pdfBackfill === run) _pdfBackfill = null;
+    const b = document.getElementById('pdfBfBtn');
+    if (b) { b.textContent = __( 'Close', 'noodled' ); b.onclick = () => { document.getElementById('modalContainer').innerHTML = ''; }; b.focus(); }
+  };
+  let list;
+  try { list = await api.unindexed_attachments(); } catch (e) { finish(__( 'Could not load the list of PDFs.', 'noodled' )); return; }
+  list = Array.isArray(list) ? list : [];
+  if (!list.length) { bar(1); finish(__( 'All your PDFs are already searchable.', 'noodled' )); return; }
+  let done = 0, failed = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (run.cancelled || !document.getElementById('pdfBfStatus')) break;
+    /* translators: %1$d is the current PDF number, %2$d is the total */
+    status(sprintf( __( 'Reading PDF %1$d of %2$d…', 'noodled' ), i + 1, list.length ));
+    bar(i / list.length);
+    try {
+      const r = await fetch(api._base + '/file/' + parseInt(list[i].id, 10), { credentials: 'same-origin', headers: { 'X-WP-Nonce': api._nonce } });
+      if (!r.ok) throw new Error('file ' + r.status);
+      const text = await extractPdfText(await r.blob());
+      if (run.cancelled) break;
+      await api.set_attachment_text(list[i].id, text);
+      done++;
+    } catch (e) { failed++; }
+  }
+  bar((done + failed) / list.length);
+  /* translators: %1$d is the number of PDFs made searchable, %2$d is the number that could not be read */
+  const counts = sprintf( __( '%1$d made searchable, %2$d could not be read.', 'noodled' ), done, failed );
+  /* translators: %s is the "N made searchable, N could not be read." sentence */
+  finish(run.cancelled ? sprintf( __( 'Stopped. %s', 'noodled' ), counts ) : counts);
+}
+function stopPdfBackfill() {
+  if (_pdfBackfill) _pdfBackfill.cancelled = true;
+  const el = document.getElementById('pdfBfStatus');
+  if (el) el.textContent = __( 'Stopping after this PDF…', 'noodled' );
+}
+function cancelPdfBackfill() {
+  if (_pdfBackfill) _pdfBackfill.cancelled = true;
+  document.getElementById('modalContainer').innerHTML = '';
+}
+
 function loadLib(key, urls) {
   if (_libs[key]) return _libs[key];
   _libs[key] = (async () => {

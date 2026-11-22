@@ -481,7 +481,27 @@ class Noodled_Notes {
 
 	// $filters (all optional): 'notebook' (name), 'days' (modified within N
 	// days), 'tag' (validated name). With an empty $query only the filters apply.
+	// Note search plus notes whose PDF attachment text matches (free text of 3+
+	// characters, no filters). The PDF hits use the same scope pair and skip
+	// trashed and locked notes (Noodled_Attachments::search_text).
 	public static function search( string $query, array $notebook_ids = [], array $extra_note_ids = [], array $filters = [] ): array {
+		global $wpdb;
+		$plain = ( $filters['notebook'] ?? '' ) === '' && (int) ( $filters['days'] ?? 0 ) === 0 && ( $filters['tag'] ?? '' ) === '';
+		$files = $plain ? Noodled_Attachments::search_text( $query, $notebook_ids, $extra_note_ids ) : [];
+		$rows  = self::search_rows( $query, $notebook_ids, $extra_note_ids, $filters );
+		$have  = array_column( $rows, 'id' );
+		$more  = array_diff( array_unique( array_column( $files, 'note_id' ) ), $have );
+		if ( ! $more ) return $rows;
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$extra    = $wpdb->get_results(
+			"SELECT * FROM " . self::table() . " WHERE deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids)) AND id IN (" . implode( ',', array_map( 'intval', $more ) ) . ") ORDER BY modified_at DESC",
+			ARRAY_A
+		);
+		return array_merge( $rows, array_map( static fn( $r ) => self::format_row( $r, false ), $extra ?: [] ) );
+	}
+
+	private static function search_rows( string $query, array $notebook_ids = [], array $extra_note_ids = [], array $filters = [] ): array {
 		global $wpdb;
 		// Scope to the user's accessible notebooks plus any directly-shared notes.
 		// Empty scope matches nothing (never search all users' notes).

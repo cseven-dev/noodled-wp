@@ -131,6 +131,11 @@ const NOTE_ROWS = [
   { id: 114, notebook: 'Work', title: 'Conference talk outline', body: 'Opening story, three lessons from the outage, live demo, questions.', days: 352 },
 ];
 const STARRED = [103];
+// Attachment-text hits (GET /search/files shape) for the PDF search shots.
+const PDF_HITS = [
+  { note_id: 112, attachment_id: 601, filename: 'tire-warranty.pdf', snippet: 'Keep the receipt and the rotation log in the glovebox. Coverage: the tread warranty runs 80,000 km or six years, whichever comes first, provided rotation records are kept.' },
+  { note_id: 107, attachment_id: 603, filename: 'api-spec-v2-final-reviewed.pdf', snippet: 'Section 4.2 warranty of compatibility: v1 clients keep working until the adapter is retired.' },
+];
 NOTE_ROWS.forEach(r => { r.modified_at = stamp(r.days, 9 + (r.id % 8)); r.created_at = stamp(r.days + 3, 9); });
 NOTEBOOKS.forEach(nb => { nb.count = NOTE_ROWS.filter(r => r.notebook === nb.name).length; });
 
@@ -207,6 +212,12 @@ function handleApi(route, req, theme) {
       const t = ('[[' + (u.searchParams.get('title') || '') + ']]').toLowerCase();
       return json(NOTE_ROWS.filter(r => r.body.toLowerCase().includes(t)).map(r => formatNote(r, false)));
     }
+    // PDF search: one note that matches only inside its PDF, one that matches both ways.
+    if (p === '/search/files') {
+      const q = (u.searchParams.get('q') || '').toLowerCase();
+      return json(PDF_HITS.filter(h => h.snippet.toLowerCase().includes(q)));
+    }
+    if (p === '/attachments/unindexed') return json([{ id: 601, note_id: 112, filename: 'tire-warranty.pdf' }, { id: 602, note_id: 104, filename: 'handbook.pdf' }, { id: 603, note_id: 107, filename: 'api-spec.pdf' }]);
     if (p === '/search') {
       const q = (u.searchParams.get('q') || '').toLowerCase();
       return json(NOTE_ROWS.filter(r => (r.title + ' ' + r.body).toLowerCase().includes(q)).map(r => formatNote(r, false)));
@@ -366,6 +377,26 @@ async function main() {
       await shot(page, `desktop-ai-ask-${t}`);
       await closeModal(page);
       // The boot-time loading skeleton, drawn on demand.
+      // PDF search: a hit row that matches only inside a PDF (Car maintenance).
+      await page.evaluate(() => selectNotebook(null));
+      await page.fill('#searchInput', 'warranty');
+      await page.waitForSelector('.note-item .file-hit');
+      await shot(page, `desktop-pdf-search-${t}`);
+      await page.evaluate(() => clearSearch());
+      // The menu item, then the backfill popup mid-run and finished (extraction faked:
+      // the CDN is blocked here, and the real extraction is checked separately).
+      await page.evaluate(() => openMenuDashboard());
+      await page.waitForSelector('.md-panel');
+      await page.evaluate(() => { const b = [...document.querySelectorAll('.md-card')].find(x => x.textContent.includes('Make PDFs searchable')); if (b) b.scrollIntoView({ block: 'center' }); });
+      await shot(page, `desktop-menu-pdf-${t}`);
+      await page.evaluate(() => closeMenuDashboard());
+      await page.evaluate(() => { window.extractPdfText = () => new Promise(r => setTimeout(() => r('text'), 700)); window.fetch = ((orig) => (url, o) => String(url).includes('/file/') ? Promise.resolve(new Response(new Blob(['%PDF']))) : orig(url, o))(window.fetch); });
+      page.evaluate(() => { makePdfsSearchable(); });
+      await page.waitForFunction(() => /2 of 3/.test((document.getElementById('pdfBfStatus') || {}).textContent || ''));
+      await shot(page, `desktop-pdf-backfill-${t}`);
+      await page.waitForFunction(() => /made searchable/.test((document.getElementById('pdfBfStatus') || {}).textContent || ''), null, { timeout: 5000 });
+      await shot(page, `desktop-pdf-backfill-done-${t}`);
+      await closeModal(page);
       await page.evaluate(() => showLoadingSkeleton());
       await shot(page, `desktop-loading-${t}`);
     } },
@@ -401,6 +432,17 @@ async function main() {
       await page.evaluate(() => runAsk());
       await page.waitForSelector('#aiAskAnswer .ai-sources');
       await shot(page, `phone-ai-ask-${t}`);
+      await closeModal(page);
+      // PDF search hit row and the backfill popup on a phone.
+      await page.evaluate(() => { document.querySelector('.col-content')?.classList.remove('open'); });
+      await page.fill('#searchInput', 'warranty');
+      await page.waitForSelector('.note-item .file-hit');
+      await shot(page, `phone-pdf-search-${t}`);
+      await page.evaluate(() => clearSearch());
+      await page.evaluate(() => { window.extractPdfText = () => new Promise(r => setTimeout(() => r('text'), 700)); window.fetch = ((orig) => (url, o) => String(url).includes('/file/') ? Promise.resolve(new Response(new Blob(['%PDF']))) : orig(url, o))(window.fetch); });
+      page.evaluate(() => { makePdfsSearchable(); });
+      await page.waitForFunction(() => /2 of 3/.test((document.getElementById('pdfBfStatus') || {}).textContent || ''));
+      await shot(page, `phone-pdf-backfill-${t}`);
     } },
   ];
 
