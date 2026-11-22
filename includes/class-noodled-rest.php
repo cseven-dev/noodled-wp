@@ -80,27 +80,6 @@ class Noodled_REST {
 		register_rest_route( $ns, '/tasks', [
 			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'get_tasks' ], ] + $auth,
 		] );
-		// Reminders (note-attached, per-user)
-		register_rest_route( $ns, '/reminders', [
-			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'get_reminders' ], ] + $auth,
-			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'create_reminder' ], ] + $auth,
-		] );
-		register_rest_route( $ns, '/reminders/(?P<id>\d+)', [
-			[ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'delete_reminder' ], ] + $auth,
-		] );
-		register_rest_route( $ns, '/reminders/(?P<id>\d+)/sent', [
-			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'mark_reminder_sent' ], ] + $auth,
-		] );
-		// Web push (reminder delivery when the app is closed)
-		register_rest_route( $ns, '/push/key', [
-			[ 'methods' => 'GET', 'callback' => [ __CLASS__, 'push_key' ], ] + $auth,
-		] );
-		register_rest_route( $ns, '/push/subscribe', [
-			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'push_subscribe' ], ] + $auth,
-		] );
-		register_rest_route( $ns, '/push/unsubscribe', [
-			[ 'methods' => 'POST', 'callback' => [ __CLASS__, 'push_unsubscribe' ], ] + $auth,
-		] );
 		// Note sharing (owner-initiated, user-to-user)
 		register_rest_route( $ns, '/notes/(?P<id>\d+)/shares', [
 			[ 'methods' => 'GET',  'callback' => [ __CLASS__, 'note_shares' ], ] + $auth,
@@ -773,91 +752,6 @@ class Noodled_REST {
 		$result = Noodled_Notes::toggle_task( $id, (int) $req->get_param( 'idx' ) );
 		if ( ! isset( $result['error'] ) ) Noodled_Sync::queue_push( $id );
 		return new \WP_REST_Response( $result );
-	}
-
-	/* ── Web push ── */
-
-	public static function push_key(): \WP_REST_Response {
-		return new \WP_REST_Response( [ 'key' => Noodled_Push::public_key() ] );
-	}
-
-	public static function push_subscribe( \WP_REST_Request $req ): \WP_REST_Response {
-		$sub = $req->get_json_params();
-		$ok  = is_array( $sub ) ? Noodled_Push::subscribe( self::current_user_id(), $sub ) : false;
-		return new \WP_REST_Response( [ 'success' => (bool) $ok ] );
-	}
-
-	public static function push_unsubscribe( \WP_REST_Request $req ): \WP_REST_Response {
-		Noodled_Push::unsubscribe( self::current_user_id(), (string) $req->get_param( 'endpoint' ) );
-		return new \WP_REST_Response( [ 'success' => true ] );
-	}
-
-	/* ── Reminders (per-user, note-attached) ── */
-
-	public static function get_reminders( \WP_REST_Request $req ): \WP_REST_Response {
-		global $wpdb;
-		$uid = self::current_user_id();
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT r.id, r.note_id, r.remind_at, r.label, r.sent, n.title
-			   FROM {$wpdb->prefix}noodled_reminders r
-			   JOIN {$wpdb->prefix}noodled_notes n ON n.id = r.note_id
-			  WHERE r.user_id = %d AND n.deleted_at IS NULL
-			    AND ( r.sent = 0 OR r.remind_at >= ( UTC_TIMESTAMP() - INTERVAL 1 DAY ) )
-			  ORDER BY r.remind_at ASC",
-			$uid
-		), ARRAY_A );
-		$out = array_map( function ( $r ) {
-			return [
-				'id'      => (int) $r['id'],
-				'note_id' => (int) $r['note_id'],
-				'at'      => strtotime( $r['remind_at'] . ' UTC' ) * 1000,
-				'label'   => $r['label'],
-				'sent'    => (int) $r['sent'],
-				'title'   => $r['title'],
-			];
-		}, $rows ?: [] );
-		return new \WP_REST_Response( $out );
-	}
-
-	public static function create_reminder( \WP_REST_Request $req ): \WP_REST_Response {
-		$note_id = (int) $req->get_param( 'note_id' );
-		// Only let a user attach a reminder to a note they can read.
-		if ( ! self::verify_note_access( $note_id ) ) {
-			return new \WP_REST_Response( [ 'error' => __( 'Note not found', 'noodled' ) ], 404 );
-		}
-		$at_ms = (float) $req->get_param( 'at' );
-		if ( $at_ms <= 0 ) {
-			return new \WP_REST_Response( [ 'error' => __( 'Invalid reminder time', 'noodled' ) ], 400 );
-		}
-		global $wpdb;
-		$wpdb->insert( "{$wpdb->prefix}noodled_reminders", [
-			'note_id'    => $note_id,
-			'user_id'    => self::current_user_id(),
-			'remind_at'  => gmdate( 'Y-m-d H:i:s', (int) ( $at_ms / 1000 ) ),
-			'label'      => sanitize_text_field( (string) $req->get_param( 'label' ) ),
-			'sent'       => 0,
-			'created_at' => current_time( 'mysql', true ),
-		] );
-		return new \WP_REST_Response( [ 'id' => (int) $wpdb->insert_id ] );
-	}
-
-	public static function delete_reminder( \WP_REST_Request $req ): \WP_REST_Response {
-		global $wpdb;
-		$wpdb->delete( "{$wpdb->prefix}noodled_reminders", [
-			'id'      => (int) $req['id'],
-			'user_id' => self::current_user_id(),
-		] );
-		return new \WP_REST_Response( [ 'ok' => true ] );
-	}
-
-	public static function mark_reminder_sent( \WP_REST_Request $req ): \WP_REST_Response {
-		global $wpdb;
-		$wpdb->update(
-			"{$wpdb->prefix}noodled_reminders",
-			[ 'sent' => 1 ],
-			[ 'id' => (int) $req['id'], 'user_id' => self::current_user_id() ]
-		);
-		return new \WP_REST_Response( [ 'ok' => true ] );
 	}
 
 	public static function delete_note( \WP_REST_Request $req ): \WP_REST_Response {

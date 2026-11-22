@@ -3,12 +3,15 @@
 Scope notes for the four larger features still missing versus the market-leading
 PKM apps (per the 2026-06-11 gap analysis). Everything else a buyer shortlists is
 already shipped (web clipper, opt-in E2EE, code notes, drop folder, sync-safe
-history, passkeys, offline-first, reminders/push). These four are planned, not
+history, passkeys, offline-first). These four are planned, not
 built. Suggested order: **B (AI) → A (iOS slice) → D (canvas) → C (plugin API)**.
 
 ---
 
 ## A. Native mobile apps  (effort: High, ~1–2 weeks + ongoing)
+
+> **Status: paused (2026-11-22).** Not being built. Web push and reminders have
+> been removed from the web app (their tables are kept, dormant).
 
 > **Usage check, 2026-11-22:** the live site has 0 web-push subscriptions and 0
 > reminders, so push-when-the-app-is-closed is unproven demand. The share

@@ -94,11 +94,6 @@ const api = {
   ai_ask(q)                              { return this._fetch('/ai/ask', { method: 'POST', body: JSON.stringify({ q }) }); },
   get_tasks()                            { return this._fetch('/tasks'); },
   toggle_task(noteId, idx)               { return this._fetch('/notes/' + noteId + '/task-toggle', { method: 'POST', body: JSON.stringify({ idx }) }); },
-  // Reminders (note-attached, per-user). `at` is epoch milliseconds.
-  get_reminders()                        { return this._fetch('/reminders'); },
-  create_reminder(noteId, at, label)     { return this._fetch('/reminders', { method: 'POST', body: JSON.stringify({ note_id: noteId, at, label }) }); },
-  delete_reminder(id)                    { return this._fetch('/reminders/' + id, { method: 'DELETE' }); },
-  mark_reminder_sent(id)                 { return this._fetch('/reminders/' + id + '/sent', { method: 'POST' }); },
 };
 
 // ── State ──
@@ -170,12 +165,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('splash')?.classList.add('hidden');
   document.addEventListener('keydown', handleGlobalKey);
 
-  // Reminders, table editing, and notification-click routing
-  loadReminders();
+  // Table editing and service-worker messages
   setupTableEditing();
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', onSwMessage);
 
-  // Restore last note (or open one a reminder/notification deep-linked to)
+  // Restore last note (or open the one a ?noodled_note= link points to)
   const _openId = new URLSearchParams(location.search).get('noodled_note');
   if (_openId) selectNote(+_openId); else restoreLastNote();
 
@@ -1619,7 +1613,6 @@ function renderContent() {
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleZenMode()">${esc(__( 'Zen mode', 'noodled' ))}</div>
             <div class="dropdown-sep"></div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showHistory()">${esc(__( 'Version history', 'noodled' ))}</div>
-            <div class="dropdown-item" role="menuitem" tabindex="0" onclick="openReminderModal()">${esc(__( 'Remind me…', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="setWordGoal()">${esc(__( 'Word count goal', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="saveAsTemplate()">${esc(__( 'Save as template', 'noodled' ))}</div>
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="showReadingPrefs()">${esc(__( 'Reading preferences', 'noodled' ))}</div>
@@ -4127,35 +4120,7 @@ function tableAct(act) {
   schedSave();
 }
 
-// ── Reminders + notifications ──────────────────────────────
-let reminders = [];
-let _reminderFired = {};
-let _reminderTimer = null;
-async function loadReminders() {
-  try { reminders = await api.get_reminders(); } catch (e) { reminders = []; }
-  if (!Array.isArray(reminders)) reminders = [];
-  if (!_reminderTimer) _reminderTimer = setInterval(checkReminders, 30000);
-  checkReminders();
-  // If notifications are already allowed, (re)register for server push so
-  // reminders also fire when the app is closed (#22). No-op without permission.
-  if ('Notification' in window && Notification.permission === 'granted') subscribePush();
-}
-// Subscribe this device to web push and hand the subscription to the server.
-// Best-effort and idempotent; only proceeds once notifications are granted.
-async function subscribePush() {
-  try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      const r = await api._fetch('/push/key');
-      if (!r || !r.key) return;
-      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(r.key) });
-    }
-    await api._fetch('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
-  } catch (e) { /* push is a bonus; the in-app scheduler is the fallback */ }
-}
+// ── Base64url helpers (passkeys) ──────────────────────────────
 function urlB64ToBytes(base64) {
   const pad = '='.repeat((4 - base64.length % 4) % 4);
   const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
@@ -4194,78 +4159,8 @@ async function registerPasskey() {
     else showToast(__( 'Passkey setup failed.', 'noodled' ));
   }
 }
-function checkReminders() {
-  const now = Date.now();
-  reminders.forEach(r => {
-    if (r.sent || _reminderFired[r.id]) return;
-    if (r.at && r.at <= now) { _reminderFired[r.id] = true; fireReminder(r); }
-  });
-}
-function fireReminder(r) {
-  const title = r.title || __( 'Note reminder', 'noodled' );
-  const opts = { body: r.label || __( 'You asked to be reminded about this note.', 'noodled' ), tag: 'noodled-reminder-' + r.id, data: { noteId: r.note_id } };
-  try {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opts)).catch(() => { try { new Notification(title, opts); } catch (e) {} });
-      } else { new Notification(title, opts); }
-    }
-  } catch (e) {}
-  showToast('⏰ ' + title);
-  api.mark_reminder_sent(r.id).catch(() => {});
-  r.sent = 1;
-}
-function openReminderModal() {
-  if (!activeNote) return;
-  const d = new Date(Date.now() + 3600000); d.setSeconds(0, 0);
-  const pad = n => String(n).padStart(2, '0');
-  const localVal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const inStyle = 'width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,#252530);color:var(--text);font-size:16px;box-sizing:border-box';
-  const mine = reminders.filter(r => r.note_id === activeNote.id && !r.sent);
-  const list = mine.length ? mine.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:13px">${esc(new Date(r.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }))}${r.label ? ' — ' + esc(r.label) : ''}</span>
-      <button class="btn btn-sm" onclick="removeReminder(${r.id})" aria-label="${escAttr(__( 'Delete reminder', 'noodled' ))}">&times;</button>
-    </div>`).join('') : `<div style="font-size:12px;color:var(--text-muted)">${esc(__( 'No reminders on this note yet.', 'noodled' ))}</div>`;
-  const el = document.getElementById('modalContainer');
-  el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
-    <div class="modal" style="max-width:420px">
-      <h3>${esc(__( 'Remind me', 'noodled' ))}</h3>
-      <label for="remWhen" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'When', 'noodled' ))}</label>
-      <input type="datetime-local" id="remWhen" value="${esc(localVal)}" style="${inStyle};margin-bottom:10px">
-      <label for="remLabel" style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(__( 'Note to self (optional)', 'noodled' ))}</label>
-      <input type="text" id="remLabel" placeholder="${escAttr(__( 'e.g. Follow up on this', 'noodled' ))}" style="${inStyle};margin-bottom:12px">
-      <div style="margin-bottom:6px">${list}</div>
-      <div class="modal-buttons">
-        <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
-        <button class="btn btn-sm btn-accent" onclick="saveReminder()">${esc(__( 'Set reminder', 'noodled' ))}</button>
-      </div>
-    </div></div>`;
-}
-async function saveReminder() {
-  if (!activeNote) return;
-  const whenEl = document.getElementById('remWhen');
-  const label = (document.getElementById('remLabel')?.value || '').trim();
-  if (!whenEl || !whenEl.value) { showToast(__( 'Pick a time', 'noodled' )); return; }
-  const at = new Date(whenEl.value).getTime();
-  if (!at || at < Date.now() - 60000) { showToast(__( 'Pick a time in the future', 'noodled' )); return; }
-  if ('Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
-  subscribePush(); // register for closed-app delivery now that we may have permission (#22)
-  const r = await api.create_reminder(activeNote.id, at, label);
-  if (r && r.id) {
-    reminders.push({ id: r.id, note_id: activeNote.id, at, label, sent: 0, title: activeNote.title });
-    document.getElementById('modalContainer').innerHTML = '';
-    showToast(__( 'Reminder set', 'noodled' ));
-    if ('Notification' in window && Notification.permission !== 'granted') showToast(__( 'Allow notifications to be alerted', 'noodled' ));
-  } else { showToast((r && r.error) || __( 'Could not set reminder', 'noodled' )); }
-}
-async function removeReminder(id) {
-  await api.delete_reminder(id).catch(() => {});
-  reminders = reminders.filter(r => r.id !== id);
-  openReminderModal();
-}
 function onSwMessage(e) {
   if (!e.data) return;
-  if (e.data.type === 'noodled-open-note' && e.data.noteId) openNoteFromNotification(+e.data.noteId);
   // The service worker flushed queued edits in the background (#4): re-sync the
   // in-memory queue from IndexedDB, refresh the list, and confirm.
   if (e.data.type === 'noodled-synced') {
@@ -4277,9 +4172,6 @@ function onSwMessage(e) {
       if (e.data.count > 0) showToast(__( 'Synced pending changes', 'noodled' ));
     }).catch(() => {});
   }
-}
-async function openNoteFromNotification(id) {
-  try { if (!notes.find(n => n.id === id)) await loadNotes(); selectNote(id); } catch (e) {}
 }
 
 // ── Bulk select mode ──

@@ -79,7 +79,6 @@ try {
 	require_once NOODLED_PATH . 'includes/class-noodled-auth.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-permissions.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-plaud.php';
-	require_once NOODLED_PATH . 'includes/class-noodled-push.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-webauthn.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-evernote.php';
 	require_once NOODLED_PATH . 'includes/class-noodled-ai.php';
@@ -144,9 +143,7 @@ function noodled_init() {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'noodled_daily_cleanup' );
 		}
 
-		// Reminder web push: check for due reminders every 5 minutes and deliver
-		// them so they fire when the app is closed (best-effort; the in-app
-		// scheduler covers the app-open case).
+		// 5-minute tick: retries pending GitHub backups.
 		if ( ! wp_next_scheduled( 'noodled_push_check' ) ) {
 			wp_schedule_event( time() + 120, 'noodled_5min', 'noodled_push_check' );
 		}
@@ -202,48 +199,14 @@ function noodled_migrate_sessions() {
 	}
 }
 
-// A 5-minute cron interval for the reminder push check.
+// A 5-minute cron interval (noodled_push_check: retries pending GitHub backups).
 add_filter( 'cron_schedules', function ( $schedules ) {
 	$schedules['noodled_5min'] = [ 'interval' => 300, 'display' => __( 'Every 5 minutes (noodled)', 'noodled' ) ];
 	return $schedules;
 } );
 
 /**
- * Deliver web-push notifications for reminders that are due and not yet sent, so
- * they fire when the app is closed. Marks each reminder sent (shared flag with
- * the in-app scheduler, so neither path double-notifies). Best-effort.
- */
-add_action( 'noodled_push_check', 'noodled_run_push_check' );
-function noodled_run_push_check() {
-	global $wpdb;
-	$r = $wpdb->prefix . 'noodled_reminders';
-	$n = $wpdb->prefix . 'noodled_notes';
-	$now = current_time( 'mysql', true );
-	$due = $wpdb->get_results( $wpdb->prepare(
-		"SELECT r.id, r.note_id, r.user_id, r.label, n.title
-		   FROM {$r} r LEFT JOIN {$n} n ON n.id = r.note_id
-		  WHERE r.sent = 0 AND r.remind_at <= %s
-		  ORDER BY r.remind_at ASC LIMIT 50", $now
-	), ARRAY_A );
-	foreach ( (array) $due as $row ) {
-		$title = $row['label'] ?: ( $row['title'] ?: __( 'Reminder', 'noodled' ) );
-		$delivered = Noodled_Push::send_to_user( (int) $row['user_id'], [
-			'title'  => get_bloginfo( 'name' ) ?: 'noodled',
-			'body'   => $title,
-			'noteId' => (int) $row['note_id'],
-			'tag'    => 'noodled-reminder-' . (int) $row['id'],
-		] );
-		// Only consume the reminder if a push actually went out. If the user has
-		// no working subscription (or delivery failed), leave it unsent so the
-		// in-app scheduler still fires it when the app next opens (no regression).
-		if ( $delivered > 0 ) {
-			$wpdb->update( $r, [ 'sent' => 1 ], [ 'id' => (int) $row['id'] ] );
-		}
-	}
-}
-
-/**
- * Same 5-minute tick: retry GitHub backups that are still pending (failed or
+ * 5-minute tick: retry GitHub backups that are still pending (failed or
  * queued beyond what a request pushed on shutdown). Bounded by drain()'s budget.
  */
 add_action( 'noodled_push_check', 'noodled_run_sync_drain' );

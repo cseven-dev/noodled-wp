@@ -44,7 +44,7 @@ markdown editor never reflows); **lock a note** (opt-in per-note end-to-end
 encryption, client-side AES-256-GCM, the passphrase never leaves the device);
 **durable server-side version history with a visual diff and restore** (now
 snapshotted on sync overwrites too, reachable from a toolbar clock icon or the
-note's right-click menu); **reminders** (date/time → notification); export HTML /
+note's right-click menu); export HTML /
 download markdown / print.
 
 ### Capture
@@ -88,8 +88,8 @@ email notifications; admin drop folders (member-owned, shared to admin).
 
 ### Platform
 PWA: installable, home-screen shortcuts, share-target, service-worker app-shell
-caching, **reminder notifications** (client-scheduled in-app, plus **VAPID web
-push via wp-cron** so reminders fire when the app is closed). **Captain's Log**: a
+caching, Background Sync replay of offline edits. (Reminders and web push were
+removed; their tables stay dormant.) **Captain's Log**: a
 fun in-app history of the product, reachable from the ☰ menu. WCAG 2.2 AA pass;
 i18n (text domain, `.pot`, `wp.i18n`).
 
@@ -97,7 +97,7 @@ i18n (text domain, `.pot`, `wp.i18n`).
 
 PHP 8.2+ plugin; vanilla-JS SPA (`assets/js/noodled.js`); 11 custom tables via
 dbDelta (notebooks, notes, users, sessions, permissions, note_permissions,
-attachments, reminders, revisions, push_subs, webauthn_creds); REST namespace
+attachments, reminders (dormant), revisions, push_subs (dormant), webauthn_creds); REST namespace
 `noodled/v1` (every response
 `private, no-store`); private attachment proxy; magic-link auth. List responses
 ship server-built `preview`+`tasks` (not full bodies) with lazy `/bodies` +
@@ -116,7 +116,7 @@ The four larger features still missing versus the market-leading PKM apps. See
 
 - **AI: ask-your-notes / summarize** (Med) — bring-your-own-key, server-proxied,
   never sends locked notes.
-- **Native mobile apps** (High) — Capacitor wrapper of the existing PWA, with
+- **Native mobile apps** (High, paused) — Capacitor wrapper of the existing PWA, with
   native push + share-extension; iOS push-when-closed is the 80/20 first slice.
 - **Canvas / whiteboard** (High) — an infinite board persisted as a note so it
   syncs via GitHub like everything else.
