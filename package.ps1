@@ -1,12 +1,10 @@
 # noodled-wp package & deploy script
-# Creates a zip for manual upload or deploys via FTP to SiteGround
+# Creates a zip for manual upload or deploys over SSH with WP-CLI
 
 param(
     [switch]$Deploy,
-    [string]$FtpHost = "",
-    [string]$FtpUser = "",
-    [string]$FtpPass = "",
-    [string]$FtpPath = "/wp-content/plugins/noodled"
+    [string]$SshHost = "noodled",
+    [string]$WpPath = "/home/u238-y0vgdp3dveah/www/noodled.ca/public_html"
 )
 
 $pluginDir = $PSScriptRoot
@@ -188,118 +186,26 @@ if (Test-Path $c7Env) {
     }
 }
 
-# ── Deploy via FTP ──
+# ── Deploy via SSH ──
+# Copies the zip to the server and installs it with WP-CLI. This replaces the
+# plugin folder (no stale files left behind) and needs no stored password: it
+# uses the SSH key behind the host alias in ~/.ssh/config.
 if ($Deploy) {
-    if (!$FtpHost -or !$FtpUser -or !$FtpPass) {
-        # Try .env file
-        if (Test-Path "$pluginDir\.env") {
-            Get-Content "$pluginDir\.env" | ForEach-Object {
-                if ($_ -match "^FTP_HOST=(.+)") { $FtpHost = $Matches[1].Trim() }
-                if ($_ -match "^FTP_USER=(.+)") { $FtpUser = $Matches[1].Trim() }
-                if ($_ -match "^FTP_PASS=(.+)") { $FtpPass = $Matches[1].Trim() }
-                if ($_ -match "^FTP_PATH=(.+)") { $FtpPath = $Matches[1].Trim() }
-            }
-        }
-    }
+    $remoteZip = "/tmp/$zipName"
+    Write-Host "Deploying to ${SshHost}:$WpPath ..." -ForegroundColor Cyan
 
-    if (!$FtpHost -or !$FtpUser -or !$FtpPass) {
-        Write-Error "FTP credentials required. Use -FtpHost, -FtpUser, -FtpPass or create .env file"
-        exit 1
-    }
+    & scp -q "$zipPath" "${SshHost}:$remoteZip"
+    if ($LASTEXITCODE -ne 0) { Write-Error "Deploy failed: could not copy the zip to $SshHost"; exit 1 }
 
-    $FtpPath = $FtpPath.TrimEnd("/")   # trailing slash → "noodled//file" double slash, which some FTP servers reject (553)
-    Write-Host "Deploying to $FtpHost$FtpPath ..." -ForegroundColor Cyan
-    $cred = New-Object System.Net.NetworkCredential($FtpUser, $FtpPass)
-    $ftpBase = "ftp://$FtpHost$FtpPath"
-
-    # Ensure the base plugin directory exists — on a fresh install it won't,
-    # and the per-file loop below never creates the top-level folder.
-    try {
-        $baseReq = [System.Net.FtpWebRequest]::Create($ftpBase)
-        $baseReq.Method = [System.Net.WebRequestMethods+Ftp]::MakeDirectory
-        $baseReq.Credentials = $cred
-        $baseReq.UsePassive = $true
-        $baseReq.GetResponse().Close()
-        Write-Host "Created base directory" -ForegroundColor Green
-    } catch { }
-
-    # Upload all plugin files
-    $files = Get-ChildItem "$pluginDir" -Recurse -File | Where-Object {
-        $rel = $_.FullName.Replace($pluginDir, "").TrimStart("\")
-        $skip = $false
-        foreach ($ex in $exclude) {
-            if ($rel -like "$ex*" -or $rel -like "*\$ex*") { $skip = $true; break }
-        }
-        -not $skip
-    }
-
-    $uploaded = 0
-    foreach ($f in $files) {
-        $rel = $f.FullName.Replace($pluginDir, "").TrimStart("\").Replace("\", "/")
-        $ftpUrl = "$ftpBase/$rel"
-
-        # Create directories
-        $parts = $rel.Split("/")
-        $dirPath = $ftpBase
-        for ($i = 0; $i -lt $parts.Length - 1; $i++) {
-            $dirPath += "/" + $parts[$i]
-            try {
-                $mkReq = [System.Net.FtpWebRequest]::Create($dirPath)
-                $mkReq.Method = [System.Net.WebRequestMethods+Ftp]::MakeDirectory
-                $mkReq.Credentials = $cred
-                $mkReq.UsePassive = $true
-                $mkReq.GetResponse().Close()
-            } catch { }
-        }
-
-        # Upload file
-        try {
-            $ulReq = [System.Net.FtpWebRequest]::Create($ftpUrl)
-            $ulReq.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
-            $ulReq.Credentials = $cred
-            $ulReq.UseBinary = $true
-            $ulReq.UsePassive = $true
-            $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
-            $s = $ulReq.GetRequestStream()
-            $s.Write($bytes, 0, $bytes.Length)
-            $s.Close()
-            $ulReq.GetResponse().Close()
-            $uploaded++
-        } catch {
-            Write-Warning "Failed: $rel - $_"
-        }
-    }
-
-    Write-Host "Uploaded $uploaded files" -ForegroundColor Green
-
-    # ── Flush OPcache so the new code runs immediately ──
-    # SiteGround caches compiled PHP and ignores file mtimes, so an FTP deploy
-    # otherwise keeps executing the old bytecode until PHP-FPM restarts. Drop a
-    # one-shot reset script in the web root, hit it, delete it.
-    $siteRoot = ($FtpPath -split '/public_html')[0]
-    $domain   = $siteRoot.Trim('/')
-    if ($domain) {
-        $resetFtp = "ftp://$FtpHost$siteRoot/public_html/_ocreset.php"
-        $php = '<?php if(function_exists("opcache_reset")){opcache_reset();} echo "ok";'
-        try {
-            $up = [System.Net.FtpWebRequest]::Create($resetFtp)
-            $up.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
-            $up.Credentials = $cred; $up.UsePassive = $true; $up.UseBinary = $true
-            $b = [System.Text.Encoding]::ASCII.GetBytes($php)
-            $s = $up.GetRequestStream(); $s.Write($b, 0, $b.Length); $s.Close(); $up.GetResponse().Close()
-            Invoke-WebRequest "https://$domain/_ocreset.php?cb=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" -TimeoutSec 20 -UseBasicParsing | Out-Null
-            $del = [System.Net.FtpWebRequest]::Create($resetFtp)
-            $del.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile; $del.Credentials = $cred; $del.UsePassive = $true
-            $del.GetResponse().Close()
-            Write-Host "Flushed OPcache" -ForegroundColor Green
-        } catch { Write-Warning "OPcache flush skipped: $_" }
-    }
+    $live = & ssh $SshHost "cd '$WpPath' && wp plugin install '$remoteZip' --force --quiet; rm -f '$remoteZip'; wp plugin get $pluginName --field=version"
+    $live = "$live".Trim()
+    if ($live -ne $version) { Write-Error "Deploy failed: live site reports '$live', expected $version"; exit 1 }
+    Write-Host "Live site is on v$live" -ForegroundColor Green
 }
 
 Write-Host ""
 Write-Host "Done! noodled-wp v$version" -ForegroundColor Cyan
 if (!$Deploy) {
     Write-Host "Zip: $zipPath" -ForegroundColor Yellow
-    Write-Host "To deploy: .\package.ps1 -Deploy -FtpHost your.host -FtpUser user -FtpPass pass" -ForegroundColor Yellow
-    Write-Host "Or create .env with FTP_HOST, FTP_USER, FTP_PASS, FTP_PATH" -ForegroundColor Yellow
+    Write-Host "To deploy: .\package.ps1 -Deploy" -ForegroundColor Yellow
 }
