@@ -616,6 +616,7 @@ function handleLaunchParams() {
     if (act === 'new') createNote();
     else if (act === 'journal') openDailyJournal();
     else if (act === 'capture') toggleQuickCapture();
+    else if (p.get('noodled_share') && p.get('pending')) consumePendingShare();
     else if (p.get('noodled_share')) {
       const body = [p.get('text') || '', p.get('url') || ''].filter(Boolean).join('\n\n');
       const title = p.get('title') || '';
@@ -628,11 +629,26 @@ async function createNoteFromShared(title, body) {
   await doSave();
   const nb = activeNotebook || 'General';
   const note = await api.create_note(nb, title || dateTimeTitle(), body || '');
-  if (!note || note.error) return;
+  if (!note || note.error) return false;
   activeNote = await api.get_note(null, note.id);
   await loadNotebooks(); await loadNotes(); renderNoteList(); renderContent();
   document.querySelector('.col-content')?.classList.add('open'); closeSidebar();
   setTimeout(focusNoteBody, 120);
+  return true;
+}
+// A POST share (possibly with files) that the service worker stored in
+// IndexedDB (handleShare in sw.js). Read once and delete; older than an hour is
+// stale and dropped.
+async function consumePendingShare() {
+  const rec = await idb.get('meta', 'share::pending').catch(() => null);
+  if (!rec) return;
+  await idb.del('meta', 'share::pending').catch(() => {});
+  if (!rec.at || Date.now() - rec.at > 3600000) return;
+  const body = [rec.text || '', rec.url || ''].filter(Boolean).join('\n\n');
+  const files = Array.isArray(rec.files) ? rec.files : [];
+  if (!rec.title && !body && !files.length) return;
+  if (!(await createNoteFromShared(rec.title || '', body))) return;
+  for (const f of files) await attachFile(f);
 }
 
 async function loadNotes() {
@@ -2470,6 +2486,20 @@ function showWebClipper() {
       <p style="font-size:12px;color:var(--text-muted)">${esc(__( 'On mobile (no bookmarks bar), copy the code below and make a new bookmark with it as the address:', 'noodled' ))}</p>
       <textarea id="clipBmCode" readonly spellcheck="false" style="width:100%;height:64px;font-family:monospace;font-size:11px" onclick="this.select()"></textarea>
       <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">${esc(__( 'Want a desktop drop folder too? The same token powers the noodled_dropbox watcher — drop a file in the folder and it becomes a note. Run the watcher script on your computer and paste this token into its config.', 'noodled' ))}</p>
+      <div style="font-size:12px;line-height:1.5;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <strong>${esc(__( 'iPhone share sheet', 'noodled' ))}</strong>
+        <ol style="margin:6px 0 8px 18px;padding:0">
+          <li>${esc(__( 'Open the Shortcuts app and make a new shortcut.', 'noodled' ))}</li>
+          <li>${esc(__( 'Turn on "Show in Share Sheet" and set it to receive URLs and Text from the Share Sheet.', 'noodled' ))}</li>
+          <li>${esc(__( 'Add the action "Get Contents of URL". Set the URL to the address below and the Method to POST.', 'noodled' ))}</li>
+          <li>${esc(__( 'Set Request Body to Form and add four text fields: token (the token below), title, url and text. Set url and text to the Shortcut Input.', 'noodled' ))}</li>
+          <li>${esc(__( 'Save the shortcut. In Safari or any app, tap Share and pick it to save into your Web Clips notebook.', 'noodled' ))}</li>
+        </ol>
+        <label for="clipIosEndpoint" style="display:block;color:var(--text-muted)">${esc(__( 'Address (URL)', 'noodled' ))}</label>
+        <input id="clipIosEndpoint" type="text" readonly spellcheck="false" style="width:100%;font-family:monospace;font-size:11px" onclick="this.select()">
+        <label for="clipIosToken" style="display:block;color:var(--text-muted);margin-top:6px">${esc(__( 'Token', 'noodled' ))}</label>
+        <input id="clipIosToken" type="text" readonly spellcheck="false" style="width:100%;font-family:monospace;font-size:11px" onclick="this.select()">
+      </div>
       <div class="modal-buttons">
         <button class="btn btn-sm" onclick="regenClipToken()">${esc(__( 'Reset token', 'noodled' ))}</button>
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button>
@@ -2478,6 +2508,8 @@ function showWebClipper() {
     // isn't mangled by HTML attribute escaping.
     const a = modal.querySelector('#clipBmLink'); if (a) a.setAttribute('href', bm);
     const ta = modal.querySelector('#clipBmCode'); if (ta) ta.value = bm;
+    const ie = modal.querySelector('#clipIosEndpoint'); if (ie) ie.value = cfg.endpoint || '';
+    const it = modal.querySelector('#clipIosToken'); if (it) it.value = cfg.token || '';
   }).catch(() => {
     const modal = el.querySelector('.modal');
     if (modal) modal.innerHTML = `<h3>${esc(__( 'Web clipper', 'noodled' ))}</h3><p>${esc(__( 'Could not load the clipper. Try again.', 'noodled' ))}</p><div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>`;
@@ -4425,6 +4457,9 @@ function onSwMessage(e) {
     (e.data.saved || []).forEach(s => adoptReplayed(s.note, s.item));
     idb.get('meta', 'queue::' + userScope()).then(rec => {
       saveQueue = (rec && Array.isArray(rec.items)) ? rec.items : [];
+      // Keep the localStorage copy in step too: loadSaveQueue falls back to it when
+      // the IndexedDB queue is empty, and a stale copy would replay saved edits.
+      try { localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(saveQueue)); } catch (e) {}
       updateOfflineBanner();
       loadNotes().then(renderNoteList).catch(() => {});
     }).catch(() => {});

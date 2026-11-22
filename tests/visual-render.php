@@ -3,7 +3,7 @@
  * Renders the REAL templates/app.php (or templates/login.php) outside WordPress
  * for tests/visual.js.
  *
- * Run:   php tests/visual-render.php [origin] [app|login]   (prints the HTML to stdout)
+ * Run:   php tests/visual-render.php [origin] [app|login] [version]   (prints the HTML to stdout)
  *
  * Defines only the WordPress functions, plugin constants and plugin classes the
  * templates call, sets $config the way Noodled_App::build_config() does, then
@@ -16,7 +16,7 @@ $template = ( $argv[2] ?? 'app' ) === 'login' ? 'login' : 'app';
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'NOODLED_PATH', dirname( __DIR__ ) . '/' );
 define( 'NOODLED_URL', $origin . '/wp-content/plugins/noodled/' );
-define( 'NOODLED_VERSION', '0.0.0' );
+define( 'NOODLED_VERSION', $argv[3] ?? '0.0.0' );
 
 function esc_html( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES, 'UTF-8' ); }
 function esc_attr( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES, 'UTF-8' ); }
@@ -31,6 +31,8 @@ function wp_json_encode( $v ) { return json_encode( $v, JSON_UNESCAPED_SLASHES )
 function includes_url( $path = '' ) { global $origin; return $origin . '/wp-includes/' . ltrim( $path, '/' ); }
 function rest_url( $path = '' ) { global $origin; return $origin . '/wp-json/' . ltrim( $path, '/' ); }
 function get_locale() { return 'en_US'; }
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
+function add_query_arg( $key, $value, $url ) { return $url . ( strpos( $url, '?' ) === false ? '?' : '&' ) . $key . '=' . $value; }
 
 class Noodled_Settings {
 	public static function get_brand_name() { return 'noodled'; }

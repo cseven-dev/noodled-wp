@@ -2,7 +2,9 @@
   "name": "noodled",
   "short_name": "noodled",
   "description": "Your notes, everywhere",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#111113",
   "theme_color": "#3b82f6",
@@ -49,11 +51,22 @@
   ],
   "share_target": {
     "action": "/?noodled_share=1",
-    "method": "GET",
+    "method": "POST",
+    "enctype": "multipart/form-data",
     "params": {
       "title": "title",
       "text": "text",
-      "url": "url"
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "image/*",
+            "application/pdf",
+            "text/plain"
+          ]
+        }
+      ]
     }
   }
 }

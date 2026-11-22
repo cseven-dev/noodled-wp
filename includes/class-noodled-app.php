@@ -154,6 +154,45 @@ class Noodled_App {
 		self::serve_request();
 	}
 
+	/* ── Service worker and share target (pure helpers, covered by tests/app-share.test.php) ── */
+
+	// Which early route a request takes: 'sw' (serve the worker), 'share' (a POST
+	// share without a worker) or '' (carry on).
+	public static function early_route( array $get, string $method ): string {
+		if ( isset( $get['noodled_sw'] ) ) return 'sw';
+		if ( isset( $get['noodled_share'] ) && strtoupper( $method ) === 'POST' ) return 'share';
+		return '';
+	}
+
+	public static function sw_headers(): array {
+		return [
+			'Content-Type: application/javascript; charset=utf-8',
+			'Cache-Control: no-cache, no-store, must-revalidate',
+			'X-Content-Type-Options: nosniff',
+		];
+	}
+
+	// Always the same fixed file; the noodled_sw value is never read.
+	private static function serve_sw(): void {
+		foreach ( self::sw_headers() as $h ) {
+			header( $h );
+		}
+		readfile( NOODLED_PATH . 'assets/sw.js' );
+	}
+
+	// The app URL with noodled_share=1 plus the shared title, text and url (each
+	// sanitized and cut to 2000 characters). Always built on $app_url, so the
+	// redirect never leaves the site whatever the fields contain.
+	public static function share_redirect_url( array $post, string $app_url ): string {
+		$q = [ 'noodled_share' => '1' ];
+		foreach ( [ 'title', 'text', 'url' ] as $k ) {
+			if ( ! isset( $post[ $k ] ) || ! is_string( $post[ $k ] ) ) continue;
+			$v = mb_substr( sanitize_textarea_field( wp_unslash( $post[ $k ] ) ), 0, 2000 );
+			if ( $v !== '' ) $q[ $k ] = $v;
+		}
+		return add_query_arg( array_map( 'rawurlencode', $q ), $app_url );
+	}
+
 	/* ── Core request handler ── */
 
 	private static function serve_request(): void {
@@ -167,6 +206,22 @@ class Noodled_App {
 			$uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
 			if ( ! is_string( $uri ) || $uri === '' || $uri[0] !== '/' || strpos( $uri, '//' ) === 0 ) $uri = '/';
 			wp_safe_redirect( esc_url_raw( 'https://' . $host . ( $port ? ':' . $port : '' ) . $uri ), 301 );
+			exit;
+		}
+
+		// The service worker is served from the app path (?noodled_sw=<version>) so
+		// its scope covers the app page; a worker under /wp-content/plugins/ never
+		// controls it. A share POST that arrives before a worker is installed is
+		// turned into the GET share URL (files are dropped). Neither reads a path,
+		// URL or code from the request.
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? (string) $_SERVER['REQUEST_METHOD'] : 'GET';
+		$early  = self::early_route( $_GET, $method );
+		if ( $early === 'sw' ) {
+			self::serve_sw();
+			exit;
+		}
+		if ( $early === 'share' ) {
+			wp_safe_redirect( self::share_redirect_url( $_POST, self::get_app_url() ), 303 );
 			exit;
 		}
 

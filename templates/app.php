@@ -251,9 +251,19 @@ if ( file_exists( $noodled_json ) ) {
 }
 ?>
 <script defer src="<?php echo esc_url( $noodled_asset( 'assets/js/noodled.js' ) ); ?>"></script>
+<?php
+// The worker is served from the app path (Noodled_App::serve_sw) so its scope
+// covers the app page. The version in the URL makes each release a new worker.
+$noodled_app_url  = Noodled_App::get_app_url();
+$noodled_sw_url   = add_query_arg( 'noodled_sw', NOODLED_VERSION, $noodled_app_url );
+$noodled_sw_scope = (string) wp_parse_url( $noodled_app_url, PHP_URL_PATH );
+if ( $noodled_sw_scope === '' ) $noodled_sw_scope = '/';
+?>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('<?php echo esc_url( NOODLED_URL . 'assets/sw.js' ); ?>');
+  navigator.serviceWorker.register(<?php echo wp_json_encode( $noodled_sw_url ); ?>, { scope: <?php echo wp_json_encode( $noodled_sw_scope ); ?> }).catch(() => {});
+  // Remove the old registration under /wp-content/plugins/ (it never controlled the app).
+  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => { if (r.scope.indexOf('/wp-content/plugins/') !== -1) r.unregister(); })).catch(() => {});
 }
 </script>
 
