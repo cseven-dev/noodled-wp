@@ -41,6 +41,9 @@ const PLUGIN = '/wp-content/plugins/noodled/';
 const PHP = process.env.NOODLED_PHP || 'C:\\Users\\simon\\AppData\\Roaming\\Local\\lightning-services\\php-8.2.29+0\\bin\\win64\\php.exe';
 const SHOTS_BASE = process.env.NOODLED_SHOTS_DIR || 'C:\\Users\\simon\\AppData\\Local\\Temp\\claude\\86dcffa33c9eb493\\e4804abc-ec74-4d1a-ae7e-509852137eb5\\scratchpad\\shots';
 
+// Desktop viewport; override with NOODLED_W / NOODLED_H (e.g. 5120 x 1440 for an ultrawide monitor).
+const DESKTOP = { width: +process.env.NOODLED_W || 1440, height: +process.env.NOODLED_H || 900 };
+
 const label = (process.argv[2] || '').replace(/[^\w.-]/g, '');
 if (!label) { console.error('Usage: node tests/visual.js <label>'); process.exit(2); }
 const OUT = path.join(SHOTS_BASE, label);
@@ -108,6 +111,20 @@ const SHOWCASE = [
   'Supplier price sheet: [Northwood catalogue](https://example.com/northwood).',
 ].join('\n');
 
+const LONG_ID = 199;
+const LONG_BODY = (() => {
+  const out = ['# Field guide to the long note', '', 'A deliberately long note so wide screens can flow it into columns.'];
+  for (let i = 1; i <= 14; i++) {
+    out.push('', '## Section ' + i, '');
+    out.push('Paragraph one of section ' + i + '. The quick brown fox jumps over the lazy dog while the planners argue about budgets, schedules, and which phase comes first. '.repeat(3));
+    out.push('', 'Paragraph two of section ' + i + '. Keep the plumbing where it is, move the lavender closer to the path, and book the offsite venue before the prices rise again. '.repeat(2));
+    if (i % 4 === 1) out.push('', '- first item in a list', '- second item in a list', '- third item in a list');
+    if (i % 5 === 2) out.push('', '| Item | Cost |', '| --- | --- |', '| Cabinets | 4200 |', '| Counters | 3100 |', '| Tile | 900 |');
+    if (i % 6 === 3) out.push('', '```js', 'function plan(phase) {', '  return phase === 1 ? "demo" : "install";', '}', '```');
+  }
+  return out.join('\n');
+})();
+
 const NOTEBOOKS = [
   { id: 1, name: 'General', label: 'General', count: 0, access: 'owner', owner: 1, drop: false, color: '', parent: 0, owner_name: 'Sam Rivera' },
   { id: 2, name: 'Home', label: 'Home', count: 0, access: 'owner', owner: 1, drop: false, color: '', parent: 0, owner_name: 'Sam Rivera' },
@@ -117,6 +134,7 @@ const NOTEBOOKS = [
 
 const NOTE_ROWS = [
   { id: SHOWCASE_ID, notebook: 'Home', title: 'Kitchen renovation plan', body: SHOWCASE, days: 0, pinned: true },
+  { id: LONG_ID, notebook: 'Home', title: 'Field guide to the long note', body: LONG_BODY, days: 3 },
   { id: 102, notebook: 'Home', title: 'Paint colours', body: 'Living room: Hale Navy. Hallway: Revere Pewter, eggshell finish. Trim stays Chantilly Lace. #renovation #home', days: 2, image: 501 },
   { id: 103, notebook: 'Work', title: 'Q4 planning meeting', body: 'Attendees: Priya, Marco, Jen.\n\n- [x] Share the draft roadmap\n- [ ] Follow up on hiring budget\n- [ ] Book the offsite venue\n\n#work #planning', days: 1 },
   { id: 104, notebook: 'Work', title: 'Onboarding checklist for new hires', body: 'Laptop, accounts, buddy assignment, first-week reading list, and a lunch on day one.', days: 9 },
@@ -261,7 +279,7 @@ async function main() {
   async function openApp({ theme, phone }) {
     const context = await browser.newContext(phone
       ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
-      : { viewport: { width: 1440, height: 900 } });
+      : { viewport: DESKTOP });
     // Skip first-run popups (what's new, starter note, onboarding, install prompt).
     await context.addInitScript(() => {
       try {
@@ -401,6 +419,32 @@ async function main() {
       await page.evaluate(() => showLoadingSkeleton());
       await shot(page, `desktop-loading-${t}`);
     } },
+    { phone: false, run: async (page, t) => {
+      // Wide screens: the list flows into columns and a long note flows into side-by-side columns.
+      await page.evaluate((id) => selectNote(id), LONG_ID);
+      await page.waitForFunction(() => document.getElementById('noteBody') && document.getElementById('noteBody').textContent.includes('Section 14'), null, { timeout: 5000 });
+      await page.waitForTimeout(700); // ResizeObserver debounce
+      const m = await page.evaluate(() => {
+        const nb = document.getElementById('noteBody'), body = nb.closest('.content-body');
+        const cols = (el) => { const v = getComputedStyle(el).columnCount; return v === 'auto' ? 1 : +v; };
+        const tc = getComputedStyle(document.getElementById('noteList')).gridTemplateColumns;
+        const before = body.scrollHeight;
+        body.classList.remove('multicol');
+        const single = body.scrollHeight;
+        body.classList.add('multicol');
+        return { w: innerWidth, listCols: tc === 'none' ? 1 : tc.split(' ').length, noteCols: cols(nb), scrollH: before, singleH: single };
+      });
+      const wantList = m.w >= 3800 ? 4 : m.w >= 2800 ? 3 : m.w >= 1900 ? 2 : 1;
+      if (m.listCols !== wantList) problems.push(`long-note ${t}: list columns ${m.listCols}, expected ${wantList} at ${m.w}`);
+      const multi = m.w >= 2300 ? m.noteCols > 1 : m.noteCols === 1;
+      if (!multi) problems.push(`long-note ${t}: note column-count ${m.noteCols} at ${m.w}`);
+      if (m.w >= 2300 && !(m.scrollH < m.singleH)) problems.push(`long-note ${t}: scrollHeight ${m.scrollH} not below single-column ${m.singleH}`);
+      await shot(page, `desktop-long-note-${t}`);
+      await openShowcase(page);
+      await page.waitForTimeout(700);
+      const short = await page.evaluate(() => { const v = getComputedStyle(document.getElementById('noteBody')).columnCount; return v === 'auto' ? 1 : +v; });
+      if (short !== 1) problems.push(`long-note ${t}: short note has column-count ${short}`);
+    } },
     { phone: true, run: async (page, t) => {
       await shot(page, `phone-list-${t}`);
       await openShowcase(page);
@@ -471,7 +515,7 @@ async function main() {
     for (const scheme of ['dark', 'light']) {
       const where = 'login-' + (phone ? 'phone' : 'desktop') + '/' + scheme;
       const context = await browser.newContext({
-        ...(phone ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }),
+        ...(phone ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: DESKTOP }),
         colorScheme: scheme,
       });
       await context.route('**/*', (route) => {

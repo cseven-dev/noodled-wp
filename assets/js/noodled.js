@@ -1870,6 +1870,8 @@ function renderContent() {
   renderAttachmentGallery();
   resolveTransclusions();
   renderRichBlocks();
+  fitNoteColumns();
+  watchNoteColumns();
   // Opened from a search? Briefly highlight the matches in the body.
   if ((searchFree || '').trim()) setTimeout(highlightSearchInBody, 40);
   // Fade in transition
@@ -6633,6 +6635,53 @@ function copyCodeBlock(btn) {
   }).catch(() => showToast(__( 'Copy failed', 'noodled' )));
 }
 
+// ── Wide screens: long notes flow into side-by-side columns ──
+// n = min(columns that fit, screens of text); a short note stays one centred measure.
+const NOTE_COL_GAP = 56;
+let _colRO = null, _colT = 0;
+function fitNoteColumns() {
+  const nb = document.getElementById('noteBody');
+  const body = nb && nb.closest('#colContent > .content-body');
+  if (!body) return;
+  const p = (config && config.editor_prefs) || {};
+  const measure = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--measure')) || 720;
+  const fits = Math.floor((body.clientWidth - 40 + NOTE_COL_GAP) / (measure + NOTE_COL_GAP));
+  let n = 1;
+  const on = p.columns !== false && !p.wide && window.innerWidth > 768 && !readingMode && !typewriterMode
+    && !document.querySelector('#splitView.show') && fits >= 2;
+  const st = body.scrollTop;
+  if (on) {
+    // Measure at one column, then set the final count in the same task (nothing paints between).
+    body.classList.remove('multicol');
+    nb.style.minHeight = '0';
+    const h = nb.getBoundingClientRect().height;
+    const cs = getComputedStyle(body);
+    const used = nb.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - parseFloat(cs.paddingTop);
+    const vis = Math.max(200, body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - Math.max(0, used));
+    nb.style.minHeight = '';
+    n = Math.max(1, Math.min(fits, Math.ceil(h / vis)));
+  }
+  if (n > 1) {
+    body.style.setProperty('--cols-n', n);
+    body.style.setProperty('--cols-w', (n * measure + (n - 1) * NOTE_COL_GAP) + 'px');
+    body.classList.add('multicol');
+  } else {
+    body.classList.remove('multicol');
+    body.style.removeProperty('--cols-n');
+    body.style.removeProperty('--cols-w');
+  }
+  if (body.scrollTop !== st) body.scrollTop = st;
+}
+// Re-fit (debounced) when the window, the note area or the note's height changes.
+function watchNoteColumns() {
+  if (!window.ResizeObserver) return;
+  if (!_colRO) _colRO = new ResizeObserver(() => { clearTimeout(_colT); _colT = setTimeout(fitNoteColumns, 300); });
+  _colRO.disconnect();
+  const nb = document.getElementById('noteBody');
+  const body = nb && nb.closest('#colContent > .content-body');
+  if (body) { _colRO.observe(body); _colRO.observe(nb); }
+}
+
 // ── Note-list keyboard navigation (↑/↓ select, Enter open, Del trash) ──
 let _navIndex = -1;
 function noteNavKey(e) {
@@ -6642,10 +6691,37 @@ function noteNavKey(e) {
   if (document.querySelector('#modalContainer .modal-overlay')) return; // a dialog owns the keys
   if (!filteredNotes.length) return;
   if (_navIndex >= filteredNotes.length) _navIndex = filteredNotes.length - 1;
-  if (e.key === 'ArrowDown') { e.preventDefault(); _navIndex = Math.min((_navIndex < 0 ? -1 : _navIndex) + 1, filteredNotes.length - 1); paintNav(); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); _navIndex = Math.max((_navIndex < 0 ? 0 : _navIndex) - 1, 0); paintNav(); }
+  const cols = noteListCols();
+  if (e.key === 'ArrowDown') { e.preventDefault(); _navIndex = cols > 1 ? navByRow(1) : Math.min((_navIndex < 0 ? -1 : _navIndex) + 1, filteredNotes.length - 1); paintNav(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _navIndex = cols > 1 ? navByRow(-1) : Math.max((_navIndex < 0 ? 0 : _navIndex) - 1, 0); paintNav(); }
+  else if (e.key === 'ArrowRight' && cols > 1) { e.preventDefault(); _navIndex = Math.min((_navIndex < 0 ? -1 : _navIndex) + 1, filteredNotes.length - 1); paintNav(); }
+  else if (e.key === 'ArrowLeft' && cols > 1) { e.preventDefault(); _navIndex = Math.max((_navIndex < 0 ? 0 : _navIndex) - 1, 0); paintNav(); }
   else if (e.key === 'Enter' && _navIndex >= 0) { e.preventDefault(); selectNote(filteredNotes[_navIndex].id); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && _navIndex >= 0) { e.preventDefault(); deleteNote(filteredNotes[_navIndex].id); }
+}
+// Column count of the note list (1 unless the wide-screen grid is on).
+function noteListCols() {
+  const l = document.getElementById('noteList');
+  const t = l ? getComputedStyle(l).gridTemplateColumns : '';
+  return t && t !== 'none' ? t.split(' ').length : 1;
+}
+// Up/Down in the grid: the note one visual row above/below, nearest the same column
+// (date headers span the full width, so a plain index jump would drift).
+function navByRow(dir) {
+  const cur = filteredNotes[_navIndex];
+  if (!cur) return 0;
+  const items = [...document.querySelectorAll('#noteList .note-item')];
+  const me = items.find(el => +el.dataset.noteId === +cur.id);
+  if (!me) return _navIndex;
+  const r = me.getBoundingClientRect();
+  const cand = items.filter(el => { const b = el.getBoundingClientRect(); return dir > 0 ? b.top >= r.bottom - 1 : b.bottom <= r.top + 1; });
+  if (!cand.length) return _navIndex;
+  const tops = cand.map(el => el.getBoundingClientRect().top);
+  const rowTop = dir > 0 ? Math.min(...tops) : Math.max(...tops);
+  const row = cand.filter(el => Math.abs(el.getBoundingClientRect().top - rowTop) < 2);
+  row.sort((x, y) => Math.abs(x.getBoundingClientRect().left - r.left) - Math.abs(y.getBoundingClientRect().left - r.left));
+  const idx = filteredNotes.findIndex(n => +n.id === +row[0].dataset.noteId);
+  return idx < 0 ? _navIndex : idx;
 }
 function paintNav() {
   document.querySelectorAll('.note-item.nav-focus').forEach(el => el.classList.remove('nav-focus'));
@@ -6662,6 +6738,7 @@ function applyReadingPrefs() {
   root.style.setProperty('--editor-lh', p.lh || 1.7);
   document.body.classList.toggle('editor-serif', !!p.serif);
   document.body.classList.toggle('editor-wide', !!p.wide);
+  fitNoteColumns();
 }
 function showReadingPrefs() {
   const p = (config.editor_prefs = config.editor_prefs || {});
@@ -6674,6 +6751,7 @@ function showReadingPrefs() {
       <input type="range" id="rpLh" aria-label="${escAttr(__( 'Line height', 'noodled' ))}" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
       <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> ${esc(__( 'Serif body font', 'noodled' ))}</label>
       <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpWide" ${p.wide ? 'checked' : ''}> ${esc(__( 'Use the full width', 'noodled' ))}</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" id="rpColumns" ${p.columns !== false ? 'checked' : ''}> ${esc(__( 'Flow long notes into columns on wide screens', 'noodled' ))}</label>
       <div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button></div>
     </div></div>`;
   const upd = () => {
@@ -6681,11 +6759,12 @@ function showReadingPrefs() {
     p.lh = +document.getElementById('rpLh').value;
     p.serif = document.getElementById('rpSerif').checked;
     p.wide = document.getElementById('rpWide').checked;
+    p.columns = document.getElementById('rpColumns').checked;
     applyReadingPrefs();
     clearTimeout(showReadingPrefs._t);
     showReadingPrefs._t = setTimeout(() => api.set_config('editor_prefs', p).catch(() => {}), 400);
   };
-  ['rpSize', 'rpLh', 'rpSerif', 'rpWide'].forEach(id => document.getElementById(id).addEventListener('input', upd));
+  ['rpSize', 'rpLh', 'rpSerif', 'rpWide', 'rpColumns'].forEach(id => document.getElementById(id).addEventListener('input', upd));
 }
 
 // ── Tag manager (rename / delete a tag across all notes) ─────

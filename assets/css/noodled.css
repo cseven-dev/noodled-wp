@@ -1934,6 +1934,36 @@ body.zen-mode .rendered-content > *:focus-within { opacity: 1; }
   margin-top: 8px; padding-top: 12px;
 }
 
+/* ── Wide screens (ultrawide monitors): note list in columns ── */
+@media (min-width: 1900px) {
+  .col-notes { width: 600px; }
+  .note-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+  .note-list > :not(.note-item):not(.note-item-wrapper) { grid-column: 1 / -1; }
+}
+@media (min-width: 2800px) {
+  .col-notes { width: 900px; }
+  .note-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 3800px) {
+  .col-notes { width: 1200px; }
+  .note-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ── Wide screens: a long open note flows into side-by-side columns (set by fitNoteColumns) ── */
+@media screen and (min-width: 769px) {
+  body:not(.editor-wide):not(.reading-mode):not(.typewriter-mode) #colContent > .content-body.multicol {
+    padding-left: max(var(--sp-5), calc((100% - var(--cols-w)) / 2));
+    padding-right: max(var(--sp-5), calc((100% - var(--cols-w)) / 2));
+  }
+  body:not(.editor-wide):not(.reading-mode):not(.typewriter-mode) #colContent > .content-body.multicol > .rendered-content {
+    column-count: var(--cols-n);
+    column-gap: 56px;
+    column-rule: 1px solid var(--border);
+  }
+  .content-body.multicol > .rendered-content :is(table, pre, img, blockquote, li, .callout, .transclude) { break-inside: avoid; }
+  .content-body.multicol > .rendered-content :is(h1, h2, h3, h4, h5, h6) { break-after: avoid; }
+}
+
 /* ── Checklist progress badges ── */
 .att-badge.task-badge { background: rgba(59,130,246,.16); }
 .att-badge.task-badge.all-done { background: rgba(16,185,129,.2); color: var(--text); }
