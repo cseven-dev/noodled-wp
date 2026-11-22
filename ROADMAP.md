@@ -10,6 +10,11 @@ built. Suggested order: **B (AI) → A (iOS slice) → D (canvas) → C (plugin 
 
 ## A. Native mobile apps  (effort: High, ~1–2 weeks + ongoing)
 
+> **Usage check, 2026-11-22:** the live site has 0 web-push subscriptions and 0
+> reminders, so push-when-the-app-is-closed is unproven demand. The share
+> extension (Share to noodled) is the stronger reason to wrap the app. Confirm
+> one of the two is actually wanted before starting this.
+
 > **Scoped:** see `MOBILE-IOS-SCOPE.md` for the detailed iOS 80/20 first-slice plan
 > (Capacitor wrap + APNs push + share extension + universal links), phases, costs,
 > and open decisions. The root `NOODLE_MOBILE_PLAN.md` is superseded (it describes an

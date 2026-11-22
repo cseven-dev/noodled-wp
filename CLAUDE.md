@@ -64,7 +64,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **What it is:** A WordPress plugin that replicates the noodled desktop note-taking app as a full web version with family sharing.
 
-**Version:** 1.1.154 (`Version:` header + `NOODLED_VERSION` in `noodled.php`; changelog in `metadata.json`).
+**Version:** 1.1.156, with 1.1.157 built on branch `v1.1.157-hardening` (`Version:` header + `NOODLED_VERSION` in `noodled.php`; changelog in `metadata.json`).
 
 **Stack:**
 - WordPress plugin (PHP 8.2+)
@@ -104,7 +104,15 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Desktop app writes to `~/Documents/noodled-notes/` (git repo) → pushes to GitHub
 - WordPress pulls from GitHub (webhook or import) → stores in custom DB tables
 - Web edits save to DB → auto-push to GitHub via Contents API
-- Conflict resolution: last-write-wins by modified timestamp
+- Web saves are pushed after the response is sent (`Noodled_Sync::queue_push` on `shutdown`); the `noodled_push_check` cron retries anything left (`drain`). Push state lives on the note row: `gh_path` (the repo file the note owns), `push_pending`, `push_attempts`, `push_error`
+- Only notes in admin-owned notebooks are pushed, and pulls only write into the first admin's notebooks (`is_pushable_notebook`, `sync_owner_id`)
+- Pull rule (`apply_pulled_file`): identical content only records the sha; otherwise the repo copy wins only when its `modified` is strictly later, else the web copy is kept and re-pushed
+- Save conflicts: the client sends the note's `mtime` (full seconds) as `base_modified`; `update_note` returns `conflict` when it differs. Client saves are serialized (`serialSave`)
+
+**Tests (run from this folder, nothing to install):**
+- `node tests/roundtrip.test.js`: markdown to editor and back, through the real `noodled.js` in headless Chromium (Playwright from `~/.claude/skills/gauntlet/node_modules`). Run it after ANY change to `renderMarkdown` / `htmlToMarkdown`
+- `node tests/save-conflict.test.js`: save, conflict and search-order behaviour against a fake REST server
+- `php tests/sync.test.php`: GitHub push/pull engine against a fake GitHub and database (PHP at `%APPDATA%\Local\lightning-services\php-8.2.29+0\bin\win64\php.exe`)
 
 **Auth model:**
 - WP admins auto-authenticated as noodled admin
