@@ -15,8 +15,9 @@
  * Dependency: Playwright from C:\Users\simon\.claude\skills\gauntlet\node_modules
  * (override with NOODLED_PLAYWRIGHT_DIR). Falls back to system Chrome, then Edge.
  *
- * Exit code: 0 when every shot was taken, 1 if the app failed to boot or a shot
- * failed, 2 if the run could not start.
+ * Exit code: 0 when every shot was taken, 1 if the app failed to boot, a shot
+ * failed or a page logged a console error (warnings are only listed), 2 if the
+ * run could not start.
  */
 
 const path = require('path');
@@ -505,7 +506,8 @@ async function main() {
   for (const f of written) console.log('  ' + f);
   if (blocked.size) console.log('Blocked requests: ' + [...blocked].join(', '));
   if (problems.length) { console.log('Problems:'); for (const p of problems) console.log('  ' + p); }
-  process.exit(bootFailed || problems.some(p => !p.includes(': console ')) ? 1 : 0);
+  // Console warnings are reported only; a console error or uncaught page error fails the run.
+  process.exit(bootFailed || problems.some(p => !p.includes(': console warning: ')) ? 1 : 0);
 }
 
 main().catch(e => { console.error(e); process.exit(2); });

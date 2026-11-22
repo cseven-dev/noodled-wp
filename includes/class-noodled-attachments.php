@@ -252,7 +252,8 @@ class Noodled_Attachments {
 	public static function get_for_note( int $note_id ): array {
 		global $wpdb;
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM " . self::table() . " WHERE note_id = %d ORDER BY sort_order ASC, created_at ASC, id ASC",
+			// Only the listed columns: text_content (up to 500KB of PDF text) is never needed here.
+			"SELECT id, filename, mime_type, file_size, alt, exif FROM " . self::table() . " WHERE note_id = %d ORDER BY sort_order ASC, created_at ASC, id ASC",
 			$note_id
 		), ARRAY_A );
 

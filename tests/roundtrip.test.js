@@ -15,6 +15,7 @@
  * A case is [name, markdown] or [name, markdown, opts]: opts.expect is the exact
  * first-round-trip output when it is an accepted normalization of the input, and
  * opts.map is set as noodledConfig.map (location-note map provider) for the case.
+ * opts.labels is the exact text each rendered wiki link must show, in order.
  *
  * Dependency: Playwright is NOT installed in this repo. It is loaded from
  *   C:\Users\simon\.claude\skills\gauntlet\node_modules
@@ -74,6 +75,8 @@ const CASES = [
   // Accepted normalization: the blank line right after a heading is dropped.
   // The link target lives in another notebook: only the cross-notebook title
   // index (noteIndex) knows it, so it must resolve and not render as broken.
+  // The label is shown as typed: escaped once, never as &amp; (resolved and broken links).
+  ['wiki link label with &, < and >', 'See [[A & B]] and [[x < y > z]] now.', { index: [{ id: 951, title: 'A & B', notebook: 'General', modified: '', pinned: false }], labels: ['A & B', 'x < y > z'] }],
   ['wiki link to a note only in the title index', 'See [[Elsewhere Note]] for details.', { index: [{ id: 950, title: 'Elsewhere Note', notebook: 'Work', modified: '', pinned: false }], noBroken: true }],
   ['heading followed by blank line', '# Title\n\nFirst paragraph.\n\n## Section\n\nSecond paragraph.', { expect: '# Title\nFirst paragraph.\n\n## Section\nSecond paragraph.' }],
   ['paragraphs with inline formatting', 'Plain **bold** and *italic* and `inline code` here.\n\nA [link](https://example.com/a?b=1&c=2) and ***bold italic*** too.'],
@@ -225,6 +228,7 @@ async function main() {
       renderContent();
       await new Promise(r => setTimeout(r, 30));
       const broken = document.querySelectorAll('#noteBody .wikilink.broken').length;
+      const labels = [...document.querySelectorAll('#noteBody .wikilink')].map(a => a.textContent);
       const nb = document.getElementById('noteBody');
       const leak = nb ? {
         links: nb.querySelectorAll('a').length,
@@ -233,7 +237,7 @@ async function main() {
         text: /="|onclick|noopener/.test(nb.textContent),
       } : null;
       const body = currentBody();
-      return body === null ? { body: md, skipped: true, broken, leak } : { body, skipped: false, broken, leak };
+      return body === null ? { body: md, skipped: true, broken, leak, labels } : { body, skipped: false, broken, leak, labels };
     }, { md, others: OTHER_NOTES, map: map || {}, index: index || null });
   }
 
@@ -255,6 +259,9 @@ async function main() {
       if (b !== a) problems.push(['round trip changed the markdown', a, b]);
       if (c !== b) problems.push(['second round trip differs from first (not idempotent)', b, c]);
       if (opts.noBroken && (first.broken || second.broken)) problems.push('a wiki link rendered as broken');
+      if (opts.labels) for (const r of [first, second]) {
+        if (JSON.stringify(r.labels) !== JSON.stringify(opts.labels)) { problems.push(['wiki link labels', JSON.stringify(opts.labels), JSON.stringify(r.labels)]); break; }
+      }
       if (opts.clean) for (const r of [first, second]) {
         const l = r.leak;
         if (!l) { problems.push('no editor to inspect'); break; }

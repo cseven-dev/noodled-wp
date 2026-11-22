@@ -126,8 +126,10 @@ class FakeWpdb {
 					'snippet' => mb_substr( $p[0]['text_content'], max( 1, $pos - 50 ) - 1, 120 ) ];
 			}, $rows ), 0, 50 );
 		}
-		if ( preg_match( '/^SELECT \* FROM wp_noodled_attachments WHERE note_id = (\d+) ORDER BY sort_order ASC, created_at ASC, id ASC$/', $q, $m ) ) {
-			return array_values( array_filter( $this->atts, static fn( $a ) => $a['note_id'] === (int) $m[1] ) );
+		// Noodled_Attachments::get_for_note: returns only the selected columns.
+		if ( preg_match( '/^SELECT id, filename, mime_type, file_size, alt, exif FROM wp_noodled_attachments WHERE note_id = (\d+) ORDER BY sort_order ASC, created_at ASC, id ASC$/', $q, $m ) ) {
+			$cols = array_flip( [ 'id', 'filename', 'mime_type', 'file_size', 'alt', 'exif' ] );
+			return array_values( array_map( static fn( $a ) => array_intersect_key( $a, $cols ), array_filter( $this->atts, static fn( $a ) => $a['note_id'] === (int) $m[1] ) ) );
 		}
 		// Noodled_Notes::search_rows (MATCH, then LIKE) and the PDF merge (id IN).
 		if ( preg_match( '/^SELECT \* FROM wp_noodled_notes WHERE deleted_at IS NULL AND \(notebook_id IN \(([\d,]+)\) OR id IN \(([\d,]+)\)\) AND (.*) ORDER BY modified_at DESC$/s', $q, $m ) ) {

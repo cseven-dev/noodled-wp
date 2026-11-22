@@ -324,6 +324,7 @@ function renderNotebooks() {
   el.innerHTML = html;
 
   document.getElementById('nbAll').className = 'nb-all' + (activeNotebook === null && !viewingTrash && !viewingStarred && !viewingTasks && _activeSmart === null ? ' active' : '');
+  document.getElementById('nbStarred')?.classList.toggle('active', viewingStarred);
   renderSmartNotebooks();
   setupNotebookDrag();
 }
@@ -524,8 +525,18 @@ async function renameNotebook(name) {
 }
 
 async function deleteNotebook(name) {
-  /* translators: %s is the notebook name */
-  if (!(await showConfirm(sprintf( __( 'Delete notebook "%s"? Its notes move to Trash and are removed from the GitHub backup.', 'noodled' ), name ), { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
+  // Only an admin's own notebooks are backed up, and only once GitHub sync is set up.
+  const nb = notebooks.find(n => n.name === name);
+  let backedUp = false;
+  if (nb && nb.access === 'owner' && noodledConfig.user && noodledConfig.user.admin) {
+    try { const s = await api.git_status(); backedUp = !!(s && s.initialized); } catch (e) {}
+  }
+  const msg = backedUp
+    /* translators: %s is the notebook name */
+    ? sprintf( __( 'Delete notebook "%s"? Its notes move to Trash and are removed from the GitHub backup.', 'noodled' ), name )
+    /* translators: %s is the notebook name */
+    : sprintf( __( 'Delete notebook "%s"? Its notes move to Trash.', 'noodled' ), name );
+  if (!(await showConfirm(msg, { danger: true, okLabel: __( 'Delete', 'noodled' ) }))) return;
   await api.delete_notebook(name);
   if (activeNotebook === name) activeNotebook = null;
   activeNote = null;
@@ -3290,11 +3301,12 @@ function renderMarkdown(text) {
       .replace(/\u0000/g, '')
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => keep(`<img src="${safeUrl(url)}" alt="${attrText(alt)}">`))
       .replace(/\[\[([^\]]+)\]\]/g, (match, title) => {
-        // The line is already escLine'd: undo that for the lookup and the data-title.
+        // The line is already escLine'd: undo that for the lookup and the attributes;
+        // the label is used as is (escaping it again would show &amp;).
         const raw = title.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
         const target = findNoteByTitle(raw);
-        if (target) return keep(`<a href="#" class="wikilink" title="${escAttr((target.preview || target.title || '').slice(0, 140))}" onclick="event.preventDefault(); selectNote(${target.id})">`) + `${esc(title)}</a>`;
-        return keep(`<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), title.trim() ))}" data-title="${escAttr(raw)}" onclick="event.preventDefault(); createLinkedNote(this.dataset.title)">`) + `${esc(title)}</a>`;
+        if (target) return keep(`<a href="#" class="wikilink" title="${escAttr((target.preview || target.title || '').slice(0, 140))}" onclick="event.preventDefault(); selectNote(${target.id})">`) + title + '</a>';
+        return keep(`<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), raw ))}" data-title="${escAttr(raw)}" onclick="event.preventDefault(); createLinkedNote(this.dataset.title)">`) + title + '</a>';
       })
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => keep(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">`) + `${txt}</a>`)
       // Autolink bare URLs (not already inside a markdown link's href/text).
@@ -4600,6 +4612,8 @@ async function setWordGoal() {
 // Show every note with this tag, across all notebooks.
 async function filterByTag(tag) {
   await selectNotebook(null);
+  // On the phone the open note covers the list: go back to it to show the results.
+  document.querySelector('.col-content')?.classList.remove('open');
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = 'tag:' + tag;
   onSearch();
@@ -5216,8 +5230,10 @@ async function summarizeNote() {
     if (!body) return;
     if (r.error) { body.innerHTML = aiErrorHtml(r.error); return; }
     _aiDigest = { id: noteId, markdown: r.markdown || r.text || '' };
+    // A code note is one verbatim block: text added on top would turn it into a normal note.
+    const isCode = !!(activeNote && activeNote.id === noteId && codeNoteParts(activeNote.body));
     body.innerHTML = aiResultHtml(_aiDigest.markdown)
-      + `<div style="margin-top:12px"><button class="btn btn-accent" id="aiAddTop" onclick="addDigestToNote()">${icon('plus')} ${esc(__( 'Add to top of note', 'noodled' ))}</button></div>`;
+      + (isCode ? '' : `<div style="margin-top:12px"><button class="btn btn-accent" id="aiAddTop" onclick="addDigestToNote()">${icon('plus')} ${esc(__( 'Add to top of note', 'noodled' ))}</button></div>`);
   } catch (e) {
     const body = document.getElementById('aiModalBody');
     if (body) body.innerHTML = aiErrorHtml(e.message || __( 'AI request failed.', 'noodled' ));
