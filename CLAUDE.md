@@ -112,6 +112,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **Tests (run from this folder, nothing to install):**
 - `node tests/roundtrip.test.js`: markdown to editor and back, through the real `noodled.js` in headless Chromium (Playwright from `~/.claude/skills/gauntlet/node_modules`). Run it after ANY change to `renderMarkdown` / `htmlToMarkdown`
 - `node tests/save-conflict.test.js`: save, conflict and search-order behaviour against a fake REST server
+- `node tests/visual.js <label>`: screenshots of the real app (template rendered by `tests/visual-render.php` with the PHP CLI, fake REST data) at desktop and phone sizes in both themes, written to the session scratchpad `shots/<label>/`, never into the repo
 - `php tests/sync.test.php`: GitHub push/pull engine against a fake GitHub and database (PHP at `%APPDATA%\Local\lightning-services\php-8.2.29+0\bin\win64\php.exe`)
 
 **Auth model:**
