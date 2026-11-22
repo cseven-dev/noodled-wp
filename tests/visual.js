@@ -440,6 +440,49 @@ async function main() {
       if (!multi) problems.push(`long-note ${t}: note column-count ${m.noteCols} at ${m.w}`);
       if (m.w >= 2300 && !(m.scrollH < m.singleH)) problems.push(`long-note ${t}: scrollHeight ${m.scrollH} not below single-column ${m.singleH}`);
       await shot(page, `desktop-long-note-${t}`);
+      if (m.w >= 2300) {
+        // Typing at the end of a multi-column note keeps the columns, the caret and the text.
+        const typed = await page.evaluate(async () => {
+          const nb = document.getElementById('noteBody');
+          const last = nb.lastElementChild;
+          const r = document.createRange(); r.selectNodeContents(last); r.collapse(false);
+          const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); nb.focus();
+          document.execCommand('insertText', false, ' ZZTYPED');
+          await new Promise(res => setTimeout(res, 700));
+          const v = getComputedStyle(nb).columnCount;
+          return { cols: v === 'auto' ? 1 : +v, has: nb.textContent.includes('ZZTYPED'), same: document.getElementById('noteBody') === nb, caretIn: nb.contains(getSelection().anchorNode) };
+        });
+        if (!(typed.cols > 1 && typed.has && typed.same && typed.caretIn)) problems.push(`long-note ${t}: typing broke columns ${JSON.stringify(typed)}`);
+        // Arrow keys in the list grid: Down moves one row (same column), Right moves one note.
+        const nav = await page.evaluate(() => {
+          document.activeElement && document.activeElement.blur();
+          const pos = () => { const el = document.querySelector('#noteList .note-item.kbd-nav, #noteList .note-item.nav-focus, #noteList .note-item.keynav') || document.querySelectorAll('#noteList .note-item')[_navIndex]; const b = el.getBoundingClientRect(); return { i: _navIndex, x: Math.round(b.left), y: Math.round(b.top) }; };
+          const key = (k) => document.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+          const its = [...document.querySelectorAll('#noteList .note-item')];
+          const start = its.findIndex((el, i) => its[i + 1] && Math.abs(its[i + 1].getBoundingClientRect().top - el.getBoundingClientRect().top) < 2);
+          _navIndex = filteredNotes.findIndex(n => +n.id === +its[start].dataset.noteId); const a = pos();
+          key('ArrowRight'); const b = pos();
+          key('ArrowDown'); const c = pos();
+          key('ArrowUp'); const d = pos();
+          return { a, b, c, d };
+        });
+        if (!(nav.b.i === nav.a.i + 1 && nav.b.x > nav.a.x && nav.b.y === nav.a.y && nav.c.y > nav.b.y && nav.d.y === nav.b.y)) problems.push(`long-note ${t}: arrow keys in grid ${JSON.stringify(nav)}`);
+        // The reading preference turns the columns off and back on.
+        const pref = await page.evaluate(async () => {
+          const cnt = () => { const v = getComputedStyle(document.getElementById('noteBody')).columnCount; return v === 'auto' ? 1 : +v; };
+          showReadingPrefs();
+          const cb = document.getElementById('rpColumns');
+          cb.checked = false; cb.dispatchEvent(new Event('input', { bubbles: true }));
+          await new Promise(res => setTimeout(res, 500));
+          const off = cnt();
+          cb.checked = true; cb.dispatchEvent(new Event('input', { bubbles: true }));
+          await new Promise(res => setTimeout(res, 500));
+          const on = cnt();
+          document.getElementById('modalContainer').innerHTML = '';
+          return { off, on };
+        });
+        if (!(pref.off === 1 && pref.on > 1)) problems.push(`long-note ${t}: columns preference ${JSON.stringify(pref)}`);
+      }
       await openShowcase(page);
       await page.waitForTimeout(700);
       const short = await page.evaluate(() => { const v = getComputedStyle(document.getElementById('noteBody')).columnCount; return v === 'auto' ? 1 : +v; });
