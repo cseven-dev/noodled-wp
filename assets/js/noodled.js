@@ -30,7 +30,7 @@ const api = {
       setOnline(true);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || `API error ${res.status}`);
+        throw new Error(err.message || err.error || `API error ${res.status}`);
       }
       return res.json();
     } catch (e) {
@@ -91,7 +91,7 @@ const api = {
   note_unshare(noteId, email)            { return this._fetch('/notes/' + noteId + '/unshare', { method: 'POST', body: JSON.stringify({ email }) }); },
   get_revisions(noteId)                  { return this._fetch('/notes/' + noteId + '/revisions'); },
   // AI assistant (server-proxied; keys never reach the browser)
-  ai_summarize(noteId)                   { return this._fetch('/ai/summarize', { method: 'POST', body: JSON.stringify({ note_id: noteId }) }); },
+  ai_summarize(noteId, digest)           { return this._fetch('/ai/summarize', { method: 'POST', body: JSON.stringify({ note_id: noteId, digest: !!digest }) }); },
   ai_ask(q)                              { return this._fetch('/ai/ask', { method: 'POST', body: JSON.stringify({ q }) }); },
   get_tasks()                            { return this._fetch('/tasks'); },
   toggle_task(noteId, idx)               { return this._fetch('/notes/' + noteId + '/task-toggle', { method: 'POST', body: JSON.stringify({ idx }) }); },
@@ -5114,17 +5114,51 @@ function aiResultHtml(text) {
   return `<div class="rendered-content" style="max-height:55vh;overflow:auto">${renderMarkdown(text)}</div>`;
 }
 
+let _aiDigest = null; // { id, markdown } of the summary shown in the popup
 async function summarizeNote() {
   if (!activeNote) return;
+  const noteId = activeNote.id;
+  _aiDigest = null;
   aiModalShell(__( 'Summary', 'noodled' ), aiThinkingHtml());
   try {
-    const r = await api.ai_summarize(activeNote.id);
+    await doSave(); // the server summarizes the stored body, so flush edits first
+    const r = await api.ai_summarize(noteId, true);
     const body = document.getElementById('aiModalBody');
     if (!body) return;
-    body.innerHTML = r.error ? aiErrorHtml(r.error) : aiResultHtml(r.text);
+    if (r.error) { body.innerHTML = aiErrorHtml(r.error); return; }
+    _aiDigest = { id: noteId, markdown: r.markdown || r.text || '' };
+    body.innerHTML = aiResultHtml(_aiDigest.markdown)
+      + `<div style="margin-top:12px"><button class="btn btn-accent" id="aiAddTop" onclick="addDigestToNote()">${icon('plus')} ${esc(__( 'Add to top of note', 'noodled' ))}</button></div>`;
   } catch (e) {
     const body = document.getElementById('aiModalBody');
-    if (body) body.innerHTML = aiErrorHtml(__( 'AI request failed.', 'noodled' ));
+    if (body) body.innerHTML = aiErrorHtml(e.message || __( 'AI request failed.', 'noodled' ));
+  }
+}
+
+// Put the summary from the popup on top of the open note, saved with the
+// normal conflict base (a conflict opens the usual dialog).
+async function addDigestToNote() {
+  const d = _aiDigest;
+  if (!d || !activeNote || activeNote.id !== d.id) return;
+  const btn = document.getElementById('aiAddTop');
+  if (btn) btn.disabled = true;
+  try {
+    await doSave();
+    if (_conflictOpen) return;
+    const cb = currentBody();
+    const body = cb === null ? (activeNote.body || '') : cb;
+    const title = document.getElementById('titleInput')?.value || activeNote.title;
+    document.getElementById('modalContainer').innerHTML = '';
+    const r = await saveOpenNote(activeNote, title, d.markdown + '\n---\n\n' + body);
+    if (r && r.conflict) return;
+    if (!r || r.error) { showToast(__( 'Could not add the summary', 'noodled' )); return; }
+    _aiDigest = null;
+    await loadNotes(); renderContent();
+    showToast(__( 'Summary added to the top of the note', 'noodled' ));
+  } catch (e) {
+    showToast(__( 'Could not add the summary', 'noodled' ));
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -5149,10 +5183,18 @@ async function runAsk() {
   ansEl.innerHTML = aiThinkingHtml();
   try {
     const r = await api.ai_ask(q);
-    ansEl.innerHTML = r.error ? aiErrorHtml(r.error) : aiResultHtml(r.text);
+    ansEl.innerHTML = r.error ? aiErrorHtml(r.error) : aiResultHtml(r.text) + aiSourcesHtml(r.sources);
   } catch (e) {
-    ansEl.innerHTML = aiErrorHtml(__( 'AI request failed.', 'noodled' ));
+    ansEl.innerHTML = aiErrorHtml(e.message || __( 'AI request failed.', 'noodled' ));
   }
+}
+
+// The notes that went into the answer's context, each a link to open it.
+function aiSourcesHtml(sources) {
+  const list = (Array.isArray(sources) ? sources : []).filter(s => s && Number(s.id) > 0);
+  if (!list.length) return '';
+  return `<div class="ai-sources"><h4>${esc(__( 'Sources', 'noodled' ))}</h4><ul>${list.map(s =>
+    `<li><a href="#" onclick="event.preventDefault();document.getElementById('modalContainer').innerHTML='';selectNote(${Number(s.id)})">${icon('file-text')} ${esc(s.title || __( 'Untitled', 'noodled' ))}</a></li>`).join('')}</ul></div>`;
 }
 
 // ── Embed media ──

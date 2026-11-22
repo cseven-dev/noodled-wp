@@ -60,7 +60,7 @@ $config = [
 	'appUrl'    => $origin . '/',
 	'brandName' => 'noodled',
 	'map'       => [ 'provider' => 'osm', 'mapboxToken' => '', 'gmapsKey' => '' ],
-	'aiEnabled' => false,
+	'aiEnabled' => true,
 	'user'      => [ 'name' => 'Sam Rivera', 'email' => 'sam@example.com', 'admin' => true, 'owner' => true ],
 ];
 

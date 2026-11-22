@@ -606,4 +606,42 @@ class Noodled_Notes {
 		foreach ( $rows ?: [] as $r ) $out[] = [ 'id' => (int) $r['id'], 'title' => $r['title'] ?? '', 'body' => $r['body'] ?? '' ];
 		return $out;
 	}
+
+	// Notes for the AI "ask your notes" context, most relevant first, scoped
+	// exactly like search(). FULLTEXT relevance on the question's keywords; when
+	// that finds fewer than 5 notes, LIKE hits per keyword and then the newest
+	// notes (corpus()) top it up. De-duplicated; ask() applies the size cap and
+	// skips locked bodies.
+	public static function ask_candidates( string $q, array $notebook_ids = [], array $extra_note_ids = [] ): array {
+		global $wpdb;
+		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
+		$note_ids = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
+		$where    = "deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids))";
+		$out = [];
+		$add = static function ( $rows ) use ( &$out ) {
+			foreach ( $rows ?: [] as $r ) {
+				$id = (int) $r['id'];
+				if ( ! isset( $out[ $id ] ) ) $out[ $id ] = [ 'id' => $id, 'title' => $r['title'] ?? '', 'body' => $r['body'] ?? '' ];
+			}
+		};
+		$words = Noodled_AI::keywords( $q );
+		if ( $words ) {
+			$kw = implode( ' ', $words );
+			$add( $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, title, body FROM " . self::table() . " WHERE $where AND MATCH(title, body) AGAINST(%s) ORDER BY MATCH(title, body) AGAINST(%s) DESC LIMIT 40",
+				$kw, $kw
+			), ARRAY_A ) );
+			if ( count( $out ) < 5 ) {
+				foreach ( $words as $w ) {
+					$like = '%' . $wpdb->esc_like( $w ) . '%';
+					$add( $wpdb->get_results( $wpdb->prepare(
+						"SELECT id, title, body FROM " . self::table() . " WHERE $where AND (title LIKE %s OR body LIKE %s) ORDER BY modified_at DESC LIMIT 40",
+						$like, $like
+					), ARRAY_A ) );
+				}
+			}
+		}
+		if ( count( $out ) < 5 ) $add( self::corpus( $notebook_ids, $extra_note_ids ) );
+		return array_values( $out );
+	}
 }

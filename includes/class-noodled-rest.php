@@ -1277,7 +1277,7 @@ class Noodled_REST {
 		if ( ! $note ) {
 			return new \WP_REST_Response( [ 'error' => __( 'Access denied', 'noodled' ) ], 403 );
 		}
-		$r = Noodled_AI::summarize( $note );
+		$r = $req->get_param( 'digest' ) ? Noodled_AI::digest( $note ) : Noodled_AI::summarize( $note );
 		return new \WP_REST_Response( $r, isset( $r['error'] ) ? 400 : 200 );
 	}
 
@@ -1288,7 +1288,7 @@ class Noodled_REST {
 		}
 		$nb_ids   = self::accessible_notebook_ids();
 		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
-		$notes    = Noodled_Notes::corpus( $nb_ids, $note_ids );
+		$notes    = Noodled_Notes::ask_candidates( $q, $nb_ids, $note_ids );
 		$r = Noodled_AI::ask( $q, $notes );
 		return new \WP_REST_Response( $r, isset( $r['error'] ) ? 400 : 200 );
 	}

@@ -216,6 +216,12 @@ function noodled_run_sync_drain() {
 	}
 }
 
+// Same tick: opt-in AI summaries of new Plaud transcripts (at most 2 per tick).
+add_action( 'noodled_push_check', 'noodled_run_ai_plaud' );
+function noodled_run_ai_plaud() {
+	Noodled_AI::plaud_tick();
+}
+
 /**
  * One-time migration to per-user-private noodles:
  * - assign any orphaned (owner_id=0) notebooks to the first admin user

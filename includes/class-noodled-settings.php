@@ -144,6 +144,7 @@ class Noodled_Settings {
 		}
 		if ( isset( $input['ai_key'] ) )   $clean['ai_key']   = sanitize_text_field( $input['ai_key'] );
 		if ( isset( $input['ai_model'] ) ) $clean['ai_model'] = sanitize_text_field( $input['ai_model'] );
+		if ( isset( $input['ai_provider'] ) ) $clean['ai_plaud_auto'] = ! empty( $input['ai_plaud_auto'] ) ? '1' : '';
 
 		// Flush rewrite rules when path changes
 		if ( ( $old['app_path'] ?? 'noodled' ) !== ( $clean['app_path'] ?? 'noodled' ) ) {
@@ -425,6 +426,12 @@ class Noodled_Settings {
 						<td>
 							<input type="text" id="noodled-ai-model" name="<?php echo self::$option_key; ?>[ai_model]" value="<?php echo esc_attr( $opts['ai_model'] ?? '' ); ?>" class="regular-text" placeholder="<?php echo esc_attr( implode( ' / ', array_map( [ 'Noodled_AI', 'default_model' ], Noodled_AI::PROVIDERS ) ) ); ?>">
 							<p class="description"><?php esc_html_e( 'Optional. Leave blank to use a sensible default for the selected provider.', 'noodled' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th><?php esc_html_e( 'Plaud summaries', 'noodled' ); ?></th>
+						<td>
+							<label for="noodled-ai-plaud-auto"><input type="checkbox" id="noodled-ai-plaud-auto" name="<?php echo self::$option_key; ?>[ai_plaud_auto]" value="1" <?php checked( ! empty( $opts['ai_plaud_auto'] ) ); ?>> <?php esc_html_e( 'Automatically add a summary and action items to new Plaud transcripts (sends the transcript to your AI provider)', 'noodled' ); ?></label>
 						</td>
 					</tr>
 				</table>

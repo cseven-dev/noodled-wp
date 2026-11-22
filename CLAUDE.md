@@ -114,6 +114,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `node tests/save-conflict.test.js`: save, conflict and search-order behaviour against a fake REST server
 - `node tests/visual.js <label>`: screenshots of the real app (template rendered by `tests/visual-render.php` with the PHP CLI, fake REST data) at desktop and phone sizes in both themes, written to the session scratchpad `shots/<label>/`, never into the repo
 - `php tests/sync.test.php`: GitHub push/pull engine against a fake GitHub and database (PHP at `%APPDATA%\Local\lightning-services\php-8.2.29+0\bin\win64\php.exe`)
+- `php tests/ai.test.php`: AI digest parsing, ask retrieval and scope, locked-note privacy and the Plaud auto-summary tick, with the provider faked through the `noodled_ai_transport` filter (nothing is tested against a real provider)
 
 **Auth model:**
 - WP admins auto-authenticated as noodled admin
@@ -138,5 +139,6 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Code notes:** a verbatim monospace note the markdown editor never reflows (`codeNoteParts`).
 - **Captain's Log:** an in-app product-history page in the ☰ menu (`showCaptainsLog`, `CAPTAINS_LOG`).
 - **Version history** is snapshotted before GitHub-sync and move overwrites (not just on save) and is reachable from a toolbar clock icon and the note's right-click menu.
+- **AI summary and action items:** `POST /ai/summarize {note_id, digest: true}` (read access to the note) returns `Noodled_AI::digest()` Markdown; the summary popup's "Add to top of note" saves it through `saveOpenNote`. `POST /ai/ask` now retrieves with `Noodled_Notes::ask_candidates()` (FULLTEXT on `Noodled_AI::keywords()`, same scope pair as search) and returns `sources`. Opt-in setting `ai_plaud_auto` marks new Plaud notes `meta_json.ai_plaud = pending`; `Noodled_AI::plaud_tick()` on the `noodled_push_check` tick (2 notes per tick, claim via `running`, 3 tries) prepends the digest after an `ai` version snapshot. Test seam: the `noodled_ai_transport` filter. Locked bodies are never sent. Untested against a real provider.
 
 **Deploy to Local:** Copy `noodled-wp/` to `wp-content/plugins/noodled/`

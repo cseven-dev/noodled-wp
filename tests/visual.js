@@ -213,6 +213,19 @@ function handleApi(route, req, theme) {
     }
     return json([]);
   }
+  // A save echoes the stored note (unchanged), like update_note does.
+  if (method === 'PUT' && (m = p.match(/^\/notes\/(\d+)$/))) {
+    const r = NOTE_ROWS.find(x => x.id === +m[1]);
+    if (r) return json(formatNote(r));
+  }
+  // Canned AI replies (no provider is ever called).
+  if (p === '/ai/summarize') {
+    const md = '## Summary\nThe kitchen is being redone in two phases to stay on budget, keeping the existing plumbing.\n\n## Action items\n- [ ] Book the permit inspection\n- [ ] Get a second quote for the countertop\n- [ ] Ask about the vent hood clearance\n';
+    return json({ markdown: md, text: md });
+  }
+  if (p === '/ai/ask') {
+    return json({ text: 'You chose **Hale Navy** for the living room and Revere Pewter for the hallway, with Chantilly Lace trim. The cabinet colour is already picked for the kitchen.', sources: [{ id: 102, title: 'Paint colours' }, { id: SHOWCASE_ID, title: 'Kitchen renovation plan' }] });
+  }
   return json({});
 }
 
@@ -340,6 +353,18 @@ async function main() {
       await page.waitForSelector('#modalContainer .tag-chip');
       await shot(page, `desktop-tag-cloud-${t}`);
       await closeModal(page);
+      // AI: the summary popup with "Add to top of note", and Ask with sources.
+      await openShowcase(page);
+      page.evaluate(() => { summarizeNote(); });
+      await page.waitForSelector('#aiAddTop');
+      await shot(page, `desktop-ai-summary-${t}`);
+      await closeModal(page);
+      await page.evaluate(() => askYourNotes());
+      await page.fill('#aiAskInput', 'What paint colours did we pick?');
+      await page.evaluate(() => runAsk());
+      await page.waitForSelector('#aiAskAnswer .ai-sources');
+      await shot(page, `desktop-ai-ask-${t}`);
+      await closeModal(page);
       // The boot-time loading skeleton, drawn on demand.
       await page.evaluate(() => showLoadingSkeleton());
       await shot(page, `desktop-loading-${t}`);
@@ -365,6 +390,17 @@ async function main() {
       await page.evaluate(() => { closeSearchFilters(); return showTagCloud(); });
       await page.waitForSelector('#modalContainer .tag-chip');
       await shot(page, `phone-tag-cloud-${t}`);
+      await closeModal(page);
+      await openShowcase(page);
+      page.evaluate(() => { summarizeNote(); });
+      await page.waitForSelector('#aiAddTop');
+      await shot(page, `phone-ai-summary-${t}`);
+      await closeModal(page);
+      await page.evaluate(() => askYourNotes());
+      await page.fill('#aiAskInput', 'What paint colours did we pick?');
+      await page.evaluate(() => runAsk());
+      await page.waitForSelector('#aiAskAnswer .ai-sources');
+      await shot(page, `phone-ai-ask-${t}`);
     } },
   ];
 

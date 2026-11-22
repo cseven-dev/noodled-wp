@@ -120,7 +120,7 @@ class Noodled_Plaud {
 			$now  = current_time( 'mysql', true );
 			$created_at = $created_ts ? gmdate( 'Y-m-d H:i:s', $created_ts ) : $now;
 
-			$wpdb->insert( $table, [
+			$row = [
 				'slug'        => $slug,
 				'notebook_id' => $notebook_id,
 				'title'       => sanitize_text_field( $rec['filename'] ?? 'Recording' ),
@@ -128,7 +128,12 @@ class Noodled_Plaud {
 				'source'      => 'plaud',
 				'created_at'  => $created_at,
 				'modified_at' => $now,
-			] );
+			];
+			// Opt-in: queue an AI summary for the 5-minute tick (Noodled_AI::plaud_tick).
+			if ( Noodled_Settings::get( 'ai_plaud_auto' ) && Noodled_AI::is_configured() ) {
+				$row['meta_json'] = wp_json_encode( [ 'ai_plaud' => 'pending' ] );
+			}
+			$wpdb->insert( $table, $row );
 
 			if ( $wpdb->insert_id ) {
 				$downloaded++;
