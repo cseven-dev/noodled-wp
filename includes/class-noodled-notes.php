@@ -3,6 +3,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Noodled_Notes {
 
+	const REVISION_KEEP = 30;
+	const REVISION_GAP = 600;
+
 	private static function table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'noodled_notes';
@@ -216,12 +219,21 @@ class Noodled_Notes {
 		return self::get_one( (int) $wpdb->insert_id ) ?? [ 'error' => __( 'Failed to create note', 'noodled' ) ];
 	}
 
-	public static function update( int $id, array $data ): array {
+	public static function update( int $id, array $data, string $force_reason = '' ): array {
 		global $wpdb;
 
-		// Snapshot the pre-edit state into version history before overwriting it.
-		if ( isset( $data['title'] ) || isset( $data['body'] ) ) {
-			self::save_revision( $id );
+		// Locking a note: drop its plaintext versions instead of snapshotting them.
+		$locking = false;
+		if ( isset( $data['body'] ) && strpos( (string) $data['body'], 'noodled:enc:v1:' ) === 0 ) {
+			$stored  = $wpdb->get_var( $wpdb->prepare( "SELECT body FROM " . self::table() . " WHERE id = %d", $id ) );
+			$locking = strpos( (string) $stored, 'noodled:enc:v1:' ) !== 0;
+		}
+		if ( $locking ) {
+			$wpdb->delete( $wpdb->prefix . 'noodled_revisions', [ 'note_id' => $id ] );
+		} elseif ( isset( $data['title'] ) || isset( $data['body'] ) ) {
+			// Snapshot the pre-edit state into version history before overwriting it.
+			// Plain edits are throttled; a named reason (restore, conflict) always snapshots.
+			self::save_revision( $id, $force_reason ?: 'edit', $force_reason === '' );
 		}
 
 		$update = [ 'modified_at' => current_time( 'mysql', true ) ];
@@ -250,8 +262,9 @@ class Noodled_Notes {
 	/* ── Version history (durable, server-side) ── */
 
 	// Snapshot the note's CURRENT stored title/body as a revision. Deduped against
-	// the latest revision and pruned to the most recent 15 so history stays bounded.
-	public static function save_revision( int $id ): void {
+	// the latest revision and pruned to the most recent REVISION_KEEP so history stays
+	// bounded. With $throttle, a snapshot is skipped if the last one is under REVISION_GAP old.
+	public static function save_revision( int $id, string $reason = '', bool $throttle = false ): void {
 		global $wpdb;
 		$cur = $wpdb->get_row( $wpdb->prepare(
 			"SELECT title, body FROM " . self::table() . " WHERE id = %d", $id
@@ -259,19 +272,24 @@ class Noodled_Notes {
 		if ( ! $cur ) return;
 		$rev = $wpdb->prefix . 'noodled_revisions';
 		$last = $wpdb->get_row( $wpdb->prepare(
-			"SELECT title, body FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 1", $id
+			"SELECT title, body, created_at FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 1", $id
 		), ARRAY_A );
 		if ( $last && $last['title'] === (string) $cur['title'] && $last['body'] === (string) $cur['body'] ) {
 			return; // no change since the last snapshot
+		}
+		// created_at is stored in UTC.
+		if ( $throttle && $last && strtotime( $last['created_at'] . ' UTC' ) > time() - self::REVISION_GAP ) {
+			return;
 		}
 		$wpdb->insert( $rev, [
 			'note_id'    => $id,
 			'title'      => $cur['title'],
 			'body'       => $cur['body'],
+			'reason'     => $reason,
 			'created_at' => current_time( 'mysql', true ),
 		] );
 		$stale = $wpdb->get_col( $wpdb->prepare(
-			"SELECT id FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 50 OFFSET 15", $id
+			"SELECT id FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 100 OFFSET " . self::REVISION_KEEP, $id
 		) );
 		if ( $stale ) {
 			$wpdb->query( "DELETE FROM $rev WHERE id IN (" . implode( ',', array_map( 'intval', $stale ) ) . ")" );
@@ -282,13 +300,14 @@ class Noodled_Notes {
 		global $wpdb;
 		$rev = $wpdb->prefix . 'noodled_revisions';
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT id, title, body, created_at FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 15", $id
+			"SELECT id, title, body, reason, created_at FROM $rev WHERE note_id = %d ORDER BY id DESC LIMIT 30", $id
 		), ARRAY_A );
 		return array_map( function ( $r ) {
 			return [
 				'id'    => (int) $r['id'],
 				'title' => $r['title'],
 				'body'  => (string) $r['body'],
+				'reason' => (string) $r['reason'],
 				// ISO-8601 UTC so the client can render a local relative time.
 				'time'  => $r['created_at'] ? ( str_replace( ' ', 'T', substr( $r['created_at'], 0, 19 ) ) . 'Z' ) : '',
 			];
@@ -353,6 +372,7 @@ class Noodled_Notes {
 	public static function permanent_delete( int $id ): bool {
 		global $wpdb;
 		Noodled_Attachments::delete_for_note( $id );
+		$wpdb->delete( $wpdb->prefix . 'noodled_revisions', [ 'note_id' => $id ] );
 		$wpdb->delete( self::table(), [ 'id' => $id ] );
 		return true;
 	}
@@ -366,6 +386,9 @@ class Noodled_Notes {
 		$note_ids = $wpdb->get_col( "SELECT id FROM " . self::table() . " WHERE $where" );
 		foreach ( $note_ids as $nid ) {
 			Noodled_Attachments::delete_for_note( (int) $nid );
+		}
+		if ( $note_ids ) {
+			$wpdb->query( "DELETE FROM {$wpdb->prefix}noodled_revisions WHERE note_id IN (" . implode( ',', array_map( 'intval', $note_ids ) ) . ")" );
 		}
 		$wpdb->query( "DELETE FROM " . self::table() . " WHERE $where" );
 		return true;
@@ -394,7 +417,7 @@ class Noodled_Notes {
 
 		// Snapshot before a move (which can force-rename the title on a clash) so the
 		// pre-move title/body stays recoverable from History.
-		self::save_revision( $id );
+		self::save_revision( $id, 'move' );
 		$wpdb->update( self::table(), [
 			'notebook_id' => $notebook_id,
 			'title'       => $title,

@@ -50,7 +50,7 @@ const api = {
   get_notes(notebook)                    { return this._fetch('/notes' + (notebook ? '?notebook=' + encodeURIComponent(notebook) : '')); },
   get_note(notebook, noteId)             { return this._fetch('/notes/' + noteId).then(note => { cacheBody(note); return note; }).catch(async err => { const c = await readCachedBody(noteId); if (c) return c; throw err; }); },
   create_note(notebook, title, body)     { return this._fetch('/notes', { method: 'POST', body: JSON.stringify({ notebook, title, body: body || '' }) }); },
-  save_note(notebook, noteId, title, body, opts) { const p = { title, body }; if (opts && opts.base) p.base_modified = opts.base; if (opts && opts.force) p.force = true; return this._fetch('/notes/' + noteId, { method: 'PUT', body: JSON.stringify(p) }); },
+  save_note(notebook, noteId, title, body, opts) { const p = { title, body }; if (opts && opts.base) p.base_modified = opts.base; if (opts && opts.force) p.force = true; if (opts && opts.snapshot) p.snapshot = true; return this._fetch('/notes/' + noteId, { method: 'PUT', body: JSON.stringify(p) }); },
   delete_note(notebook, noteId)          { return this._fetch('/notes/' + noteId, { method: 'DELETE' }); },
   move_note(from, noteId, to)            { return this._fetch('/notes/' + noteId + '/move', { method: 'POST', body: JSON.stringify({ notebook: to }) }); },
   toggle_pin(notebook, noteId)           { return this._fetch('/notes/' + noteId + '/pin', { method: 'POST' }); },
@@ -2147,6 +2147,7 @@ function promptPassphrase(mode) {
     el.innerHTML = `<div class="modal-overlay"><div class="modal" style="max-width:380px">
       <h3>${esc(create ? __( 'Set a protection passphrase', 'noodled' ) : __( 'Enter passphrase', 'noodled' ))}</h3>
       ${create ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5">${esc(__( 'Locked notes are encrypted on your device. If you forget this passphrase, those notes cannot be recovered by anyone, including the site admin.', 'noodled' ))}</p>` : ''}
+      ${create ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5">${esc(__( 'Earlier unlocked versions are removed from version history.', 'noodled' ))}</p>` : ''}
       <input type="password" id="ppass1" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Passphrase', 'noodled' ))}">
       ${create ? `<input type="password" id="ppass2" autocomplete="off" style="width:100%;margin-top:8px" placeholder="${escAttr(__( 'Confirm passphrase', 'noodled' ))}">` : ''}
       <div id="pperr" style="color:#e11;font-size:12px;margin-top:6px;min-height:14px"></div>
@@ -3937,18 +3938,24 @@ document.addEventListener('paste', e => {
 // ── Note version history (durable, server-side revisions) ──
 async function showHistory() {
   if (!activeNote) return;
+  if (noteIsLocked(activeNote.body)) { showToast(__( 'Version history is not shown for locked notes', 'noodled' )); return; }
   let history = [];
   try { history = await api.get_revisions(activeNote.id); } catch (e) {}
   if (!Array.isArray(history)) history = [];
   activeNote._history = history;
   if (!history.length) { showToast(__( 'No earlier versions yet', 'noodled' )); return; }
+  // Why each version was saved (the server's revision reason).
+  const reasons = {
+    edit: __( 'Edited', 'noodled' ), sync: __( 'Before GitHub sync', 'noodled' ), move: __( 'Before move', 'noodled' ),
+    restore: __( 'Before restore', 'noodled' ), conflict: __( 'Before overwrite', 'noodled' ), ai: __( 'Before AI summary', 'noodled' ),
+  };
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal" style="max-width:500px">
       <h3>${esc(__( 'Note History', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
         ${history.map((h, i) => `<div class="history-item" role="button" tabindex="0" onclick="showHistoryDiff(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHistoryDiff(${i});}" style="padding:10px;cursor:pointer;border-bottom:1px solid var(--border)">
-          <div style="font-size:12px;color:var(--text-muted)">${relativeTime(h.time)} — ${esc(h.title || '')} <span style="float:right;color:var(--accent)">${esc(__( 'View changes', 'noodled' ))} &rsaquo;</span></div>
+          <div style="font-size:12px;color:var(--text-muted)">${relativeTime(h.time)}${reasons[h.reason] ? ' · ' + esc(reasons[h.reason]) : ''} · ${esc(h.title || '')} <span style="float:right;color:var(--accent)">${esc(__( 'View changes', 'noodled' ))} &rsaquo;</span></div>
           <div style="font-size:11px;color:var(--text);margin-top:4px">${esc((h.body || '').substring(0, 100))}...</div>
         </div>`).join('')}
       </div>
@@ -3959,16 +3966,22 @@ async function showHistory() {
   </div>`;
 }
 
-function restoreHistory(index) {
+async function restoreHistory(index) {
   if (!activeNote) return;
   const history = activeNote._history || [];
-  if (!history[index]) return;
-  activeNote.body = history[index].body;
-  activeNote.title = history[index].title;
-  document.getElementById('modalContainer').innerHTML = '';
-  renderContent();
-  doSave();
-  showToast(__( 'Restored from history', 'noodled' ));
+  const h = history[index];
+  if (!h) return;
+  try {
+    await doSave(); // flush pending edits so they are snapshotted before the restore
+    if (_conflictOpen) return; // that flush raised a conflict; let the user settle it first
+    // Save the exact revision text (no editor round trip); the server snapshots first.
+    const r = await saveOpenNote(activeNote, h.title, h.body, { snapshot: true });
+    if (r && r.conflict) return;
+    if (!r || r.error) { showToast(__( 'Could not restore this version', 'noodled' )); return; }
+    document.getElementById('modalContainer').innerHTML = '';
+    await loadNotes(); renderContent();
+    showToast(__( 'Restored from history', 'noodled' ));
+  } catch (e) { showToast(__( 'Could not restore this version', 'noodled' )); }
 }
 
 // ── Line-level diff (LCS) between a historical version and the current note ──

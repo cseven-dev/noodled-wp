@@ -736,7 +736,9 @@ class Noodled_REST {
 		$data = [];
 		if ( $req->get_param( 'title' ) !== null ) $data['title'] = $req->get_param( 'title' );
 		if ( $req->get_param( 'body' ) !== null )  $data['body']  = $req->get_param( 'body' );
-		$result = Noodled_Notes::update( (int) $req['id'], $data );
+		// A forced save or a restore always snapshots (no throttle), with its reason.
+		$snap   = $force ? 'conflict' : ( $req->get_param( 'snapshot' ) ? 'restore' : '' );
+		$result = Noodled_Notes::update( (int) $req['id'], $data, $snap );
 		if ( ! isset( $result['error'] ) ) {
 			Noodled_Sync::queue_push( (int) $req['id'] );
 		}

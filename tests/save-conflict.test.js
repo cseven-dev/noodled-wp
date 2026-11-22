@@ -58,6 +58,7 @@ const fake = {
   putDelay: 0,       // ms to hold PUT responses (to overlap saves)
   offline: false,    // abort PUTs like a dropped connection
   searchResults: null,
+  revisions: {},     // note id -> GET /notes/{id}/revisions response
   stamp() {
     const d = new Date(Date.UTC(2026, 10, 22, 13, 45, 0) + this.clock * 1000);
     return d.toISOString().slice(0, 19).replace('T', ' ');
@@ -132,6 +133,7 @@ async function handleApi(route, req) {
     r.modified_at = fake.tick();
     return json(fake.format(r));
   }
+  if (method === 'GET' && (m = p.match(/^\/notes\/(\d+)\/revisions$/))) return json(fake.revisions[+m[1]] || []);
   if (method === 'GET' && p === '/search') return json(fake.searchResults || []);
   if (method === 'GET' && p === '/bodies') return json(Object.values(fake.rows).map(r => ({ id: r.id, body: r.body })));
   return json([]);
@@ -444,6 +446,33 @@ async function main() {
     check(lastSave().response.conflict === true, 'stale title-only save did not get a conflict response');
     check(fake.rows[1].body === 'from the other device', 'other device text was overwritten');
     check((await ev(() => __t.state())).conflictOpen === true, 'conflict dialog not opened');
+  });
+
+  // 8. restoring a version saves its exact text with snapshot:true.
+  await group('8 restore sends snapshot:true and the exact revision body', async check => {
+    freshNote();
+    // Text the editor round trip would normalise (extra blank lines, trailing spaces, * bullets).
+    const oldBody = 'Line one  \n\n\n\nLine two\n* star bullet\n';
+    fake.revisions = { 1: [{ id: 5, title: 'Alpha old', body: oldBody, reason: 'edit', time: '2026-11-22T13:00:00Z' }] };
+    await ev(() => __t.open(1));
+    // Clear toasts left by earlier groups: showToast loops forever once a 5th toast is stacked
+    // (dismissToast(..., true) removes on a timer, so the while loop never shrinks the stack).
+    await ev(() => { const st = document.getElementById('toastStack'); if (st) st.innerHTML = ''; });
+    await ev(() => showHistory());
+    check(await ev(() => document.querySelector('#modalContainer .history-item') !== null), 'history list not shown');
+    await ev(() => restoreHistory(0));
+    const s = lastSave();
+    // restoreHistory flushes pending edits first, so its base is the mtime the save before it returned.
+    const server = fake.saves.length > 1 ? fake.saves[fake.saves.length - 2].response.mtime : '2026-11-22 13:45:10';
+    check(s && s.payload.snapshot === true, 'restore did not send snapshot:true');
+    check(s && s.payload.body === oldBody, 'restore body not exact: ' + JSON.stringify(s && s.payload.body));
+    check(s && s.payload.title === 'Alpha old', 'restore title ' + (s && s.payload.title));
+    check(s && s.payload.base_modified === server && !s.response.conflict, 'restore base ' + (s && s.payload.base_modified) + ' vs ' + server);
+    check(fake.rows[1].body === oldBody, 'server body not restored');
+    const st = await ev(() => __t.state());
+    check(st.body === oldBody && st.mtime === fake.rows[1].modified_at, 'open note did not adopt the restored version');
+    check(await ev(() => document.querySelector('#modalContainer .modal') === null), 'history modal not closed');
+    fake.revisions = {};
   });
 
   const harnessErrors = await page.evaluate(() => window.__pageErrors.slice());

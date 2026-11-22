@@ -595,7 +595,7 @@ class Noodled_Sync {
 		if ( strcmp( substr( $data['modified_at'], 0, 16 ), substr( (string) $existing['modified_at'], 0, 16 ) ) > 0 ) {
 			// Snapshot the current content before the sync overwrites it, so the
 			// pre-sync version stays recoverable from History.
-			Noodled_Notes::save_revision( (int) $existing['id'] );
+			Noodled_Notes::save_revision( (int) $existing['id'], 'sync' );
 			$wpdb->update( $t, $data, [ 'id' => (int) $existing['id'] ] );
 			return 'updated';
 		}

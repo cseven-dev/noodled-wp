@@ -160,6 +160,7 @@ CREATE TABLE {$wpdb->prefix}noodled_revisions (
   note_id bigint(20) unsigned NOT NULL,
   title varchar(500) NOT NULL DEFAULT '',
   body longtext,
+  reason varchar(20) NOT NULL DEFAULT '',
   created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_note (note_id)
