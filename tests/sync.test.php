@@ -841,7 +841,7 @@ scenario( 'a stale delete never removes a file a live note now owns', function (
 	Noodled_GitHub::$calls = [];
 	$r = Noodled_Sync::push_note( 2501 );
 	ok( ! empty( $r['success'] ), 'row released' );
-	same( 1, count( Noodled_GitHub::$calls ), 'no retry' );
+	same( 0, count( Noodled_GitHub::$calls ), 'no delete is even attempted' );
 	same( [ 'Work/Same.md' ], files(), 'live note\'s file kept' );
 	same( '', row( 2501 )['gh_path'], 'trashed row lets go of the path' );
 	same( 0, (int) row( 2501 )['push_pending'], 'pending cleared' );

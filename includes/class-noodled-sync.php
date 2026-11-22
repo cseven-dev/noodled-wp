@@ -131,17 +131,18 @@ class Noodled_Sync {
 			&& (string) $row['sha'] !== '' && (string) $row['gh_path'] !== '' ) {
 			$path    = (string) $row['gh_path'];
 			$message = "noodled sync: delete {$row['title']}";
-			$result  = Noodled_GitHub::delete_file( $path, (string) $row['sha'], $message );
 
-			// 409/422: our sha is stale. Retry once with the remote sha, unless a
-			// live note now owns this path: then the file is not ours to delete.
-			if ( is_wp_error( $result ) && in_array( self::error_status( $result ), [ 409, 422 ], true ) ) {
-				$owner = $wpdb->get_var( $wpdb->prepare(
-					"SELECT id FROM {$t} WHERE gh_path = %s AND deleted_at IS NULL AND id != %d LIMIT 1", $path, $note_id
-				) );
-				if ( $owner ) {
-					$result = [ 'released' => true ];
-				} else {
+			// If a live note now owns this path, the file is not ours to delete:
+			// just release this row's claim on it.
+			$owner = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$t} WHERE gh_path = %s AND deleted_at IS NULL AND id != %d LIMIT 1", $path, $note_id
+			) );
+			if ( $owner ) {
+				$result = [ 'released' => true ];
+			} else {
+				$result = Noodled_GitHub::delete_file( $path, (string) $row['sha'], $message );
+				// 409/422: our sha is stale. Retry once with the remote sha.
+				if ( is_wp_error( $result ) && in_array( self::error_status( $result ), [ 409, 422 ], true ) ) {
 					$remote = Noodled_GitHub::get_file( $path );
 					$result = is_wp_error( $remote ) ? $remote : Noodled_GitHub::delete_file( $path, (string) $remote['sha'], $message );
 				}
