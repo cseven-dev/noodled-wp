@@ -58,6 +58,7 @@ const fake = {
   putDelay: 0,       // ms to hold PUT responses (to overlap saves)
   offline: false,    // abort PUTs like a dropped connection
   searchResults: null,
+  searchCalls: [],   // query params of every GET /search
   revisions: {},     // note id -> GET /notes/{id}/revisions response
   racy: new Set(),   // ids another device re-saves right after each GET /notes/{id}
   readOnly: new Set(), // ids whose PUT answers 403 (no write access)
@@ -71,13 +72,15 @@ const fake = {
       id: r.id, slug: 'n' + r.id, notebook: r.notebook, title: r.title, source: '', pinned: !!r.pinned,
       created: r.created_at.slice(0, 16), modified: r.modified_at.slice(0, 16), mtime: r.modified_at,
       att: 0, preview: r.body.slice(0, 160), tasks: { done: 0, total: 0 },
+      // Same rule as Noodled_Notes::tags_of (no fenced code in these fixtures).
+      tags: [...new Set((r.body.match(/(?:^|\s)#([A-Za-z][\w-]*)/g) || []).map(t => t.trim().slice(1)))],
     };
     if (withBody) out.body = r.body;
     return out;
   },
   reset(rows) {
     this.rows = {}; this.saves = []; this.putDelay = 0; this.offline = false; this.searchResults = null;
-    this.racy = new Set(); this.readOnly = new Set();
+    this.racy = new Set(); this.readOnly = new Set(); this.searchCalls = [];
     for (const r of rows) this.rows[r.id] = { pinned: false, notebook: 'General', created_at: '2026-11-01 09:00:00', ...r };
   },
   // Same rule as Noodled_REST::update_note.
@@ -147,7 +150,12 @@ async function handleApi(route, req) {
     return json(fake.format(r));
   }
   if (method === 'GET' && (m = p.match(/^\/notes\/(\d+)\/revisions$/))) return json(fake.revisions[+m[1]] || []);
-  if (method === 'GET' && p === '/search') return json(fake.searchResults || []);
+  if (method === 'GET' && p === '/search') {
+    const params = {};
+    for (const [k, v] of u.searchParams) if (k !== '_cb') params[k] = v;
+    fake.searchCalls.push(params);
+    return json(fake.searchResults || []);
+  }
   if (method === 'GET' && p === '/bodies') return json(Object.values(fake.rows).map(r => ({ id: r.id, body: r.body })));
   // Same shape as Noodled_Notes::titles(): every note, all notebooks, no bodies.
   if (method === 'GET' && p === '/titles') return json(Object.values(fake.rows).map(r => ({ id: r.id, title: r.title, notebook: r.notebook, modified: r.modified_at.slice(0, 16), pinned: !!r.pinned })));
@@ -436,6 +444,29 @@ async function main() {
     check(JSON.stringify(await ev(() => __t.order())) === '[11,13,12]', 'api.search order ' + JSON.stringify(await ev(() => __t.order())));
     await ev(async () => { searchScope = 'notebook'; activeNotebook = null; document.getElementById('searchInput').value = ''; onSearch(); await new Promise(r => setTimeout(r, 100)); });
     check(JSON.stringify(await ev(() => __t.order())) === '[12,11,13]', 'cleared-query order ' + JSON.stringify(await ev(() => __t.order())));
+
+    // Filter tokens narrow the local list; highlighting uses only the free text.
+    fake.reset([
+      { id: 14, title: 'Pump log', body: 'serviced the pump #garden', notebook: 'Home', modified_at: '2026-11-20 10:00:00' },
+      { id: 15, title: 'Pump invoice', body: 'paid for the pump', notebook: 'Work', modified_at: '2026-11-21 10:00:00' },
+      { id: 16, title: 'Seeds', body: 'tomatoes #garden', notebook: 'Work', modified_at: '2026-11-19 10:00:00' },
+    ]);
+    await ev(async () => { searchScope = 'notebook'; activeNotebook = null; document.getElementById('searchInput').value = ''; await loadNotes(); });
+    const listFor = (q) => ev(async (q) => { document.getElementById('searchInput').value = q; onSearch(); await new Promise(r => setTimeout(r, 150)); return __t.order(); }, q);
+    check(JSON.stringify(await listFor('tag:garden')) === '[14,16]', 'tag:garden list ' + JSON.stringify(await ev(() => __t.order())));
+    check(JSON.stringify(await listFor('tag:garden pump')) === '[14]', 'tag:garden pump list ' + JSON.stringify(await ev(() => __t.order())));
+    check(JSON.stringify(await listFor('notebook:Work')) === '[15,16]', 'notebook:Work list ' + JSON.stringify(await ev(() => __t.order())));
+    check(JSON.stringify(await listFor('notebook:"Work" tag:garden')) === '[16]', 'notebook:"Work" tag:garden list ' + JSON.stringify(await ev(() => __t.order())));
+    await listFor('tag:garden pump');
+    const marks = await ev(() => [...document.querySelectorAll('#noteList mark')].map(m => m.textContent.toLowerCase()));
+    check(marks.length > 0 && marks.every(t => t === 'pump'), 'highlights ' + JSON.stringify(marks));
+    check(await ev(() => searchFree) === 'pump', 'searchFree ' + JSON.stringify(await ev(() => searchFree)));
+    // Server path ("All" inside a notebook): the filters are sent as query params.
+    fake.searchCalls = [];
+    await ev(async () => { activeNotebook = 'Home'; searchScope = 'all'; document.getElementById('searchInput').value = 'pump tag:garden modified:7d notebook:"Home"'; filterNotes(); await new Promise(r => setTimeout(r, 200)); });
+    const call = fake.searchCalls[fake.searchCalls.length - 1] || {};
+    check(call.q === 'pump' && call.tag === 'garden' && call.days === '7' && call.notebook === 'Home', 'search params ' + JSON.stringify(call));
+    await ev(async () => { searchScope = 'notebook'; activeNotebook = null; document.getElementById('searchInput').value = ''; onSearch(); await new Promise(r => setTimeout(r, 100)); });
   });
 
   // 7. saves outside the autosave path also carry the conflict base.

@@ -120,6 +120,9 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
         <span class="nb-name"><?php echo $noodled_icon( 'list-checks' ); ?> <?php esc_html_e( 'Tasks', 'noodled' ); ?></span>
         <span class="count" id="taskCount"></span>
       </div>
+      <div class="nb-item" id="nbTags" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Browse tags', 'noodled' ); ?>" onclick="showTagCloud()">
+        <span class="nb-name"><?php echo $noodled_icon( 'tag' ); ?> <?php esc_html_e( 'Tags', 'noodled' ); ?></span>
+      </div>
       <div class="nb-item" id="nbCalendar" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Calendar', 'noodled' ); ?>" onclick="showCalendar()">
         <span class="nb-name"><?php echo $noodled_icon( 'calendar' ); ?> <?php esc_html_e( 'Calendar', 'noodled' ); ?></span>
       </div>
@@ -145,6 +148,8 @@ echo esc_html( sprintf( __( '%s notes', 'noodled' ), Noodled_Settings::get_brand
       </span>
       <button class="sort-btn search-scope" id="searchScopeBtn" onclick="toggleSearchScope()" title="<?php esc_attr_e( 'Search this notebook or everywhere', 'noodled' ); ?>"><?php esc_html_e( 'Here', 'noodled' ); ?></button>
       <button class="sort-btn" id="sortBtn" onclick="cycleSort()" title="<?php esc_attr_e( 'Change sort order', 'noodled' ); ?>"><?php esc_html_e( 'Modified', 'noodled' ); ?></button>
+      <button class="sort-btn search-filter-btn" id="searchFilterBtn" type="button" onclick="showSearchFilters()" title="<?php esc_attr_e( 'Search filters', 'noodled' ); ?>" aria-label="<?php esc_attr_e( 'Search filters', 'noodled' ); ?>" aria-haspopup="true" aria-expanded="false" aria-controls="searchFilterMenu"><?php echo $noodled_icon( 'filter' ); ?></button>
+      <div class="toolbar-dropdown search-filters" id="searchFilterMenu" aria-label="<?php esc_attr_e( 'Search filters', 'noodled' ); ?>"></div>
     </div>
     <div class="list-filters" id="listFilters">
       <button class="filter-chip" id="fcAtt" onclick="toggleListFilter('att')" aria-pressed="false"><?php echo $noodled_icon( 'paperclip' ); ?> <?php esc_html_e( 'Files', 'noodled' ); ?></button>

@@ -116,16 +116,16 @@ const NOTEBOOKS = [
 
 const NOTE_ROWS = [
   { id: SHOWCASE_ID, notebook: 'Home', title: 'Kitchen renovation plan', body: SHOWCASE, days: 0, pinned: true },
-  { id: 102, notebook: 'Home', title: 'Paint colours', body: 'Living room: Hale Navy. Hallway: Revere Pewter, eggshell finish. Trim stays Chantilly Lace.', days: 2, image: 501 },
-  { id: 103, notebook: 'Work', title: 'Q4 planning meeting', body: 'Attendees: Priya, Marco, Jen.\n\n- [x] Share the draft roadmap\n- [ ] Follow up on hiring budget\n- [ ] Book the offsite venue', days: 1 },
+  { id: 102, notebook: 'Home', title: 'Paint colours', body: 'Living room: Hale Navy. Hallway: Revere Pewter, eggshell finish. Trim stays Chantilly Lace. #renovation #home', days: 2, image: 501 },
+  { id: 103, notebook: 'Work', title: 'Q4 planning meeting', body: 'Attendees: Priya, Marco, Jen.\n\n- [x] Share the draft roadmap\n- [ ] Follow up on hiring budget\n- [ ] Book the offsite venue\n\n#work #planning', days: 1 },
   { id: 104, notebook: 'Work', title: 'Onboarding checklist for new hires', body: 'Laptop, accounts, buddy assignment, first-week reading list, and a lunch on day one.', days: 9 },
-  { id: 105, notebook: 'General', title: 'Books to read', body: 'The Overstory, Piranesi, A Psalm for the Wild-Built, The Ministry for the Future.', days: 16 },
+  { id: 105, notebook: 'General', title: 'Books to read', body: 'The Overstory, Piranesi, A Psalm for the Wild-Built, The Ministry for the Future. #reading', days: 16 },
   { id: 106, notebook: 'General', title: 'Gift ideas', body: 'Mom: pottery class voucher. Dad: a decent bread knife. Alex: climbing gym pass.', days: 34 },
-  { id: 107, notebook: 'Work', title: 'API migration notes', body: 'The v2 endpoints return ISO dates. Keep the v1 adapter until all three clients are switched over.', days: 51 },
-  { id: 108, notebook: 'Home', title: 'Garden layout', body: 'Tomatoes along the south fence, herbs in the raised bed, and move the lavender closer to the path.', days: 75 },
-  { id: 109, notebook: 'General', title: 'Trip to Lisbon', body: 'Flights booked for May. Want to see Alfama, the tile museum, and take the train out to Sintra.', days: 110 },
+  { id: 107, notebook: 'Work', title: 'API migration notes', body: 'The v2 endpoints return ISO dates. Keep the v1 adapter until all three clients are switched over. #work', days: 51 },
+  { id: 108, notebook: 'Home', title: 'Garden layout', body: 'Tomatoes along the south fence, herbs in the raised bed, and move the lavender closer to the path. #garden #home', days: 75 },
+  { id: 109, notebook: 'General', title: 'Trip to Lisbon', body: 'Flights booked for May. Want to see Alfama, the tile museum, and take the train out to Sintra. #travel', days: 110 },
   { id: 110, notebook: 'Work', title: 'Performance review prep', body: 'Wins: shipped the billing rewrite, mentored two juniors. Growth: delegate earlier.', days: 150 },
-  { id: 111, notebook: 'General', title: 'Running log', body: 'Week 12: 5k in 27:40, long run 14k. Knee feels fine after the new shoes.', days: 196 },
+  { id: 111, notebook: 'General', title: 'Running log', body: 'Week 12: 5k in 27:40, long run 14k. Knee feels fine after the new shoes. #health', days: 196 },
   { id: 112, notebook: 'Home', title: 'Car maintenance', body: 'Oil change at 82,000 km. Winter tires go on in November, rotate in spring.', days: 240 },
   { id: 113, notebook: 'General', title: 'Podcast episode ideas', body: 'Interview a beekeeper, a history of the paperclip, and why trains run late.', days: 300 },
   { id: 114, notebook: 'Work', title: 'Conference talk outline', body: 'Opening story, three lessons from the outage, live demo, questions.', days: 352 },
@@ -162,11 +162,18 @@ function taskCounts(body) {
   const done = (body.match(/^\s*[-*+]\s+\[[xX]\]/gm) || []).length;
   return { done, total: m.length };
 }
+// Same rule as Noodled_Notes::tags_of (locked bodies and fenced code have none).
+function tagsOf(body) {
+  if (body.startsWith('noodled:enc:v1:')) return [];
+  const m = body.replace(/```[\s\S]*?```/g, ' ').match(/(?:^|\s)#([A-Za-z][\w-]*)/g) || [];
+  return [...new Set(m.map(t => t.trim().slice(1)))];
+}
 function formatNote(r, withBody = true) {
   const out = {
     id: r.id, slug: 'n' + r.id, notebook: r.notebook, title: r.title, source: '', pinned: !!r.pinned,
     created: r.created_at.slice(0, 16), modified: r.modified_at.slice(0, 16), mtime: r.modified_at,
     att: r.image ? 1 : 0, thumb: r.image || 0, preview: r.body.split('\n').map(l => l.replace(/^\s*(#+|>|[-*+](\s+\[[ xX]\])?|\d+\.|\|)\s*/, '')).join(' ').replace(/[*`|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160), tasks: taskCounts(r.body),
+    tags: tagsOf(r.body),
   };
   if (withBody) out.body = r.body;
   return out;
@@ -195,7 +202,7 @@ function handleApi(route, req, theme) {
     if (p === '/bodies') return json(NOTE_ROWS.map(r => ({ id: r.id, body: r.body })));
     if (p === '/trash/count') return json(0);
     // Cross-notebook title index (Noodled_Notes::titles shape, no bodies).
-    if (p === '/titles') return json(NOTE_ROWS.map(r => ({ id: r.id, title: r.title, notebook: r.notebook, modified: r.modified_at.slice(0, 16), pinned: !!r.pinned })));
+    if (p === '/titles') return json(NOTE_ROWS.map(r => ({ id: r.id, title: r.title, notebook: r.notebook, modified: r.modified_at.slice(0, 16), pinned: !!r.pinned, tags: tagsOf(r.body) })));
     if (p === '/backlinks') {
       const t = ('[[' + (u.searchParams.get('title') || '') + ']]').toLowerCase();
       return json(NOTE_ROWS.filter(r => r.body.toLowerCase().includes(t)).map(r => formatNote(r, false)));
@@ -319,6 +326,20 @@ async function main() {
       await page.evaluate(() => { config.starred = []; return showStarred(); });
       await page.waitForFunction(() => document.querySelectorAll('.note-item').length === 0);
       await shot(page, `desktop-starred-empty-${t}`);
+      // Search filters popover, then a picked tag filtering the list.
+      await page.evaluate(() => selectNotebook(null));
+      await page.click('#searchFilterBtn');
+      await page.waitForSelector('#searchFilterMenu.show');
+      await shot(page, `desktop-search-filters-${t}`);
+      await page.click('#searchFilterMenu .sf-tag[data-value="home"]');
+      await page.waitForFunction(() => document.getElementById('searchInput').value === 'tag:home');
+      await shot(page, `desktop-search-tag-${t}`);
+      await page.evaluate(() => clearSearch());
+      // Tag cloud from the sidebar "Tags" item.
+      await page.click('#nbTags');
+      await page.waitForSelector('#modalContainer .tag-chip');
+      await shot(page, `desktop-tag-cloud-${t}`);
+      await closeModal(page);
       // The boot-time loading skeleton, drawn on demand.
       await page.evaluate(() => showLoadingSkeleton());
       await shot(page, `desktop-loading-${t}`);
@@ -335,6 +356,15 @@ async function main() {
       await page.waitForSelector('#cmdpInput');
       await page.fill('#cmdpInput', 'pla');
       await shot(page, `phone-palette-query-${t}`);
+      await closeModal(page);
+      // Back to the list, then the search filters popover and the tag cloud.
+      await page.evaluate(() => { document.querySelector('.col-content')?.classList.remove('open'); });
+      await page.click('#searchFilterBtn');
+      await page.waitForSelector('#searchFilterMenu.show');
+      await shot(page, `phone-search-filters-${t}`);
+      await page.evaluate(() => { closeSearchFilters(); return showTagCloud(); });
+      await page.waitForSelector('#modalContainer .tag-chip');
+      await shot(page, `phone-tag-cloud-${t}`);
     } },
   ];
 

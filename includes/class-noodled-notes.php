@@ -41,6 +41,7 @@ class Noodled_Notes {
 			'thumb'    => ( isset( $r['img_id'] ) && ! str_starts_with( $body, 'noodled:enc:v1:' ) ) ? (int) $r['img_id'] : 0,
 			'preview'  => self::preview_of( $body ),
 			'tasks'    => self::task_counts( $body ),
+			'tags'     => self::tags_of( $body ),
 			// 'failed' once a GitHub push of this note has failed (cleared on success).
 			'backup'   => ( (int) ( $r['push_attempts'] ?? 0 ) > 0 ) ? 'failed' : '',
 		];
@@ -72,6 +73,16 @@ class Noodled_Notes {
 			return mb_substr( $s, 0, 160 ) . '…';
 		}
 		return strlen( $s ) > 160 ? substr( $s, 0, 160 ) . '…' : $s;
+	}
+
+	// Inline #tags of a body, unique, in order of first use. A tag starts with a
+	// letter (so #1 is not one); fenced code is ignored; locked notes have none
+	// (their ciphertext is never parsed).
+	private static function tags_of( string $body ): array {
+		if ( str_starts_with( $body, 'noodled:enc:v1:' ) ) return [];
+		$s = preg_replace( '/```.*?```/s', ' ', $body );
+		if ( ! preg_match_all( '/(?:^|\s)#([A-Za-z][\w-]*)/', (string) $s, $m ) ) return [];
+		return array_values( array_unique( $m[1] ) );
 	}
 
 	// Checklist progress for the list badge, without shipping the body.
@@ -468,25 +479,54 @@ class Noodled_Notes {
 		return self::get_one( $id ) ?? [ 'error' => __( 'Note not found', 'noodled' ) ];
 	}
 
-	public static function search( string $query, array $notebook_ids = [], array $extra_note_ids = [] ): array {
+	// $filters (all optional): 'notebook' (name), 'days' (modified within N
+	// days), 'tag' (validated name). With an empty $query only the filters apply.
+	public static function search( string $query, array $notebook_ids = [], array $extra_note_ids = [], array $filters = [] ): array {
 		global $wpdb;
 		// Scope to the user's accessible notebooks plus any directly-shared notes.
 		// Empty scope matches nothing (never search all users' notes).
 		$ids       = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
 		$note_ids  = $extra_note_ids ? implode( ',', array_map( 'intval', $extra_note_ids ) ) : '0';
 		$where     = "deleted_at IS NULL AND (notebook_id IN ($ids) OR id IN ($note_ids))";
+		// Filters narrow the scope further; every value goes through prepare().
+		$args = [];
+		$nb_filter = (string) ( $filters['notebook'] ?? '' );
+		if ( $nb_filter !== '' ) {
+			$where .= " AND notebook_id IN (SELECT id FROM {$wpdb->prefix}noodled_notebooks WHERE name = %s)";
+			$args[] = $nb_filter;
+		}
+		$days = (int) ( $filters['days'] ?? 0 );
+		if ( $days > 0 ) {
+			$where .= ' AND modified_at >= %s';
+			$args[] = gmdate( 'Y-m-d H:i:s', time() - $days * 86400 );
+		}
+		$tag = (string) ( $filters['tag'] ?? '' );
+		if ( $tag !== '' ) {
+			// Only a valid tag name ever reaches the pattern; anything else matches nothing.
+			if ( ! preg_match( '/^[A-Za-z][\w-]*$/D', $tag ) ) return [];
+			$where .= ' AND body REGEXP %s';
+			$args[] = '(^|[[:space:]])#' . $tag . '([^A-Za-z0-9_-]|$)';
+		}
+		if ( $query === '' ) {
+			if ( ! $args ) return [];
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM " . self::table() . " WHERE $where ORDER BY modified_at DESC",
+				$args
+			), ARRAY_A );
+			return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
+		}
 		// Try FULLTEXT first, fall back to LIKE for short queries
 		if ( strlen( $query ) >= 3 ) {
 			$rows = $wpdb->get_results( $wpdb->prepare(
 				"SELECT * FROM " . self::table() . " WHERE $where AND MATCH(title, body) AGAINST(%s IN BOOLEAN MODE) ORDER BY modified_at DESC",
-				'*' . $query . '*'
+				array_merge( $args, [ '*' . $query . '*' ] )
 			), ARRAY_A );
 			if ( $rows ) return array_map( static fn( $r ) => self::format_row( $r, false ), $rows );
 		}
 		$like = '%' . $wpdb->esc_like( $query ) . '%';
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM " . self::table() . " WHERE $where AND (title LIKE %s OR body LIKE %s) ORDER BY modified_at DESC",
-			$like, $like
+			array_merge( $args, [ $like, $like ] )
 		), ARRAY_A );
 		return array_map( static fn( $r ) => self::format_row( $r, false ), $rows ?: [] );
 	}
@@ -509,8 +549,9 @@ class Noodled_Notes {
 	}
 
 	// Title index of every note the user can open (all notebooks, not just the
-	// open one), for wiki-link resolution and the quick switcher. Scoped exactly
-	// like search(); empty scope matches nothing. Never ships bodies.
+	// open one), for wiki-link resolution, the quick switcher and the tag lists.
+	// Scoped exactly like search(); empty scope matches nothing. The body is read
+	// only to derive tags and is never returned.
 	public static function titles( array $notebook_ids = [], array $extra_note_ids = [] ): array {
 		global $wpdb;
 		$ids      = $notebook_ids ? implode( ',', array_map( 'intval', $notebook_ids ) ) : '0';
@@ -518,7 +559,7 @@ class Noodled_Notes {
 		$t        = self::table();
 		$nb       = $wpdb->prefix . 'noodled_notebooks';
 		$rows = $wpdb->get_results(
-			"SELECT t.id, t.title, t.modified_at, t.pinned, n.name AS nb_name FROM {$t} t LEFT JOIN {$nb} n ON n.id = t.notebook_id WHERE t.deleted_at IS NULL AND (t.notebook_id IN ($ids) OR t.id IN ($note_ids)) ORDER BY t.modified_at DESC",
+			"SELECT t.id, t.title, t.body, t.modified_at, t.pinned, n.name AS nb_name FROM {$t} t LEFT JOIN {$nb} n ON n.id = t.notebook_id WHERE t.deleted_at IS NULL AND (t.notebook_id IN ($ids) OR t.id IN ($note_ids)) ORDER BY t.modified_at DESC",
 			ARRAY_A
 		);
 		$out = [];
@@ -529,6 +570,7 @@ class Noodled_Notes {
 				'notebook' => (string) ( $r['nb_name'] ?? '' ),
 				'modified' => $r['modified_at'] ? substr( $r['modified_at'], 0, 16 ) : '',
 				'pinned'   => (bool) $r['pinned'],
+				'tags'     => self::tags_of( (string) ( $r['body'] ?? '' ) ),
 			];
 		}
 		return $out;

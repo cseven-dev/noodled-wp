@@ -59,7 +59,7 @@ const api = {
   permanent_delete(noteId)               { return this._fetch('/trash/' + noteId, { method: 'DELETE' }); },
   empty_trash()                          { return this._fetch('/trash', { method: 'DELETE' }); },
   trash_count()                          { return this._fetch('/trash/count'); },
-  search(query)                          { return this._fetch('/search?q=' + encodeURIComponent(query)); },
+  search(query, f)                       { let qs = '/search?q=' + encodeURIComponent(query); if (f) ['notebook', 'days', 'tag'].forEach(k => { if (f[k]) qs += '&' + k + '=' + encodeURIComponent(f[k]); }); return this._fetch(qs); },
   get_backlinks(title)                   { return this._fetch('/backlinks?title=' + encodeURIComponent(title)); },
   get_bodies()                           { return this._fetch('/bodies'); },
   get_titles()                           { return this._fetch('/titles'); },
@@ -108,6 +108,9 @@ let config = { theme: 'dark' };
 let saveTimer = null;
 let sortMode = 'modified'; // 'modified', 'created', 'alpha'
 let searchQuery = '';
+// The free-text part of the search box (filter tokens like tag:x removed),
+// lower-cased; it drives the list and in-note highlighting.
+let searchFree = '';
 let showRawMarkdown = false;
 let bulkMode = false;
 let bulkSelected = new Set();
@@ -788,26 +791,39 @@ function toggleSearchScope() {
 }
 
 function filterNotes() {
-  searchQuery = document.getElementById('searchInput').value.toLowerCase();
+  const raw = document.getElementById('searchInput').value;
+  searchQuery = raw.toLowerCase();
   const q = searchQuery.trim();
+  // Filter tokens (tag:x, notebook:"Name", modified:7d, ...) are split from the free text.
+  const parsed = parseSearchQuery(raw);
+  searchFree = parsed.free.toLowerCase();
+  const free = searchFree.trim();
   // "Everywhere" scope: search ALL accessible notebooks via the server (only
   // meaningful when a single notebook is open; "All Notes" already loads them).
-  if (q && searchScope === 'all' && activeNotebook && !viewingTrash) {
-    api.search(document.getElementById('searchInput').value.trim()).then(results => {
+  // The server applies the first notebook:, modified: and tag: tokens; the rest
+  // are applied here.
+  const sent = {}, rest = [];
+  parsed.filters.forEach(f => {
+    if (['notebook', 'modified', 'tag'].includes(f.key) && !(f.key in sent)) sent[f.key] = f.value; else rest.push(f);
+  });
+  const days = parseInt(sent.modified, 10) || 0;
+  if (q && searchScope === 'all' && activeNotebook && !viewingTrash && (free.length >= 2 || sent.notebook || sent.tag || days)) {
+    api.search(free, { notebook: sent.notebook, tag: sent.tag, days }).then(results => {
       if (searchQuery.trim() !== q) return; // a newer keystroke superseded this
-      filteredNotes = applyListFilters(Array.isArray(results) ? results : []);
-      sortFiltered(); titleMatchesFirst(q); renderNoteList();
+      filteredNotes = applyListFilters((Array.isArray(results) ? results : []).filter(n => matchFilters(n, rest)));
+      sortFiltered(); if (free) titleMatchesFirst(free); renderNoteList();
     }).catch(() => {});
     return;
   }
   if (q) {
     // Full-body search needs the bodies hydrated; fetch them once, then re-filter.
-    if (!_bodiesLoaded) ensureBodies().then(() => { if (searchQuery.trim()) filterNotes(); });
+    if (free && !_bodiesLoaded) ensureBodies().then(() => { if (searchQuery.trim()) filterNotes(); });
     // Token-AND: every word must appear somewhere (title, body, or notebook),
     // so "dish pump" matches a note containing both words in any order. Until
     // bodies arrive this searches title/preview/notebook, then upgrades.
-    const toks = q.split(/\s+/);
+    const toks = free ? free.split(/\s+/) : [];
     filteredNotes = notes.filter(n => {
+      if (!matchFilters(n, parsed.filters)) return false;
       const hay = ((n.title || '') + ' ' + (n.body || n.preview || '') + ' ' + (n.notebook || '')).toLowerCase();
       return toks.every(t => hay.includes(t));
     });
@@ -816,9 +832,53 @@ function filterNotes() {
   }
   filteredNotes = applyListFilters(filteredNotes);
   sortFiltered();
-  if (q) titleMatchesFirst(q);
+  if (free) titleMatchesFirst(free);
   partitionSharedLast();
   renderNoteList();
+}
+
+// Split a search string into free text and filter tokens. Keys kept as filters:
+// tag, has, source, notebook, modified, created (key:value or key:"two words").
+// Any other token, including unknown key:value ones, stays free text.
+function parseSearchQuery(q) {
+  const keys = ['tag', 'has', 'source', 'notebook', 'modified', 'created'];
+  const free = [], filters = [];
+  const re = /(\w+):"([^"]*)"|(\w+):(\S+)|(\S+)/g;
+  let m;
+  while ((m = re.exec(q || ''))) {
+    const key = (m[1] || m[3] || '').toLowerCase();
+    const value = m[1] ? m[2] : m[4];
+    if (key && keys.includes(key) && value !== '') filters.push({ key, value: key === 'tag' ? value.replace(/^#/, '') : value });
+    else free.push(m[0]);
+  }
+  return { free: free.join(' '), filters };
+}
+
+// Does a note pass every filter token? (has:task|open|done|file, source:x,
+// notebook:x, tag:x, modified:Nd, created:Nd; values compared case-insensitively.)
+function matchFilters(note, filters) {
+  for (const f of filters || []) {
+    const key = f.key, v = String(f.value).toLowerCase();
+    if (key === 'has') {
+      const t = note.tasks || {};
+      if (v === 'task' && !(t.total > 0)) return false;
+      if (v === 'open' && !(t.total > (t.done || 0))) return false;
+      if (v === 'done' && !((t.done || 0) > 0)) return false;
+      if (v === 'file' && !(note.att > 0)) return false;
+    } else if (key === 'source') { if ((note.source || '').toLowerCase() !== v) return false; }
+    else if (key === 'notebook') { if ((note.notebook || '').toLowerCase() !== v) return false; }
+    else if (key === 'modified' || key === 'created') {
+      const days = parseInt(v, 10);
+      if (days) { const ts = note[key]; if (!ts) return false; const age = (Date.now() - new Date(String(ts).replace(' ', 'T')).getTime()) / 86400000; if (age > days) return false; }
+    } else if (key === 'tag') {
+      if (Array.isArray(note.tags)) { if (!note.tags.some(t => String(t).toLowerCase() === v)) return false; }
+      else {
+        const hay = ((note.body || '') + ' ' + (note.title || '') + ' ' + (note.preview || '')).toLowerCase();
+        if (!new RegExp('#' + v.replace(/[^a-z0-9_-]/g, '') + '\\b').test(hay)) return false;
+      }
+    }
+  }
+  return true;
 }
 
 // While searching, list notes whose TITLE holds every search word ahead of
@@ -847,6 +907,64 @@ function partitionSharedLast() {
 }
 
 function onSearch() { updateSearchClear(); filterNotes(); }
+
+// Search filters popover (funnel button in the search box): pick a notebook, a
+// tag or a modified range; the choice is written into the search box as a token.
+function showSearchFilters() {
+  const menu = document.getElementById('searchFilterMenu');
+  const btn = document.getElementById('searchFilterBtn');
+  if (!menu) return;
+  if (menu.classList.contains('show')) { closeSearchFilters(); return; }
+  const counts = tagCounts();
+  const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b)).slice(0, 30);
+  const item = (key, value, label) => `<div class="dropdown-item" data-key="${escAttr(key)}" data-value="${escAttr(value)}">${esc(label)}</div>`;
+  const ranges = [['1d', __( 'Today', 'noodled' )], ['7d', __( 'Past week', 'noodled' )], ['30d', __( 'Past month', 'noodled' )], ['365d', __( 'Past year', 'noodled' )]];
+  menu.innerHTML = `<div class="sf-head">${esc(__( 'Notebook', 'noodled' ))}</div>`
+    + (notebooks || []).map(nb => item('notebook', nb.name, nb.label || nb.name)).join('')
+    + `<div class="dropdown-sep"></div><div class="sf-head">${esc(__( 'Tag', 'noodled' ))}</div>`
+    + (tags.length ? `<div class="sf-tags">${tags.map(t => `<div class="dropdown-item sf-tag" data-key="tag" data-value="${escAttr(t)}">#${esc(t)}</div>`).join('')}</div>`
+      : `<div class="sf-empty">${esc(__( 'No tags yet.', 'noodled' ))}</div>`)
+    + `<div class="dropdown-sep"></div><div class="sf-head">${esc(__( 'Modified', 'noodled' ))}</div>`
+    + ranges.map(([v, l]) => item('modified', v, l)).join('')
+    + `<div class="sf-hint">${esc(__( 'You can also type tag:, notebook: or modified:7d', 'noodled' ))}</div>`;
+  menu.onclick = e => {
+    const it = e.target.closest('.dropdown-item');
+    if (!it) return;
+    e.stopPropagation();
+    applySearchFilter(it.dataset.key, it.dataset.value);
+  };
+  menu.classList.add('show');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  armDropdownMenu(menu);
+  document.addEventListener('keydown', searchFiltersKeydown, true);
+  setTimeout(() => document.addEventListener('click', closeSearchFilters, { once: true }), 10);
+}
+function closeSearchFilters() {
+  const menu = document.getElementById('searchFilterMenu');
+  if (menu) menu.classList.remove('show');
+  document.getElementById('searchFilterBtn')?.setAttribute('aria-expanded', 'false');
+  document.removeEventListener('keydown', searchFiltersKeydown, true);
+  document.removeEventListener('click', closeSearchFilters);
+}
+// Esc closes the filters popover and puts focus back on its button.
+function searchFiltersKeydown(e) {
+  if (e.key !== 'Escape') return;
+  e.preventDefault(); e.stopPropagation();
+  closeSearchFilters();
+  document.getElementById('searchFilterBtn')?.focus();
+}
+// Put key:value into the search box, replacing any token with the same key.
+function applySearchFilter(key, value) {
+  const inp = document.getElementById('searchInput');
+  if (!inp) return;
+  const token = (key === 'notebook' || /\s/.test(value)) ? `${key}:"${value.replace(/"/g, '')}"` : `${key}:${value}`;
+  const re = new RegExp('(^|\\s)' + key + ':("[^"]*"|\\S+)', 'gi');
+  const rest = inp.value.replace(re, ' ').replace(/\s+/g, ' ').trim();
+  inp.value = (rest ? rest + ' ' : '') + token;
+  closeSearchFilters();
+  onSearch();
+  inp.focus();
+}
 
 // Light haptic tap on supported devices (mobile). Silently no-ops elsewhere.
 function haptic(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern || 8); } catch (e) {} }
@@ -897,7 +1015,7 @@ function cycleSort() {
 // first, and clear them the moment the user starts editing. Marks serialize away
 // harmlessly (htmlToMarkdown keeps the text, drops the tag), so it's safe.
 function highlightSearchInBody() {
-  const q = (searchQuery || '').trim();
+  const q = (searchFree || '').trim();
   const el = document.getElementById('noteBody');
   if (!q || !el) return;
   const toks = q.split(/\s+/).filter(Boolean).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -1063,6 +1181,7 @@ function clearSearch() {
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = '';
   searchQuery = '';
+  searchFree = '';
   updateSearchClear();
   filterNotes();
 }
@@ -1113,7 +1232,7 @@ function renderNoteItem(n) {
            ${bulkMode ? '' : `draggable="true" ondragstart="noteDragStart(event, ${n.id})" ondragend="noteDragEnd()"`}
            onclick="${bulkMode ? `toggleBulkSelect(${n.id}, event)` : `handleNoteTap(event, ${n.id})`}"
            oncontextmenu="event.preventDefault(); showNoteContext(event, ${n.id})">
-        <div class="title">${checkbox}${pin}${star}${sharedBadge}${highlightMatch(n.title, searchQuery)}${badge}</div>
+        <div class="title">${checkbox}${pin}${star}${sharedBadge}${highlightMatch(n.title, searchFree.trim())}${badge}</div>
         <div class="meta">
           <span class="note-time" data-ts="${escAttr(fullDate)}" title="${escAttr(fullDate)}">${esc(time)}</span>
           <span>${esc(n.notebook)}</span>
@@ -1121,7 +1240,7 @@ function renderNoteItem(n) {
           ${attBadge}
           ${taskBadge}
         </div>
-        <div class="preview">${highlightMatch(preview, searchQuery)}</div>
+        <div class="preview">${highlightMatch(preview, searchFree.trim())}</div>
         ${thumb}
       </div>
     `;
@@ -1681,7 +1800,7 @@ function renderContent() {
   resolveTransclusions();
   renderRichBlocks();
   // Opened from a search? Briefly highlight the matches in the body.
-  if ((searchQuery || '').trim()) setTimeout(highlightSearchInBody, 40);
+  if ((searchFree || '').trim()) setTimeout(highlightSearchInBody, 40);
   // Fade in transition
   el.classList.remove('note-fade');
   void el.offsetWidth; // trigger reflow
@@ -3754,28 +3873,9 @@ function renderSmartNotebooks() {
 // Match a note against a saved query: free text + key:value tokens
 // (has:task|open|file, source:x, notebook:x, tag:x, modified:Nd, created:Nd).
 function matchSmartQuery(note, q) {
-  const tokens = (q || '').trim().split(/\s+/).filter(Boolean);
-  const free = [];
-  for (const tok of tokens) {
-    const mm = tok.match(/^(tag|has|source|notebook|modified|created):(.+)$/i);
-    if (!mm) { free.push(tok.toLowerCase()); continue; }
-    const key = mm[1].toLowerCase(), v = mm[2].toLowerCase();
-    if (key === 'has') {
-      const t = note.tasks || {};
-      if (v === 'task' && !(t.total > 0)) return false;
-      if (v === 'open' && !(t.total > (t.done || 0))) return false;
-      if (v === 'done' && !((t.done || 0) > 0)) return false;
-      if (v === 'file' && !(note.att > 0)) return false;
-    } else if (key === 'source') { if ((note.source || '').toLowerCase() !== v) return false; }
-    else if (key === 'notebook') { if ((note.notebook || '').toLowerCase() !== v) return false; }
-    else if (key === 'modified' || key === 'created') {
-      const days = parseInt(v, 10);
-      if (days) { const ts = note[key]; if (!ts) return false; const age = (Date.now() - new Date(String(ts).replace(' ', 'T')).getTime()) / 86400000; if (age > days) return false; }
-    } else if (key === 'tag') {
-      const hay = ((note.body || '') + ' ' + (note.title || '') + ' ' + (note.preview || '')).toLowerCase();
-      if (!new RegExp('#' + v.replace(/[^a-z0-9_-]/g, '') + '\\b').test(hay)) return false;
-    }
-  }
+  const parsed = parseSearchQuery((q || '').trim());
+  if (!matchFilters(note, parsed.filters)) return false;
+  const free = parsed.free.toLowerCase().split(/\s+/).filter(Boolean);
   if (free.length) {
     const hay = ((note.title || '') + ' ' + (note.preview || '') + ' ' + (note.body || '')).toLowerCase();
     if (!free.every(w => hay.includes(w))) return false;
@@ -4408,29 +4508,37 @@ async function setWordGoal() {
 }
 
 // ── Tag system ──
-function filterByTag(tag) {
-  document.getElementById('searchInput').value = '#' + tag;
+// Show every note with this tag, across all notebooks.
+async function filterByTag(tag) {
+  await selectNotebook(null);
+  const inp = document.getElementById('searchInput');
+  if (inp) inp.value = 'tag:' + tag;
   onSearch();
 }
 
+// Tag -> number of notes using it. The title index carries server-derived tags
+// for every note in every notebook; before it loads, scan the loaded bodies.
+function tagCounts() {
+  const counts = {};
+  const add = list => list.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+  if (Array.isArray(noteIndex)) noteIndex.forEach(n => add(n.tags || []));
+  else notes.forEach(n => add([...new Set(((n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []).map(m => m.trim().substring(1)))]));
+  return counts;
+}
+
 function getAllTags() {
-  const tags = new Set();
-  notes.forEach(n => {
-    const matches = (n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g);
-    if (matches) matches.forEach(m => tags.add(m.trim().substring(1)));
-  });
-  return Array.from(tags).sort();
+  return Object.keys(tagCounts()).sort();
 }
 
 async function showTagCloud() {
-  await ensureBodies(); // tags live in note bodies, hydrate them first
+  if (!Array.isArray(noteIndex)) await ensureBodies(); // no index yet: tags come from the bodies
   const tags = getAllTags();
   if (!tags.length) { showToast(__( 'No tags found', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal modal-sm"><h3>${esc(__( 'Tags', 'noodled' ))}</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:300px;overflow-y:auto">
-        ${tags.map(t => `<span class="tag-chip" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the tag name */ __( 'Filter by tag %s', 'noodled' ), t ))}" onclick="document.getElementById('modalContainer').innerHTML=''; document.getElementById('searchInput').value='#${t}'; onSearch();">#${esc(t)}</span>`).join('')}
+        ${tags.map(t => `<span class="tag-chip" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the tag name */ __( 'Filter by tag %s', 'noodled' ), t ))}" onclick="document.getElementById('modalContainer').innerHTML=''; filterByTag('${t}')">#${esc(t)}</span>`).join('')}
       </div>
       <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button>
@@ -6335,9 +6443,8 @@ function showReadingPrefs() {
 // ── Tag manager (rename / delete a tag across all notes) ─────
 function manageTags() {
   const menu = document.getElementById('appMenu'); if (menu) menu.classList.remove('show');
-  const tags = getAllTags();
-  const counts = {};
-  notes.forEach(n => ((n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []).forEach(t => { const k = t.trim().slice(1); counts[k] = (counts[k] || 0) + 1; }));
+  const counts = tagCounts();
+  const tags = Object.keys(counts).sort();
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal modal-sm"><h3>${esc(__( 'Manage tags', 'noodled' ))}</h3>
@@ -6352,7 +6459,8 @@ function manageTags() {
 }
 function _tagRe(tag) { return new RegExp('(^|\\s)#' + tag.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&') + '(?![\\w-])', 'g'); }
 async function _rewriteTag(tag, replacer, doneMsg) {
-  const hits = notes.filter(n => _tagRe(tag).test(n.body || ''));
+  // Every note using the tag, in all notebooks (title index), else the loaded list.
+  const hits = Array.isArray(noteIndex) ? noteIndex.filter(n => (n.tags || []).includes(tag)) : notes.filter(n => _tagRe(tag).test(n.body || ''));
   if (!hits.length) { showToast(__( 'No notes use that tag', 'noodled' )); return; }
   document.getElementById('modalContainer').innerHTML = '';
   /* translators: %d is the number of notes being updated */
@@ -6541,9 +6649,7 @@ function openSlashMenu(x, y) {
 /* ── Editor [[wikilink]] / #tag autocomplete ───────────────── */
 let _acState = null;
 function allTags() {
-  const set = new Set();
-  notes.forEach(n => { const m = (n.body || '').match(/(^|\s)#([a-zA-Z][\w-]*)/g) || []; m.forEach(t => set.add(t.trim().slice(1))); });
-  return [...set];
+  return Object.keys(tagCounts());
 }
 function editorAutocomplete() {
   const el = document.getElementById('noteBody');

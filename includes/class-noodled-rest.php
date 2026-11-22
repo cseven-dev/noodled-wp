@@ -868,10 +868,21 @@ class Noodled_REST {
 
 	public static function search( \WP_REST_Request $req ): \WP_REST_Response {
 		$q = $req->get_param( 'q' ) ?: '';
-		if ( strlen( $q ) < 2 ) return new \WP_REST_Response( [] );
+		// Optional filters (search box tokens notebook:, modified:Nd, tag:). The tag
+		// is validated in Noodled_Notes::search(); everything is bound by prepare().
+		$filters = [
+			'notebook' => sanitize_text_field( (string) $req->get_param( 'notebook' ) ),
+			'days'     => max( 0, (int) $req->get_param( 'days' ) ),
+			'tag'      => (string) $req->get_param( 'tag' ),
+		];
+		$has_filter = $filters['notebook'] !== '' || $filters['days'] > 0 || $filters['tag'] !== '';
+		if ( strlen( $q ) < 2 ) {
+			if ( ! $has_filter ) return new \WP_REST_Response( [] );
+			$q = '';
+		}
 		$nb_ids   = self::accessible_notebook_ids();
 		$note_ids = Noodled_Permissions::shared_note_ids_for_user( self::current_user_id() );
-		return new \WP_REST_Response( Noodled_Notes::search( $q, $nb_ids, $note_ids ) );
+		return new \WP_REST_Response( Noodled_Notes::search( $q, $nb_ids, $note_ids, $filters ) );
 	}
 
 	public static function backlinks( \WP_REST_Request $req ): \WP_REST_Response {
