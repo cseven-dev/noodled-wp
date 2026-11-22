@@ -300,6 +300,9 @@ async function main() {
     await ev(() => { __t.type('typed offline'); return doSave(); });
     const q = await ev(() => saveQueue.map(i => ({ noteId: i.noteId, base: i.base })));
     check(q.length === 1 && q[0].base === '2026-11-22 13:45:10', 'queue: ' + JSON.stringify(q));
+    // Save status: the failed save marked the app offline, and the queued edit is never shown as saved.
+    const offlineText = await ev(() => document.getElementById('saveIndicator').textContent);
+    check(offlineText === 'Offline, saved on this device', 'save status with an offline queue: ' + JSON.stringify(offlineText));
     fake.offline = false;
     await ev(() => retrySaveQueue());
     const s = lastSave();
@@ -347,6 +350,9 @@ async function main() {
     check(fake.rows[1].body === 'from the other device', 'other device text was overwritten');
     const st = await ev(() => __t.state());
     check(st.dialog, 'conflict dialog not shown');
+    // The save status must not claim the conflicted save went through (or still runs).
+    const statusText = await ev(() => document.getElementById('saveIndicator').textContent);
+    check(statusText !== 'Saved' && !statusText.startsWith('Saving'), 'save status after a conflict: ' + JSON.stringify(statusText));
     // Resolve with "Load theirs" and confirm the next save is clean.
     await ev(async () => { document.getElementById('cfTheirs').click(); await new Promise(r => setTimeout(r, 150)); });
     check((await ev(() => __t.state())).mtime === fake.rows[1].modified_at, 'theirs not loaded with its mtime');

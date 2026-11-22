@@ -39,6 +39,8 @@ class Noodled_Notes {
 			'att'      => isset( $r['att_count'] ) ? (int) $r['att_count'] : 0,
 			'preview'  => self::preview_of( $body ),
 			'tasks'    => self::task_counts( $body ),
+			// 'failed' once a GitHub push of this note has failed (cleared on success).
+			'backup'   => ( (int) ( $r['push_attempts'] ?? 0 ) > 0 ) ? 'failed' : '',
 		];
 		if ( $with_body ) $out['body'] = $body;
 		return $out;

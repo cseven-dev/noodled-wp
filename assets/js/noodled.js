@@ -1578,7 +1578,7 @@ function renderContent() {
     <div class="content-toolbar">
       <input class="content-title-input" id="titleInput" value="${escAttr(n.title)}"
              placeholder="${escAttr(__( 'Note title', 'noodled' ))}" aria-label="${escAttr(__( 'Note title', 'noodled' ))}" onchange="saveTitleOnly()" onkeydown="if(event.key==='Tab'){event.preventDefault();focusNoteBody();}">
-      <span class="save-indicator" id="saveIndicator" role="status" aria-live="polite"></span>
+      <span class="save-status" id="saveIndicator" role="status" aria-live="polite"></span>
       <div class="editor-actions">
         ${isCode ? `<input id="codeLangInput" class="code-lang-input" value="${escAttr(codeParts.lang)}"
                placeholder="${escAttr(__( 'language', 'noodled' ))}" oninput="onCodeLangInput()"
@@ -1646,6 +1646,7 @@ function renderContent() {
   setupDropZone();
   setupLinkClicks();
   updateWordCount();
+  renderSaveState();
   renderBacklinks();
   renderAttachmentGallery();
   resolveTransclusions();
@@ -2952,7 +2953,7 @@ function handleGlobalKey(e) {
   const tag = e.target.tagName;
   const isEditable = e.target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA';
   if (e.ctrlKey && e.key === 'n') { e.preventDefault(); createNote(); return; }
-  if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); showToast(__( 'Saved', 'noodled' )); return; }
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K') && !e.shiftKey) { e.preventDefault(); showCommandPalette(); return; }
   if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); document.getElementById('searchInput').focus(); return; }
   if (e.ctrlKey && e.key === 'p') { e.preventDefault(); showQuickOpen(); return; }
@@ -3300,45 +3301,55 @@ function setOnline(online) {
   if (online && !was && saveQueue.length) retrySaveQueue();
 }
 
-// Single source of truth for the banner: offline message, else pending-sync
-// count, else hidden.
+// The banner shows only while offline; pending changes show in the save status.
 function updateOfflineBanner() {
   const el = document.getElementById('offlineBanner');
   updateSyncPill();
   if (!el) return;
-  const n = saveQueue.length;
   if (!_isOnline) {
     el.textContent = __( "You're offline — changes are saved on this device and will sync when you reconnect", 'noodled' );
-    el.classList.add('show');
-  } else if (n) {
-    /* translators: %d is the number of changes waiting to sync */
-    el.textContent = sprintf( _n( '%d change waiting to sync…', '%d changes waiting to sync…', n, 'noodled' ), n );
     el.classList.add('show');
   } else {
     el.classList.remove('show');
   }
 }
 
-// ── Sync-status pill (toolbar): Offline / Saving… / Saved <time ago> ──
+// ── Save status (editor toolbar, #saveIndicator): the first matching state wins ──
 let _saving = false;
 let _lastSavedAt = null;
+let _saveFailedId = null; // note whose last save ended in a conflict or an error
 let _syncPillTimer = null;
-function markSaved() { _lastSavedAt = Date.now(); _saving = false; updateSyncPill(); }
+function markSaved() { _lastSavedAt = Date.now(); _saving = false; _saveFailedId = null; updateSyncPill(); }
 function updateSyncPill() {
-  const el = document.getElementById('syncPill');
-  if (!el) return;
-  el.classList.remove('offline', 'saving', 'saved');
-  let label;
-  if (!_isOnline) { el.classList.add('offline'); label = __( 'Offline', 'noodled' ); }
-  else if (_saving || saveQueue.length) { el.classList.add('saving'); label = __( 'Saving…', 'noodled' ); }
-  else {
-    el.classList.add('saved');
-    /* translators: %s is a relative time like "2m ago" */
-    label = _lastSavedAt ? sprintf( __( 'Saved %s', 'noodled' ), relativeTime(new Date(_lastSavedAt).toISOString()) ) : __( 'Saved', 'noodled' );
-  }
-  el.innerHTML = '<span class="sync-dot" aria-hidden="true"></span>' + esc(label);
-  // Keep the "x ago" fresh without spamming work.
+  renderSaveState();
+  // Keep the "x ago" title fresh without spamming work.
   if (!_syncPillTimer) _syncPillTimer = setInterval(updateSyncPill, 30000);
+}
+function renderSaveState() {
+  const el = document.getElementById('saveIndicator');
+  if (!el) return;
+  const id = activeNote ? activeNote.id : null;
+  const owner = !!(noodledConfig.user && noodledConfig.user.owner);
+  let ic = '', text = '', title = '', cls = '';
+  if (!_isOnline) {
+    ic = 'cloud-off';
+    text = saveQueue.some(q => q.noteId === id) ? __( 'Offline, saved on this device', 'noodled' ) : __( 'Offline', 'noodled' );
+  } else if (_saving) {
+    ic = 'loader'; cls = 'ic-spin'; text = __( 'Saving…', 'noodled' );
+  } else if (saveQueue.length) {
+    ic = 'refresh-cw'; text = __( 'Waiting to sync', 'noodled' );
+  } else if (id && _saveFailedId === id) {
+    ic = 'triangle-alert'; text = __( 'Not saved', 'noodled' );
+  } else if (owner && activeNote && activeNote.backup === 'failed') {
+    el.innerHTML = '<button class="save-status-btn" onclick="checkBackupStatus()" title="' + escAttr(__( 'GitHub backup failed. Click to retry.', 'noodled' )) + '">'
+      + icon('triangle-alert') + '<span>' + esc(__( 'Not backed up', 'noodled' )) + '</span></button>';
+    el.removeAttribute('title');
+    return;
+  } else if (_lastSavedAt) {
+    ic = 'check'; text = __( 'Saved', 'noodled' ); title = relativeTime(new Date(_lastSavedAt).toISOString());
+  }
+  el.innerHTML = ic ? icon(ic, cls) + '<span>' + esc(text) + '</span>' : '';
+  if (title) el.title = title; else el.removeAttribute('title');
 }
 
 // ── IndexedDB layer (offline store shared by the app + service worker) ────────
@@ -4210,7 +4221,6 @@ function onSwMessage(e) {
       saveQueue = (rec && Array.isArray(rec.items)) ? rec.items : [];
       updateOfflineBanner();
       loadNotes().then(renderNoteList).catch(() => {});
-      if (e.data.count > 0) showToast(__( 'Synced pending changes', 'noodled' ));
     }).catch(() => {});
   }
 }
@@ -5185,26 +5195,9 @@ function toggleZenMode() {
 }
 
 // ── Auto-save indicator ──
-let saveIndicatorTimer = null;
-
 function showSaveIndicator(state) {
-  // Drive the toolbar sync pill regardless of whether the inline indicator exists.
-  if (state === 'saving') { _saving = true; updateSyncPill(); }
+  if (state === 'saving') { _saving = true; renderSaveState(); }
   else markSaved();
-  const el = document.getElementById('saveIndicator');
-  if (!el) return;
-  if (state === 'saving') {
-    el.className = 'save-indicator saving';
-    el.textContent = '';
-  } else {
-    el.className = 'save-indicator saved';
-    // Retrigger the little pulse each save.
-    void el.offsetWidth;
-    el.classList.add('saved-flash');
-    el.innerHTML = icon('check');
-    clearTimeout(saveIndicatorTimer);
-    saveIndicatorTimer = setTimeout(() => { el.className = 'save-indicator'; }, 3000);
-  }
 }
 
 // ── Backlinks panel ──
@@ -5495,6 +5488,7 @@ async function queuedSave(notebook, noteId, title, body, base) {
     showSaveIndicator('saving');
     const result = await api.save_note(notebook, noteId, title, body, { base });
     if (result && !result.conflict && !result.error) showSaveIndicator('saved');
+    else { _saving = false; _saveFailedId = noteId; renderSaveState(); }
     hasUnsavedChanges = false;
     // This save carried the note's latest full content, so an older queued
     // offline edit of the same note is superseded: replaying it later would
@@ -5514,8 +5508,8 @@ async function queuedSave(notebook, noteId, title, body, base) {
     if (activeNote && activeNote.id === noteId) activeNote._queuedAt = time;
     persistSaveQueue();
     registerFlushSync(); // ask the SW to flush when the device reconnects (#4)
-    const indicator = document.getElementById('saveIndicator');
-    if (indicator) indicator.className = 'save-indicator save-queued';
+    _saving = false;
+    renderSaveState();
     if (!saveRetryTimer) {
       saveRetryTimer = setInterval(retrySaveQueue, 15000);
     }
@@ -5551,6 +5545,7 @@ async function retrySaveQueue() {
     else if (r && r.conflict) {
       saveQueue = saveQueue.filter(q => q.noteId !== item.noteId);
       persistSaveQueue();
+      _saveFailedId = item.noteId;
       try { await selectNote(item.noteId); } catch (e) {}
       showConflict(r.server, { title: item.title, body: item.body });
       return;
@@ -5561,7 +5556,6 @@ async function retrySaveQueue() {
     if (!saveQueue.length) {
       clearInterval(saveRetryTimer);
       saveRetryTimer = null;
-      showToast(__( 'Synced pending changes', 'noodled' ));
     } else {
       retrySaveQueue();
     }
@@ -5812,16 +5806,16 @@ function showConflict(server, mine) {
   el.querySelector('#cfMine').onclick = async () => {
     el.innerHTML = ''; _conflictOpen = false;
     const r = await api.save_note(activeNote.notebook, activeNote.id, mine.title, mine.body, { force: true });
-    if (r && !r.error) { adoptSaved(r); await loadNotes(); renderContent(); showToast(__( 'Kept your version', 'noodled' )); }
+    if (r && !r.error) { _saveFailedId = null; adoptSaved(r); await loadNotes(); renderContent(); showToast(__( 'Kept your version', 'noodled' )); }
   };
   el.querySelector('#cfTheirs').onclick = async () => {
-    el.innerHTML = ''; _conflictOpen = false;
+    el.innerHTML = ''; _conflictOpen = false; _saveFailedId = null;
     try { activeNote = await api.get_note(null, server.id); } catch (e) {}
     await loadNotes(); renderContent(); showToast(__( 'Loaded the other version', 'noodled' ));
   };
   // Keep both: save my version as a new note so nothing is lost, then load theirs.
   el.querySelector('#cfBoth').onclick = async () => {
-    el.innerHTML = ''; _conflictOpen = false;
+    el.innerHTML = ''; _conflictOpen = false; _saveFailedId = null;
     /* translators: appended to a note title when both conflicting versions are kept */
     const copyTitle = (mine.title || __( 'Untitled', 'noodled' )) + ' ' + __( '(conflict copy)', 'noodled' );
     try { await api.create_note(activeNote.notebook, copyTitle, mine.body); } catch (e) {}
@@ -6243,7 +6237,7 @@ function applyReadingPrefs() {
   root.style.setProperty('--editor-font', (p.size || 16) + 'px');
   root.style.setProperty('--editor-lh', p.lh || 1.7);
   document.body.classList.toggle('editor-serif', !!p.serif);
-  document.body.classList.toggle('editor-narrow', !!p.narrow);
+  document.body.classList.toggle('editor-wide', !!p.wide);
 }
 function showReadingPrefs() {
   const p = (config.editor_prefs = config.editor_prefs || {});
@@ -6255,19 +6249,19 @@ function showReadingPrefs() {
       <label style="display:block;font-size:12px;color:var(--text-muted);margin:10px 0 4px">${esc(__( 'Line height', 'noodled' ))}</label>
       <input type="range" id="rpLh" aria-label="${escAttr(__( 'Line height', 'noodled' ))}" min="1.3" max="2.2" step="0.05" value="${p.lh || 1.7}" style="width:100%">
       <label style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><input type="checkbox" id="rpSerif" ${p.serif ? 'checked' : ''}> ${esc(__( 'Serif body font', 'noodled' ))}</label>
-      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpNarrow" ${p.narrow ? 'checked' : ''}> ${esc(__( 'Narrow reading column', 'noodled' ))}</label>
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rpWide" ${p.wide ? 'checked' : ''}> ${esc(__( 'Use the full width', 'noodled' ))}</label>
       <div class="modal-buttons"><button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Done', 'noodled' ))}</button></div>
     </div></div>`;
   const upd = () => {
     p.size = +document.getElementById('rpSize').value;
     p.lh = +document.getElementById('rpLh').value;
     p.serif = document.getElementById('rpSerif').checked;
-    p.narrow = document.getElementById('rpNarrow').checked;
+    p.wide = document.getElementById('rpWide').checked;
     applyReadingPrefs();
     clearTimeout(showReadingPrefs._t);
     showReadingPrefs._t = setTimeout(() => api.set_config('editor_prefs', p).catch(() => {}), 400);
   };
-  ['rpSize', 'rpLh', 'rpSerif', 'rpNarrow'].forEach(id => document.getElementById(id).addEventListener('input', upd));
+  ['rpSize', 'rpLh', 'rpSerif', 'rpWide'].forEach(id => document.getElementById(id).addEventListener('input', upd));
 }
 
 // ── Tag manager (rename / delete a tag across all notes) ─────
