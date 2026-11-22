@@ -196,8 +196,7 @@ function applyTheme(mode) {
     btn.title = sprintf( __( 'Theme: %s (click to change)', 'noodled' ), mode );
     /* translators: %s is the current theme mode (dark, light, or auto) */
     btn.setAttribute('aria-label', sprintf( __( 'Theme: %s. Click to change.', 'noodled' ), mode ));
-    const glyph = mode === 'auto' ? '&#9681;' : (mode === 'light' ? '&#9728;' : '&#9680;');
-    btn.innerHTML = '<span aria-hidden="true">' + glyph + '</span>';
+    btn.innerHTML = icon('sun-moon');
   }
 }
 // When in auto mode, follow live OS changes.
@@ -268,8 +267,8 @@ function renderNotebooks() {
     const caret = kids.length
       ? `<span class="nb-caret${isCollapsed ? '' : ' open'}" role="button" tabindex="0" data-nb="${escAttr(name)}" aria-label="${escAttr(__( 'Expand or collapse', 'noodled' ))}" aria-expanded="${isCollapsed ? 'false' : 'true'}" onclick="event.stopPropagation();toggleNbCollapse(this.dataset.nb)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleNbCollapse(this.dataset.nb)}"><span aria-hidden="true">&#9656;</span></span>`
       : '<span class="nb-caret-spacer" aria-hidden="true"></span>';
-    const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">&#128279;</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
-    const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">&#128274;</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
+    const shared = nb.access !== 'owner' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:4px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '" aria-hidden="true">' + icon('link') + '</span><span class="sr-only">' + esc(__( '(shared with you)', 'noodled' )) + '</span>' : '';
+    const readOnly = nb.access === 'read' ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="' + escAttr(__( 'Read only', 'noodled' )) + '" aria-hidden="true">' + icon('lock') + '</span><span class="sr-only">' + esc(__( '(read only)', 'noodled' )) + '</span>' : '';
     /* translators: %s is the notebook name */
     const nbAria = escAttr(sprintf( __( 'Notebook %s', 'noodled' ), label ));
     let html = `<div class="nb-item${active}" role="button" tabindex="0" style="padding-left:${8 + depth * 14}px" data-nb="${escAttr(name)}" aria-label="${nbAria}" onclick="selectNotebook(this.dataset.nb)" oncontextmenu="event.preventDefault(); showNbContext(event, this.dataset.nb)" ondragover="noteDragOver(event)" ondragleave="this.classList.remove('drop-target')" ondrop="noteDrop(event, this.dataset.nb)">
@@ -293,7 +292,7 @@ function renderNotebooks() {
     const oCol = collapsed.has(okey);
     html += `<div class="nb-item nb-others-head" role="button" tabindex="0" aria-expanded="${oCol ? 'false' : 'true'}" aria-label="${escAttr(__( "Others' Noodles", 'noodled' ))}" onclick="toggleNbCollapse('${okey}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNbCollapse('${okey}')}">
       <span class="nb-caret${oCol ? '' : ' open'}" aria-hidden="true">&#9656;</span>
-      <span class="nb-name">&#128101; ${esc(__( "Others' Noodles", 'noodled' ))}</span>
+      <span class="nb-name">${icon('users')} ${esc(__( "Others' Noodles", 'noodled' ))}</span>
       <span class="count">${shared.length}</span>
     </div>`;
     if (!oCol) {
@@ -542,7 +541,7 @@ function showWhatsNew(v) {
   const notes = (typeof noodledConfig !== 'undefined' && noodledConfig.whatsNew) || '';
   const el = document.getElementById('modalContainer');
   /* translators: %s is the new version number */
-  if (!notes || !el || el.innerHTML.trim()) { showToast(sprintf( __( '✨ Updated to v%s', 'noodled' ), v )); return; }
+  if (!notes || !el || el.innerHTML.trim()) { showToast(sprintf( __( 'Updated to v%s', 'noodled' ), v )); return; }
   /* translators: %s is the new version number */
   const title = sprintf( __( "What's new in v%s", 'noodled' ), v );
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)document.getElementById('modalContainer').innerHTML=''">
@@ -583,13 +582,13 @@ function maybeOnboarding() {
     localStorage.setItem('noodled_onboarded', '1');
     const brand = (typeof noodledConfig !== 'undefined' && noodledConfig.brandName) || 'noodled';
     el.innerHTML = `<div class="modal-overlay"><div class="modal onboard" role="dialog" aria-modal="true" aria-labelledby="obTitle">
-      <h3 id="obTitle">${esc(sprintf( /* translators: %s is the app/brand name */ __( 'Welcome to %s 🍜', 'noodled' ), brand ))}</h3>
+      <h3 id="obTitle">${esc(sprintf( /* translators: %s is the app/brand name */ __( 'Welcome to %s', 'noodled' ), brand ))}</h3>
       <p style="font-size:13px;color:var(--text-muted);line-height:1.5">${esc(__( "A few places to know, then you're off:", 'noodled' ))}</p>
       <ul class="onboard-tips">
-        <li><span aria-hidden="true">➕</span> ${esc(__( 'The + button — new note, photo, voice note, or location', 'noodled' ))}</li>
+        <li><span aria-hidden="true">${icon('plus')}</span> ${esc(__( 'The + button — new note, photo, voice note, or location', 'noodled' ))}</li>
         <li><span aria-hidden="true">/</span> ${esc(__( 'Type “/” in a note for headings, tables, to-dos and more', 'noodled' ))}</li>
-        <li><span aria-hidden="true">🔍</span> ${esc(__( 'Search finds anything across every note', 'noodled' ))}</li>
-        <li><span aria-hidden="true">☰</span> ${esc(__( 'The menu (top right) holds everything else — tasks, calendar, graph…', 'noodled' ))}</li>
+        <li><span aria-hidden="true">${icon('search')}</span> ${esc(__( 'Search finds anything across every note', 'noodled' ))}</li>
+        <li><span aria-hidden="true">${icon('menu')}</span> ${esc(__( 'The menu (top right) holds everything else — tasks, calendar, graph…', 'noodled' ))}</li>
       </ul>
       <div class="modal-buttons"><button class="btn btn-accent" id="obDone">${esc(__( 'Start noodling', 'noodled' ))}</button></div>
     </div></div>`;
@@ -984,7 +983,7 @@ function renderNoteList() {
     if (showSharedDivider && n.shared && !sharedHeaderDone) {
       sharedHeaderDone = true;
       lastGroup = null; // restart date grouping under the shared section
-      out.push(`<div class="note-group note-group-shared">&#128101; ${esc(__( "Others' Noodles", 'noodled' ))}</div>`);
+      out.push(`<div class="note-group note-group-shared">${icon('users')} ${esc(__( "Others' Noodles", 'noodled' ))}</div>`);
     }
     if (grouped) {
       const g = n.pinned ? __( 'Pinned', 'noodled' ) : dateGroup(n.modified || n.created);
@@ -1000,24 +999,24 @@ function renderNoteList() {
 function emptyListHtml(query) {
   if (query) {
     return `<div class="empty-state list-empty">
-      <div class="empty-icon" aria-hidden="true">&#128269;</div>
+      <div class="empty-icon" aria-hidden="true">${icon('search', 'ic-lg')}</div>
       <div class="empty-title">${esc(__( 'No matching notes', 'noodled' ))}</div>
       <div class="empty-sub">${esc(sprintf( __( 'Nothing matches "%s".', 'noodled' ), query ))}</div>
       <button class="btn btn-sm" style="margin-top:12px" onclick="clearSearch()">${esc(__( 'Clear search', 'noodled' ))}</button>
     </div>`;
   }
   if (viewingTrash) {
-    return `<div class="empty-state list-empty"><div class="empty-icon" aria-hidden="true">&#128465;</div><div class="empty-title">${esc(__( 'Trash is empty', 'noodled' ))}</div><div class="empty-sub">${esc(__( 'Deleted notes show up here.', 'noodled' ))}</div></div>`;
+    return `<div class="empty-state list-empty"><div class="empty-icon" aria-hidden="true">${icon('trash-2', 'ic-lg')}</div><div class="empty-title">${esc(__( 'Trash is empty', 'noodled' ))}</div><div class="empty-sub">${esc(__( 'Deleted notes show up here.', 'noodled' ))}</div></div>`;
   }
   const where = activeNotebook
     /* translators: %s is the notebook name */
     ? sprintf( __( 'No notes in %s yet', 'noodled' ), activeNotebook )
     : __( 'No notes yet', 'noodled' );
   return `<div class="empty-state list-empty">
-    <div class="empty-icon" aria-hidden="true">&#127837;</div>
+    <div class="empty-icon" aria-hidden="true">${icon('notebook', 'ic-lg')}</div>
     <div class="empty-title">${esc(where)}</div>
     <div class="empty-sub">${esc(__( 'Create your first note to get started.', 'noodled' ))}</div>
-    <button class="btn btn-sm btn-accent" style="margin-top:12px" onclick="createNote()">${esc(__( '+ New note', 'noodled' ))}</button>
+    <button class="btn btn-sm btn-accent" style="margin-top:12px" onclick="createNote()">${icon('plus')} ${esc(__( 'New note', 'noodled' ))}</button>
   </div>`;
 }
 
@@ -1059,16 +1058,16 @@ function renderNoteItem(n) {
       : (n.body || '').replace(/[#>*`_~|\[\]]/g, '').replace(/\s+/g, ' ').trim().substring(0, 160);
     const isActive = activeNote && activeNote.id === n.id;
     const badge = n.source === 'plaud' ? '<span class="source-badge">plaud</span>' : '';
-    const pin = n.pinned ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Pinned', 'noodled' )) + '">&#128204;</span>' : '';
-    const star = isStarred(n.id) ? '<span style="margin-right:4px;font-size:11px;color:#f59e0b" title="' + escAttr(__( 'Starred', 'noodled' )) + '">&#9733;</span>' : '';
-    const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '">&#128279;</span>' : '';
+    const pin = n.pinned ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Pinned', 'noodled' )) + '">' + icon('pin', 'ic-fill') + '</span>' : '';
+    const star = isStarred(n.id) ? '<span style="margin-right:4px;font-size:11px;color:var(--yellow)" title="' + escAttr(__( 'Starred', 'noodled' )) + '">' + icon('star', 'ic-fill') + '</span>' : '';
+    const sharedBadge = n.shared ? '<span style="margin-right:4px;font-size:11px" title="' + escAttr(__( 'Shared with you', 'noodled' )) + '">' + icon('link') + '</span>' : '';
     /* translators: %d is the number of attachments */
-    const attBadge = (n.att > 0) ? `<span class="att-badge" title="${escAttr(sprintf( _n( '%d attachment', '%d attachments', n.att, 'noodled' ), n.att ))}">&#128206; ${n.att}</span>` : '';
+    const attBadge = (n.att > 0) ? `<span class="att-badge" title="${escAttr(sprintf( _n( '%d attachment', '%d attachments', n.att, 'noodled' ), n.att ))}">${icon('paperclip')} ${n.att}</span>` : '';
     // Task counts come from the server (n.tasks); fall back to scanning the body
     // only if it happens to be present.
     const tasks = (n.tasks && n.tasks.total > 0) ? n.tasks : (n.body ? checklistProgress(n.body) : null);
     /* translators: %1$d is completed tasks, %2$d is total tasks */
-    const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${escAttr(sprintf( __( '%1$d of %2$d tasks done', 'noodled' ), tasks.done, tasks.total ))}">&#10003; ${tasks.done}/${tasks.total}</span>` : '';
+    const taskBadge = tasks ? `<span class="att-badge task-badge ${tasks.done === tasks.total ? 'all-done' : ''}" title="${escAttr(sprintf( __( '%1$d of %2$d tasks done', 'noodled' ), tasks.done, tasks.total ))}">${icon('check')} ${tasks.done}/${tasks.total}</span>` : '';
     const time = relativeTime(n.modified || n.created);
     const fullDate = n.modified || n.created || '';
     // Offline-first (#6): a quiet dot marking notes whose body is cached locally.
@@ -1267,11 +1266,11 @@ function quickAddOpen() {
   if (!c || c.dataset.open === '1') return;
   haptic();
   const items = [
-    { icon: '📝', label: __( 'New note', 'noodled' ),         sub: __( 'Blank note', 'noodled' ),        run: quickAddNote },
-    { icon: '📎', label: __( 'Photo or document', 'noodled' ), sub: __( 'Upload files', 'noodled' ),      run: quickAddFiles },
-    { icon: '🎙️', label: __( 'Voice note', 'noodled' ),        sub: __( 'Dictate to text', 'noodled' ),   run: quickAddVoice },
-    { icon: '📍', label: __( 'Location note', 'noodled' ),     sub: __( 'Pin where you are', 'noodled' ), run: quickAddLocation },
-    { icon: '💻', label: __( 'Code note', 'noodled' ),         sub: __( 'Keeps characters exactly', 'noodled' ), run: createCodeNote },
+    { icon: icon('file-plus'), label: __( 'New note', 'noodled' ),         sub: __( 'Blank note', 'noodled' ),        run: quickAddNote },
+    { icon: icon('paperclip'), label: __( 'Photo or document', 'noodled' ), sub: __( 'Upload files', 'noodled' ),      run: quickAddFiles },
+    { icon: icon('mic'), label: __( 'Voice note', 'noodled' ),        sub: __( 'Dictate to text', 'noodled' ),   run: quickAddVoice },
+    { icon: icon('map-pin'), label: __( 'Location note', 'noodled' ),     sub: __( 'Pin where you are', 'noodled' ), run: quickAddLocation },
+    { icon: icon('code'), label: __( 'Code note', 'noodled' ),         sub: __( 'Keeps characters exactly', 'noodled' ), run: createCodeNote },
   ];
   window._quickAddRun = items.map(it => it.run);
   c.innerHTML =
@@ -1564,7 +1563,7 @@ async function updateTrashCount() {
 function renderContent() {
   const el = document.getElementById('colContent');
   if (!activeNote) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#127837;</div><div>' + esc(__( 'Select a note or create a new one', 'noodled' )) + '</div></div>';
+    el.innerHTML = '<div class="empty-state"><div class="icon">' + icon('file-text', 'ic-lg') + '</div><div>' + esc(__( 'Select a note or create a new one', 'noodled' )) + '</div></div>';
     return;
   }
 
@@ -1585,19 +1584,19 @@ function renderContent() {
                placeholder="${escAttr(__( 'language', 'noodled' ))}" oninput="onCodeLangInput()"
                aria-label="${escAttr(__( 'Code language', 'noodled' ))}" title="${escAttr(__( 'Code language (for syntax highlighting)', 'noodled' ))}"
                spellcheck="false" autocapitalize="off" autocomplete="off">` : ''}
-        <button class="btn btn-sm" onclick="insertBullet()" title="${escAttr(__( 'Bullet list', 'noodled' ))}" aria-label="${escAttr(__( 'Bullet list', 'noodled' ))}"><span aria-hidden="true">&#9679;</span></button>
-        <button class="btn btn-sm" onclick="insertChecklistItem()" title="${escAttr(__( 'Checklist', 'noodled' ))}" aria-label="${escAttr(__( 'Checklist', 'noodled' ))}"><span aria-hidden="true">&#9744;</span></button>
-        <button class="btn btn-sm" onclick="insertHeading()" title="${escAttr(__( 'Heading', 'noodled' ))}" aria-label="${escAttr(__( 'Heading', 'noodled' ))}">H</button>
+        <button class="btn btn-sm" onclick="insertBullet()" title="${escAttr(__( 'Bullet list', 'noodled' ))}" aria-label="${escAttr(__( 'Bullet list', 'noodled' ))}">${icon('list')}</button>
+        <button class="btn btn-sm" onclick="insertChecklistItem()" title="${escAttr(__( 'Checklist', 'noodled' ))}" aria-label="${escAttr(__( 'Checklist', 'noodled' ))}">${icon('list-checks')}</button>
+        <button class="btn btn-sm" onclick="insertHeading()" title="${escAttr(__( 'Heading', 'noodled' ))}" aria-label="${escAttr(__( 'Heading', 'noodled' ))}">${icon('heading')}</button>
         <span class="toolbar-divider" aria-hidden="true"></span>
-        <button class="btn btn-sm" onclick="showHistory()" title="${escAttr(__( 'Version history', 'noodled' ))}" aria-label="${escAttr(__( 'Version history', 'noodled' ))}"><span aria-hidden="true">&#128336;</span></button>
-        ${(noodledConfig.aiEnabled && !locked) ? `<button class="btn btn-sm" onclick="summarizeNote()" title="${escAttr(__( 'Summarize with AI', 'noodled' ))}" aria-label="${escAttr(__( 'Summarize with AI', 'noodled' ))}"><span aria-hidden="true">&#10024;</span></button>` : ''}
-        <button class="btn btn-sm" onclick="copyBody()" title="${escAttr(__( 'Copy', 'noodled' ))}" aria-label="${escAttr(__( 'Copy note', 'noodled' ))}"><span aria-hidden="true">&#128203;</span></button>
-        <button class="btn btn-sm" onclick="uploadFiles()" title="${escAttr(__( 'Add files', 'noodled' ))}" aria-label="${escAttr(__( 'Add files', 'noodled' ))}"><span aria-hidden="true">&#128206;</span></button>
-        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="${escAttr(__( 'Dictate', 'noodled' ))}" aria-label="${escAttr(__( 'Dictate', 'noodled' ))}"><span aria-hidden="true">&#127908;</span></button>
-        <button class="btn btn-sm" onclick="recordAudioMemo()" id="audioBtn" aria-pressed="false" title="${escAttr(__( 'Record audio memo', 'noodled' ))}" aria-label="${escAttr(__( 'Record audio memo', 'noodled' ))}"><span aria-hidden="true">&#128308;</span></button>
+        <button class="btn btn-sm" onclick="showHistory()" title="${escAttr(__( 'Version history', 'noodled' ))}" aria-label="${escAttr(__( 'Version history', 'noodled' ))}">${icon('history')}</button>
+        ${(noodledConfig.aiEnabled && !locked) ? `<button class="btn btn-sm" onclick="summarizeNote()" title="${escAttr(__( 'Summarize with AI', 'noodled' ))}" aria-label="${escAttr(__( 'Summarize with AI', 'noodled' ))}">${icon('sparkles')}</button>` : ''}
+        <button class="btn btn-sm" onclick="copyBody()" title="${escAttr(__( 'Copy', 'noodled' ))}" aria-label="${escAttr(__( 'Copy note', 'noodled' ))}">${icon('copy')}</button>
+        <button class="btn btn-sm" onclick="uploadFiles()" title="${escAttr(__( 'Add files', 'noodled' ))}" aria-label="${escAttr(__( 'Add files', 'noodled' ))}">${icon('paperclip')}</button>
+        <button class="btn btn-sm" onclick="toggleVoiceMemo()" id="voiceBtn" title="${escAttr(__( 'Dictate', 'noodled' ))}" aria-label="${escAttr(__( 'Dictate', 'noodled' ))}">${icon('mic')}</button>
+        <button class="btn btn-sm" onclick="recordAudioMemo()" id="audioBtn" aria-pressed="false" title="${escAttr(__( 'Record audio memo', 'noodled' ))}" aria-label="${escAttr(__( 'Record audio memo', 'noodled' ))}">${icon('circle-dot')}</button>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <div class="toolbar-menu-wrap">
-          <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="${escAttr(__( 'More tools', 'noodled' ))}" aria-label="${escAttr(__( 'More tools', 'noodled' ))}" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">&#8943;</span></button>
+          <button class="btn btn-sm" id="editorMenuBtn" onclick="toggleEditorMenu()" title="${escAttr(__( 'More tools', 'noodled' ))}" aria-label="${escAttr(__( 'More tools', 'noodled' ))}" aria-haspopup="true" aria-expanded="false">${icon('ellipsis')}</button>
           <div class="toolbar-dropdown" id="editorMenu" role="menu" aria-labelledby="editorMenuBtn">
             <div class="dropdown-item" role="menuitem" tabindex="0" onclick="toggleMarkdownView()">${showRawMarkdown ? esc(__( 'Preview mode', 'noodled' )) : esc(__( 'Source mode', 'noodled' ))}</div>
             ${noodledConfig.aiEnabled ? `<div class="dropdown-item" role="menuitem" tabindex="0" onclick="askYourNotes()">${esc(__( 'Ask your notes…', 'noodled' ))}</div>` : ''}
@@ -1625,7 +1624,7 @@ function renderContent() {
     <div class="content-body" id="dropZone">
       ${locked
         ? `<div class="note-locked" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;text-align:center;color:var(--text-muted);padding:24px">
-             <div style="font-size:42px" aria-hidden="true">&#128274;</div>
+             <div aria-hidden="true">${icon('lock', 'ic-lg')}</div>
              <div>${esc(__( 'This note is locked and encrypted on your device.', 'noodled' ))}</div>
              <button class="btn btn-accent" onclick="unlockCurrentNote()">${esc(__( 'Unlock', 'noodled' ))}</button>
            </div>`
@@ -2346,45 +2345,45 @@ function renderMenuDashboard() {
   const userName = (typeof noodledConfig !== 'undefined' && noodledConfig.user && noodledConfig.user.name) || '';
   const sections = [
     { title: __( 'Start a note', 'noodled' ), items: [
-      { icon: '📝', label: __( 'New note', 'noodled' ), fn: 'createNote', desc: __( "A blank page with today's date already on it. No staring required.", 'noodled' ) },
-      { icon: '📎', label: __( 'Photo or document', 'noodled' ), fn: 'quickAddFiles', desc: __( "Drop in a photo, a PDF, or fifty. We'll start the note for you.", 'noodled' ) },
-      { icon: '🎙️', label: __( 'Voice note', 'noodled' ), fn: 'quickAddVoice', desc: __( "Talk, don't type. The mic's already listening.", 'noodled' ) },
-      { icon: '📍', label: __( 'Location note', 'noodled' ), fn: 'quickAddLocation', desc: __( 'Drop a pin where you stand. Future-you will want to know.', 'noodled' ) },
-      { icon: '💻', label: __( 'Code note', 'noodled' ), fn: 'createCodeNote', desc: __( 'A plain monospace page that keeps every character — no formatting, no surprises.', 'noodled' ) },
+      { icon: icon('file-plus'), label: __( 'New note', 'noodled' ), fn: 'createNote', desc: __( "A blank page with today's date already on it. No staring required.", 'noodled' ) },
+      { icon: icon('paperclip'), label: __( 'Photo or document', 'noodled' ), fn: 'quickAddFiles', desc: __( "Drop in a photo, a PDF, or fifty. We'll start the note for you.", 'noodled' ) },
+      { icon: icon('mic'), label: __( 'Voice note', 'noodled' ), fn: 'quickAddVoice', desc: __( "Talk, don't type. The mic's already listening.", 'noodled' ) },
+      { icon: icon('map-pin'), label: __( 'Location note', 'noodled' ), fn: 'quickAddLocation', desc: __( 'Drop a pin where you stand. Future-you will want to know.', 'noodled' ) },
+      { icon: icon('code'), label: __( 'Code note', 'noodled' ), fn: 'createCodeNote', desc: __( 'A plain monospace page that keeps every character — no formatting, no surprises.', 'noodled' ) },
     ] },
     { title: __( 'Capture', 'noodled' ), items: [
-      { icon: '🧩', label: __( 'New from template', 'noodled' ), fn: 'showTemplates', desc: __( 'Start from a shape, not a blank stare.', 'noodled' ) },
-      { icon: '📓', label: __( 'Daily journal', 'noodled' ), fn: 'openDailyJournal', desc: __( "Today's page, ready and waiting. Brain-dump and go.", 'noodled' ) },
-      { icon: '⚡', label: __( 'Quick capture', 'noodled' ), fn: 'toggleQuickCapture', desc: __( 'A thought, before it wanders off. In and out in two seconds.', 'noodled' ) },
-      { icon: '✂️', label: __( 'Web clipper', 'noodled' ), fn: 'showWebClipper', desc: __( 'Save a page or selection from any browser straight into noodled.', 'noodled' ) },
+      { icon: icon('layout-template'), label: __( 'New from template', 'noodled' ), fn: 'showTemplates', desc: __( 'Start from a shape, not a blank stare.', 'noodled' ) },
+      { icon: icon('book-open'), label: __( 'Daily journal', 'noodled' ), fn: 'openDailyJournal', desc: __( "Today's page, ready and waiting. Brain-dump and go.", 'noodled' ) },
+      { icon: icon('zap'), label: __( 'Quick capture', 'noodled' ), fn: 'toggleQuickCapture', desc: __( 'A thought, before it wanders off. In and out in two seconds.', 'noodled' ) },
+      { icon: icon('scissors'), label: __( 'Web clipper', 'noodled' ), fn: 'showWebClipper', desc: __( 'Save a page or selection from any browser straight into noodled.', 'noodled' ) },
     ] },
     { title: __( 'Organize', 'noodled' ), items: [
-      { icon: '🏷️', label: __( 'Browse tags', 'noodled' ), fn: 'showTagCloud', desc: __( "Every #hashtag you've ever scribbled, gathered in one spot.", 'noodled' ) },
-      { icon: '🗂️', label: __( 'Manage tags', 'noodled' ), fn: 'manageTags', desc: __( 'Rename the typos. Retire the ones from 2019.', 'noodled' ) },
-      { icon: '🔗', label: __( 'Note links', 'noodled' ), fn: 'showLinkGraph', desc: __( 'See the whole tangle. Your notes were never a list.', 'noodled' ) },
-      { icon: '📊', label: __( 'Statistics', 'noodled' ), fn: 'showStats', desc: __( "Proof you've been busy. Or proof you haven't.", 'noodled' ) },
-      { icon: '🚀', label: __( "Captain's Log", 'noodled' ), fn: 'showCaptainsLog', desc: __( "noodled's whole voyage so far, with jokes.", 'noodled' ) },
+      { icon: icon('tag'), label: __( 'Browse tags', 'noodled' ), fn: 'showTagCloud', desc: __( "Every #hashtag you've ever scribbled, gathered in one spot.", 'noodled' ) },
+      { icon: icon('tags'), label: __( 'Manage tags', 'noodled' ), fn: 'manageTags', desc: __( 'Rename the typos. Retire the ones from 2019.', 'noodled' ) },
+      { icon: icon('link'), label: __( 'Note links', 'noodled' ), fn: 'showLinkGraph', desc: __( 'See the whole tangle. Your notes were never a list.', 'noodled' ) },
+      { icon: icon('chart-column'), label: __( 'Statistics', 'noodled' ), fn: 'showStats', desc: __( "Proof you've been busy. Or proof you haven't.", 'noodled' ) },
+      { icon: icon('rocket'), label: __( "Captain's Log", 'noodled' ), fn: 'showCaptainsLog', desc: __( "noodled's whole voyage so far, with jokes.", 'noodled' ) },
     ] },
     { title: __( 'Tools', 'noodled' ), items: [
-      { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), fn: 'showFocusOptions', desc: __( 'A Pomodoro nudge for the days your brain wanders.', 'noodled' ) },
-      { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), fn: 'showShortcutsHelp', desc: __( 'The fast way to do everything. Cheat sheet included.', 'noodled' ) },
+      { icon: icon('timer'), label: __( 'Focus timer', 'noodled' ), fn: 'showFocusOptions', desc: __( 'A Pomodoro nudge for the days your brain wanders.', 'noodled' ) },
+      { icon: icon('keyboard'), label: __( 'Keyboard shortcuts', 'noodled' ), fn: 'showShortcutsHelp', desc: __( 'The fast way to do everything. Cheat sheet included.', 'noodled' ) },
     ] },
     { title: __( 'Data & sync', 'noodled' ), items: [
-      { icon: '🔄', label: __( 'Sync now', 'noodled' ), fn: 'syncPull', desc: __( "Push and pull with GitHub now. Don't wait for the clock.", 'noodled' ) },
-      { icon: '📥', label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote', desc: __( "Bring the old shoebox over. We'll unpack the .enex.", 'noodled' ) },
-      { icon: '💾', label: __( 'Download everything (zip)', 'noodled' ), fn: 'exportBackup', desc: __( 'Zip the whole lot up. Belt, meet suspenders.', 'noodled' ) },
-      { icon: '📦', label: __( 'Import backup', 'noodled' ), fn: 'importBackup', desc: __( 'Put a backup back. No questions asked.', 'noodled' ) },
+      { icon: icon('refresh-cw'), label: __( 'Sync now', 'noodled' ), fn: 'syncPull', desc: __( "Push and pull with GitHub now. Don't wait for the clock.", 'noodled' ) },
+      { icon: icon('inbox'), label: __( 'Import from Evernote', 'noodled' ), fn: 'importEvernote', desc: __( "Bring the old shoebox over. We'll unpack the .enex.", 'noodled' ) },
+      { icon: icon('download'), label: __( 'Download everything (zip)', 'noodled' ), fn: 'exportBackup', desc: __( 'Zip the whole lot up. Belt, meet suspenders.', 'noodled' ) },
+      { icon: icon('upload'), label: __( 'Import backup', 'noodled' ), fn: 'importBackup', desc: __( 'Put a backup back. No questions asked.', 'noodled' ) },
     ] },
   ];
   const accountItems = [];
   if (isOwner) {
-    accountItems.push({ icon: '🌐', label: __( 'View marketing site', 'noodled' ), fn: 'viewMarketingSite', desc: __( 'Peek at your public landing page. A Back button brings you home.', 'noodled' ) });
-    accountItems.push({ icon: '👥', label: __( 'Manage people', 'noodled' ), fn: 'manageUsers', desc: __( 'Invite the family. Hand out PINs, not passwords.', 'noodled' ) });
+    accountItems.push({ icon: icon('globe'), label: __( 'View marketing site', 'noodled' ), fn: 'viewMarketingSite', desc: __( 'Peek at your public landing page. A Back button brings you home.', 'noodled' ) });
+    accountItems.push({ icon: icon('users'), label: __( 'Manage people', 'noodled' ), fn: 'manageUsers', desc: __( 'Invite the family. Hand out PINs, not passwords.', 'noodled' ) });
   }
   if (window.PublicKeyCredential) {
-    accountItems.push({ icon: '🔐', label: __( 'Set up a passkey', 'noodled' ), fn: 'registerPasskey', desc: __( 'Sign in with Face ID or a fingerprint next time, no PIN to type.', 'noodled' ) });
+    accountItems.push({ icon: icon('key-round'), label: __( 'Set up a passkey', 'noodled' ), fn: 'registerPasskey', desc: __( 'Sign in with Face ID or a fingerprint next time, no PIN to type.', 'noodled' ) });
   }
-  accountItems.push({ icon: '🚪', label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true, desc: __( 'Lock it up behind you.', 'noodled' ) });
+  accountItems.push({ icon: icon('log-out'), label: __( 'Logout', 'noodled' ), fn: 'doLogout', danger: true, desc: __( 'Lock it up behind you.', 'noodled' ) });
 
   const card = (it) => `<button class="md-card${it.danger ? ' md-danger' : ''}" onclick="menuDashPick('${it.fn}')"><span class="md-ic" aria-hidden="true">${it.icon}</span><span class="md-txt"><span class="md-lbl">${esc(it.label)}</span><span class="md-desc">${esc(it.desc || '')}</span></span></button>`;
   const section = (s) => `<section class="md-sec"><h3 class="md-sec-t">${esc(s.title)}</h3><div class="md-grid">${s.items.map(card).join('')}</div></section>`;
@@ -2401,7 +2400,7 @@ function renderMenuDashboard() {
           <span class="md-logo">${esc((typeof noodledConfig !== 'undefined' && noodledConfig.brandName) || 'noodled')}</span>
           <span class="md-tag">${esc(__( 'Use your noodle.', 'noodled' ))}</span>
         </div>
-        <button class="md-close" onclick="closeMenuDashboard()" aria-label="${escAttr(__( 'Close menu', 'noodled' ))}"><span aria-hidden="true">&#10005;</span></button>
+        <button class="md-close" onclick="closeMenuDashboard()" aria-label="${escAttr(__( 'Close menu', 'noodled' ))}">${icon('x')}</button>
       </div>
       <div class="md-body">
         <div class="md-filter-wrap">
@@ -2889,7 +2888,7 @@ async function muDrop(id, on) { try { const r = await api.admin_set_drop(id, on)
 async function muPin(id) {
   const out = document.getElementById('mu-pin-' + id); if (out) out.textContent = '…';
   /* translators: %s is the generated PIN code */
-  try { const d = await api.admin_send_pin(id); if (out) out.innerHTML = d.error ? esc(d.error) : (sprintf( __( ' PIN %s', 'noodled' ), '<b>' + esc(d.pin) + '</b>' ) + (d.emailed ? ' ✓' : '')); }
+  try { const d = await api.admin_send_pin(id); if (out) out.innerHTML = d.error ? esc(d.error) : (sprintf( __( ' PIN %s', 'noodled' ), '<b>' + esc(d.pin) + '</b>' ) + (d.emailed ? ' ' + icon('check') : '')); }
   catch (e) { if (out) out.textContent = __( 'failed', 'noodled' ); }
 }
 async function muInvite() {
@@ -2905,7 +2904,7 @@ async function muInvite() {
   document.getElementById('muEmail').value = '';
   document.getElementById('muName').value = '';
   document.getElementById('muInviteDrop').checked = false;
-  st.textContent = __( 'invited ✓', 'noodled' );
+  st.innerHTML = esc(__( 'invited', 'noodled' )) + ' ' + icon('check');
   renderManageUsers();
 }
 
@@ -3146,6 +3145,7 @@ function renderMarkdown(text) {
 }
 
 // ── UI helpers ──
+function icon(name, cls) { return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true" focusable="false"><use href="#i-' + name + '"></use></svg>'; }
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
@@ -3684,7 +3684,7 @@ function renderSmartNotebooks() {
   const sns = config.smart_notebooks || [];
   el.innerHTML = sns.map((sn, i) =>
     `<div class="nb-item smart-item${_activeSmart === i ? ' active' : ''}" role="button" tabindex="0" aria-label="${escAttr(sn.name)}" onclick="showSmartNotebook(${i})" oncontextmenu="event.preventDefault();deleteSmartNotebook(${i})" onkeydown="if(event.key==='Enter')showSmartNotebook(${i})">
-      <span class="nb-name">&#128269; ${esc(sn.name)}</span>
+      <span class="nb-name">${icon('filter')} ${esc(sn.name)}</span>
     </div>`).join('')
     + `<div class="nb-item smart-add" role="button" tabindex="0" onclick="createSmartNotebook()" onkeydown="if(event.key==='Enter')createSmartNotebook()" aria-label="${escAttr(__( 'New smart notebook', 'noodled' ))}"><span class="nb-name" style="color:var(--text-muted)">+ ${esc(__( 'Smart notebook', 'noodled' ))}</span></div>`;
 }
@@ -4194,7 +4194,7 @@ async function registerPasskey() {
       label: (navigator.platform || '') + ' ' + (/iPhone|iPad|Android/.test(navigator.userAgent) ? 'phone' : 'device'),
     };
     const r = await api._fetch('/auth/passkey/register', { method: 'POST', body: JSON.stringify(out) });
-    showToast(r && r.success ? __( '✓ Passkey saved. Next time, just tap to sign in.', 'noodled' ) : ((r && r.error) || __( 'Passkey setup failed.', 'noodled' )));
+    showToast(r && r.success ? __( 'Passkey saved. Next time, just tap to sign in.', 'noodled' ) : ((r && r.error) || __( 'Passkey setup failed.', 'noodled' )));
   } catch (e) {
     if (e && e.name === 'NotAllowedError') showToast(__( 'Passkey setup cancelled.', 'noodled' ));
     else showToast(__( 'Passkey setup failed.', 'noodled' ));
@@ -4391,7 +4391,7 @@ function showTemplates() {
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal modal-sm"><h3>${esc(__( 'New from Template', 'noodled' ))}</h3>
       <div style="max-height:300px;overflow-y:auto">
-        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the template name */ __( 'Create note from %s template', 'noodled' ), t.name ))}" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="${escAttr(__( 'Delete template', 'noodled' ))}" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">&#10005;</button>` : ''}</div>`).join('')}
+        ${templates.map((t, i) => `<div class="template-item" style="display:flex;align-items:center;gap:6px"><span style="flex:1" role="button" tabindex="0" aria-label="${escAttr(sprintf( /* translators: %s is the template name */ __( 'Create note from %s template', 'noodled' ), t.name ))}" onclick="createFromTemplate(${i})">${esc(t.name)}</span>${t.custom ? `<button class="btn btn-sm" title="${escAttr(__( 'Delete template', 'noodled' ))}" onclick="event.stopPropagation(); deleteTemplate(${i})" style="padding:2px 8px">${icon('x')}</button>` : ''}</div>`).join('')}
       </div>
       <div class="modal-buttons">
         <button class="btn btn-sm" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Cancel', 'noodled' ))}</button>
@@ -4659,7 +4659,7 @@ function setDictateBtn(on) {
   const btn = document.getElementById('voiceBtn');
   if (btn) {
     if (on) { btn.textContent = __( 'Stop', 'noodled' ); btn.classList.add('recording'); }
-    else { btn.innerHTML = '&#127908;'; btn.classList.remove('recording'); }
+    else { btn.innerHTML = icon('mic'); btn.classList.remove('recording'); }
   }
   if (on) showDictationBar(); else hideDictationBar();
 }
@@ -4927,7 +4927,7 @@ function aiModalShell(titleText, innerHtml) {
   const el = document.getElementById('modalContainer');
   el.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this){document.getElementById('modalContainer').innerHTML='';}">
     <div class="modal modal-lg">
-      <h3><span aria-hidden="true">&#10024;</span> ${esc(titleText)}</h3>
+      <h3>${icon('sparkles')} ${esc(titleText)}</h3>
       <div id="aiModalBody" aria-live="polite">${innerHtml}</div>
       <div style="margin-top:16px;text-align:right"><button class="btn" onclick="document.getElementById('modalContainer').innerHTML=''">${esc(__( 'Close', 'noodled' ))}</button></div>
     </div>
@@ -5151,7 +5151,7 @@ function toggleFindReplace() {
     <input id="frReplace" placeholder="${escAttr(__( 'Replace...', 'noodled' ))}" aria-label="${escAttr(__( 'Replace with', 'noodled' ))}">
     <button class="btn btn-sm" onclick="doReplace(false)">${esc(__( 'Replace', 'noodled' ))}</button>
     <button class="btn btn-sm" onclick="doReplace(true)">${esc(__( 'All', 'noodled' ))}</button>
-    <button class="btn btn-sm" onclick="toggleFindReplace()" title="${escAttr(__( 'Close', 'noodled' ))}" aria-label="${escAttr(__( 'Close find and replace', 'noodled' ))}"><span aria-hidden="true">&#10005;</span></button>
+    <button class="btn btn-sm" onclick="toggleFindReplace()" title="${escAttr(__( 'Close', 'noodled' ))}" aria-label="${escAttr(__( 'Close find and replace', 'noodled' ))}">${icon('x')}</button>
   `;
   const toolbar = document.querySelector('.content-toolbar');
   if (toolbar) toolbar.after(bar);
@@ -5201,7 +5201,7 @@ function showSaveIndicator(state) {
     // Retrigger the little pulse each save.
     void el.offsetWidth;
     el.classList.add('saved-flash');
-    el.textContent = '✓';
+    el.innerHTML = icon('check');
     clearTimeout(saveIndicatorTimer);
     saveIndicatorTimer = setTimeout(() => { el.className = 'save-indicator'; }, 3000);
   }
@@ -5285,10 +5285,10 @@ function renderAttachmentGallery() {
       const div = document.createElement('div');
       div.className = 'gallery-file-tile';
       const ext = (name.split('.').pop() || '').toLowerCase();
-      const glyph = /^html?$/.test(ext) ? '🌐' : (ext === 'pdf' ? '📕' : (/^(docx?|odt|rtf|txt|md|pages)$/.test(ext) ? '📄' : '📎'));
-      const icon = document.createElement('div'); icon.className = 'gf-icon'; icon.textContent = glyph;
+      const glyph = /^html?$/.test(ext) ? 'globe' : (/^(pdf|docx?|odt|rtf|txt|md|pages)$/.test(ext) ? 'file-text' : 'paperclip');
+      const iconEl = document.createElement('div'); iconEl.className = 'gf-icon'; iconEl.innerHTML = icon(glyph, 'ic-lg');
       const label = document.createElement('div'); label.className = 'gf-name'; label.textContent = name;
-      div.appendChild(icon); div.appendChild(label);
+      div.appendChild(iconEl); div.appendChild(label);
       div.title = name;
       // Open in the same window — mobile users just swipe back to return.
       div.onclick = () => { window.location.href = a.url; };
@@ -5296,7 +5296,7 @@ function renderAttachmentGallery() {
     }
     // Intuitive delete: × on each item (always shown on touch, on hover on desktop).
     const del = document.createElement('button');
-    del.className = 'gal-del'; del.type = 'button'; del.title = __( 'Delete', 'noodled' ); del.setAttribute('aria-label', __( 'Delete attachment', 'noodled' )); del.innerHTML = '&#10005;';
+    del.className = 'gal-del'; del.type = 'button'; del.title = __( 'Delete', 'noodled' ); del.setAttribute('aria-label', __( 'Delete attachment', 'noodled' )); del.innerHTML = icon('x');
     del.onclick = (e) => { e.stopPropagation(); deleteAttachment(a.id); };
     item.appendChild(del);
     // Drag to reorder (desktop). Touch devices tap to open; DnD doesn't fire.
@@ -5334,9 +5334,9 @@ function openLightbox(images, index) {
     lb.id = 'noodledLightbox';
     lb.className = 'noodled-lightbox';
     lb.innerHTML = `
-      <button class="lb-close" onclick="closeLightbox()" aria-label="${escAttr(__( 'Close', 'noodled' ))}">&#10005;</button>
-      <button class="lb-dl" onclick="downloadLightboxImage()" aria-label="${escAttr(__( 'Download', 'noodled' ))}">&#11015;&#65039;</button>
-      <button class="lb-del" onclick="deleteLightboxImage()" aria-label="${escAttr(__( 'Delete', 'noodled' ))}">&#128465;&#65039;</button>
+      <button class="lb-close" onclick="closeLightbox()" aria-label="${escAttr(__( 'Close', 'noodled' ))}">${icon('x')}</button>
+      <button class="lb-dl" onclick="downloadLightboxImage()" aria-label="${escAttr(__( 'Download', 'noodled' ))}">${icon('download')}</button>
+      <button class="lb-del" onclick="deleteLightboxImage()" aria-label="${escAttr(__( 'Delete', 'noodled' ))}">${icon('trash-2')}</button>
       <button class="lb-nav lb-prev" onclick="lightboxStep(-1)" aria-label="${escAttr(__( 'Previous', 'noodled' ))}">&#8249;</button>
       <div class="lb-stage"><img id="lbImg" alt=""><div class="lb-caption" id="lbCaption"></div></div>
       <button class="lb-nav lb-next" onclick="lightboxStep(1)" aria-label="${escAttr(__( 'Next', 'noodled' ))}">&#8250;</button>`;
@@ -5371,7 +5371,7 @@ function lightboxCaption(a) {
     if (e.ExposureTime) bits.push(esc(String(e.ExposureTime)) + 's');
     if (e.ISO) bits.push('ISO ' + esc(String(e.ISO)));
     if (e.FocalLength) bits.push(esc(String(evalFrac(e.FocalLength))) + 'mm');
-    if (e.GPSLatitude && e.GPSLongitude) bits.push('<a href="https://maps.google.com/?q=' + e.GPSLatitude + ',' + e.GPSLongitude + '" target="_blank" rel="noopener">📍 ' + esc(__( 'map', 'noodled' )) + '</a>');
+    if (e.GPSLatitude && e.GPSLongitude) bits.push('<a href="https://maps.google.com/?q=' + e.GPSLatitude + ',' + e.GPSLongitude + '" target="_blank" rel="noopener">' + icon('map-pin') + ' ' + esc(__( 'map', 'noodled' )) + '</a>');
     if (bits.length) parts.push('<span class="lb-exif">' + bits.join(' &middot; ') + '</span>');
   }
   return parts.join('<br>');
@@ -5733,21 +5733,21 @@ function showCommandPalette() {
   const el = document.getElementById('modalContainer');
   const owner = !!(noodledConfig.user && noodledConfig.user.owner);
   const cmds = [
-    { icon: '📝', label: __( 'New note', 'noodled' ), run: () => createNote() },
-    { icon: '💻', label: __( 'Code note', 'noodled' ), run: () => createCodeNote() },
-    { icon: '📄', label: __( 'New from template', 'noodled' ), run: () => showTemplates() },
-    { icon: '📎', label: __( 'Add files', 'noodled' ), run: () => uploadFiles() },
-    { icon: '🔍', label: __( 'Search notes', 'noodled' ), run: () => document.getElementById('searchInput').focus() },
-    { icon: '🗓️', label: __( 'Daily journal', 'noodled' ), run: () => openDailyJournal() },
-    { icon: '⚡', label: __( 'Quick capture', 'noodled' ), run: () => toggleQuickCapture() },
-    { icon: '⏱️', label: __( 'Focus timer', 'noodled' ), run: () => showFocusOptions() },
-    { icon: '🔄', label: __( 'Sync now', 'noodled' ), run: () => syncPull() },
-    { icon: '🌓', label: __( 'Toggle theme', 'noodled' ), run: () => toggleTheme() },
-    { icon: '⬇️', label: __( 'Download everything (zip)', 'noodled' ), run: () => exportBackup() },
-    { icon: '⬆️', label: __( 'Import backup', 'noodled' ), run: () => importBackup() },
-    { icon: '⌨️', label: __( 'Keyboard shortcuts', 'noodled' ), run: () => showShortcutsHelp() },
+    { icon: icon('file-plus'), label: __( 'New note', 'noodled' ), run: () => createNote() },
+    { icon: icon('code'), label: __( 'Code note', 'noodled' ), run: () => createCodeNote() },
+    { icon: icon('layout-template'), label: __( 'New from template', 'noodled' ), run: () => showTemplates() },
+    { icon: icon('paperclip'), label: __( 'Add files', 'noodled' ), run: () => uploadFiles() },
+    { icon: icon('search'), label: __( 'Search notes', 'noodled' ), run: () => document.getElementById('searchInput').focus() },
+    { icon: icon('book-open'), label: __( 'Daily journal', 'noodled' ), run: () => openDailyJournal() },
+    { icon: icon('zap'), label: __( 'Quick capture', 'noodled' ), run: () => toggleQuickCapture() },
+    { icon: icon('timer'), label: __( 'Focus timer', 'noodled' ), run: () => showFocusOptions() },
+    { icon: icon('refresh-cw'), label: __( 'Sync now', 'noodled' ), run: () => syncPull() },
+    { icon: icon('sun-moon'), label: __( 'Toggle theme', 'noodled' ), run: () => toggleTheme() },
+    { icon: icon('download'), label: __( 'Download everything (zip)', 'noodled' ), run: () => exportBackup() },
+    { icon: icon('upload'), label: __( 'Import backup', 'noodled' ), run: () => importBackup() },
+    { icon: icon('keyboard'), label: __( 'Keyboard shortcuts', 'noodled' ), run: () => showShortcutsHelp() },
   ];
-  if (owner) cmds.splice(3, 0, { icon: '👥', label: __( 'Manage people', 'noodled' ), run: () => manageUsers() });
+  if (owner) cmds.splice(3, 0, { icon: icon('users'), label: __( 'Manage people', 'noodled' ), run: () => manageUsers() });
 
   el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp">
     <input id="cmdpInput" placeholder="${escAttr(__( 'Type a command or note…', 'noodled' ))}" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="cmdpList" aria-activedescendant="" aria-label="${escAttr(__( 'Command palette', 'noodled' ))}">
@@ -5768,7 +5768,7 @@ function showCommandPalette() {
   }
   function render() {
     list.innerHTML = results.length ? results.map((r, i) => {
-      const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}` : `📄 ${esc(r.item.title)}`;
+      const label = r.type === 'cmd' ? `${r.item.icon || ''} ${esc(r.item.label)}` : `${icon('file-text')} ${esc(r.item.title)}`;
       const sub = r.type === 'note' ? `<span class="cmdp-sub">${esc(r.item.notebook || '')}</span>` : '';
       return `<div class="cmdp-i ${i === hi ? 'on' : ''}" data-i="${i}" id="cmdp-opt-${i}" role="option" aria-selected="${i === hi ? 'true' : 'false'}">${label}${sub}</div>`;
     }).join('') : '<div class="cmdp-empty">' + esc(__( 'No matches', 'noodled' )) + '</div>';
@@ -6399,7 +6399,7 @@ function showRecentSwitcher() {
   const items = ids.map(id => notes.find(n => n.id === id)).filter(Boolean).slice(0, 8);
   if (!items.length) { showToast(__( 'No recent notes yet', 'noodled' )); return; }
   const el = document.getElementById('modalContainer');
-  el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp"><div class="cmdp-head">${esc(__( 'Recent notes', 'noodled' ))}</div><div class="cmdp-list" id="rsList">${items.map((n, i) => `<div class="cmdp-i ${i === 0 ? 'on' : ''}" data-id="${n.id}">📄 ${esc(n.title)}<span class="cmdp-sub">${esc(n.notebook || '')}</span></div>`).join('')}</div></div></div>`;
+  el.innerHTML = `<div class="modal-overlay cmdp-overlay"><div class="cmdp"><div class="cmdp-head">${esc(__( 'Recent notes', 'noodled' ))}</div><div class="cmdp-list" id="rsList">${items.map((n, i) => `<div class="cmdp-i ${i === 0 ? 'on' : ''}" data-id="${n.id}">${icon('file-text')} ${esc(n.title)}<span class="cmdp-sub">${esc(n.notebook || '')}</span></div>`).join('')}</div></div></div>`;
   const list = el.querySelector('#rsList');
   let hi = 0;
   const rows = [...list.querySelectorAll('.cmdp-i')];
@@ -6440,14 +6440,14 @@ function appendBlock(md) {
 }
 function openSlashMenu(x, y) {
   const opts = [
-    { label: __( 'Heading', 'noodled' ), icon: 'H', run: () => insertHeading() },
-    { label: __( 'Checklist', 'noodled' ), icon: '☑', run: () => insertChecklistItem() },
-    { label: __( 'Bullet list', 'noodled' ), icon: '•', run: () => insertBullet() },
-    { label: __( 'Numbered list', 'noodled' ), icon: '1.', run: () => insertNumberedList() },
-    { label: __( 'Divider', 'noodled' ), icon: '―', run: () => appendBlock('---') },
+    { label: __( 'Heading', 'noodled' ), icon: icon('heading'), run: () => insertHeading() },
+    { label: __( 'Checklist', 'noodled' ), icon: icon('list-checks'), run: () => insertChecklistItem() },
+    { label: __( 'Bullet list', 'noodled' ), icon: icon('list'), run: () => insertBullet() },
+    { label: __( 'Numbered list', 'noodled' ), icon: icon('list-ordered'), run: () => insertNumberedList() },
+    { label: __( 'Divider', 'noodled' ), icon: icon('minus'), run: () => appendBlock('---') },
     /* translators: %s is a column header placeholder for a new table */
-    { label: __( 'Table', 'noodled' ), icon: '▦', run: () => appendBlock(`| ${__( 'Column', 'noodled' )} | ${__( 'Column', 'noodled' )} |\n| --- | --- |\n|  |  |`) },
-    { label: __( "Today's date", 'noodled' ), icon: '🗓', run: () => appendBlock(new Date().toLocaleDateString()) },
+    { label: __( 'Table', 'noodled' ), icon: icon('table'), run: () => appendBlock(`| ${__( 'Column', 'noodled' )} | ${__( 'Column', 'noodled' )} |\n| --- | --- |\n|  |  |`) },
+    { label: __( "Today's date", 'noodled' ), icon: icon('calendar'), run: () => appendBlock(new Date().toLocaleDateString()) },
   ];
   let menu = document.getElementById('slashMenu');
   if (menu) menu.remove();
@@ -6508,7 +6508,7 @@ function showAutocomplete(type, typed, matches, range) {
   let box = document.getElementById('acBox');
   if (!box) { box = document.createElement('div'); box.id = 'acBox'; box.className = 'ac-box'; box.setAttribute('role', 'listbox'); document.body.appendChild(box); }
   _acState = { type, typed, matches, hi: 0 };
-  box.innerHTML = matches.map((mtext, i) => `<div class="ac-i ${i === 0 ? 'on' : ''}" data-i="${i}" id="ac-opt-${i}" role="option" aria-selected="${i === 0 ? 'true' : 'false'}">${type === 'link' ? '🔗' : '#'} ${esc(mtext)}</div>`).join('');
+  box.innerHTML = matches.map((mtext, i) => `<div class="ac-i ${i === 0 ? 'on' : ''}" data-i="${i}" id="ac-opt-${i}" role="option" aria-selected="${i === 0 ? 'true' : 'false'}">${type === 'link' ? icon('link') : '#'} ${esc(mtext)}</div>`).join('');
   let rect; try { rect = range.getBoundingClientRect(); } catch (_) {}
   const x = (rect && rect.left) || 120, y = (rect && rect.bottom) || 160;
   box.style.left = Math.min(x, window.innerWidth - box.offsetWidth - 12) + 'px';

@@ -176,6 +176,11 @@ body {
 .btn-icon { padding: 4px 7px; font-size: 14px; border: none; background: transparent; cursor: pointer; color: var(--text); user-select: none; }
 .btn-icon:hover { background: var(--bg-item-hover); border-radius: 4px; }
 .btn-icon:active { transform: scale(0.9); }
+/* Icons (Lucide sprite in templates/icons.php) */
+.ic { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -0.2em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ic-lg, .empty-icon .ic { width: 40px; height: 40px; stroke-width: 1.5; }
+.ic-fill { fill: currentColor; }
+.ic-spin { animation: spin 1s linear infinite; }
 .btn-danger { color: var(--red); }
 .btn-danger:hover { background: rgba(231,76,60,0.15); }
 
