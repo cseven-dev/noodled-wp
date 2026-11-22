@@ -1772,9 +1772,8 @@ async function saveTitleOnly() {
   const cb = currentBody();
   const body = cb === null ? (activeNote.body || '') : cb;
   const n = activeNote;
-  const result = await serialSave(() => api.save_note(n.notebook, n.id, title, body));
-  if (!result.error) {
-    activeNote = result;
+  const result = await saveOpenNote(n, title, body);
+  if (result && !result.error && !result.conflict) {
     await loadNotebooks();
     await loadNotes();
   }
@@ -1965,11 +1964,23 @@ function adoptMtime(r) {
   return r;
 }
 
+// Save the open note with a conflict base. The base is read inside the serialized
+// function, so a save queued behind another one uses that save's new mtime.
+async function saveOpenNote(n, title, body, opts) {
+  const cur = () => (activeNote && activeNote.id === n.id) ? activeNote : n;
+  const r = await serialSave(() => api.save_note(n.notebook, n.id, title, body,
+    { base: cur().mtime || cur().modified || '', ...(opts || {}) }));
+  if (r && r.conflict) { showConflict(r.server, { title, body }); return r; }
+  if (r && !r.error) adoptSaved(r);
+  return r;
+}
+
 async function saveAndRerender() {
   const title = document.getElementById('titleInput')?.value || activeNote.title;
   const n = activeNote, body = activeNote.body;
-  const result = await serialSave(() => api.save_note(n.notebook, n.id, title, body));
-  if (!result.error) { adoptSaved(result); await loadNotes(); }
+  const result = await saveOpenNote(n, title, body);
+  if (!result || result.error || result.conflict) return;
+  await loadNotes();
   renderContent();
   setTimeout(() => {
     const el = document.getElementById('noteBody');
@@ -2169,8 +2180,9 @@ async function lockCurrentNote() {
   let enc;
   try { enc = await encryptBody(plain, window._protectPass); }
   catch (e) { showToast(__( 'Encryption failed', 'noodled' )); return; }
-  const r = await api.save_note(activeNote.notebook, activeNote.id, activeNote.title, enc);
-  if (r && !r.error) { activeNote = r; await loadNotes(); renderNoteList(); renderContent(); showToast(__( 'Note locked', 'noodled' )); }
+  const r = await saveOpenNote(activeNote, activeNote.title, enc);
+  if (r && r.conflict) return;
+  if (r && !r.error) { await loadNotes(); renderNoteList(); renderContent(); showToast(__( 'Note locked', 'noodled' )); }
   else showToast(__( 'Could not lock note', 'noodled' ));
 }
 
@@ -2180,8 +2192,9 @@ async function unlockCurrentNote() {
   let plain;
   try { plain = await decryptBody(activeNote.body, window._protectPass); }
   catch (e) { showToast(__( 'Could not decrypt (wrong passphrase?)', 'noodled' )); window._protectPass = ''; return; }
-  const r = await api.save_note(activeNote.notebook, activeNote.id, activeNote.title, plain);
-  if (r && !r.error) { activeNote = r; await loadNotes(); renderNoteList(); renderContent(); showToast(__( 'Note unlocked', 'noodled' )); }
+  const r = await saveOpenNote(activeNote, activeNote.title, plain);
+  if (r && r.conflict) return;
+  if (r && !r.error) { await loadNotes(); renderNoteList(); renderContent(); showToast(__( 'Note unlocked', 'noodled' )); }
   else showToast(__( 'Could not unlock note', 'noodled' ));
 }
 
@@ -2904,8 +2917,8 @@ async function toggleCheck(checkIndex) {
     activeNote.body = lines.join('\n');
   }
   const n = activeNote, body = activeNote.body;
-  await serialSave(async () => adoptSaved(await api.save_note(n.notebook, n.id, n.title, body)));
-  renderContent();
+  const r = await saveOpenNote(n, n.title, body);
+  if (r && !r.error && !r.conflict) renderContent();
 }
 
 // ── Copy ──
@@ -5533,7 +5546,7 @@ async function queuedSave(notebook, noteId, title, body, base) {
   try {
     showSaveIndicator('saving');
     const result = await api.save_note(notebook, noteId, title, body, { base });
-    showSaveIndicator('saved');
+    if (result && !result.conflict && !result.error) showSaveIndicator('saved');
     hasUnsavedChanges = false;
     // This save carried the note's latest full content, so an older queued
     // offline edit of the same note is superseded: replaying it later would
@@ -6188,10 +6201,10 @@ function loadLib(key, urls) {
         if (u.endsWith('.css')) { el = document.createElement('link'); el.rel = 'stylesheet'; el.href = u; }
         else { el = document.createElement('script'); el.src = u; }
         if (sri) { el.integrity = sri; el.crossOrigin = 'anonymous'; }
-        el.onload = res; el.onerror = rej; document.head.appendChild(el);
+        el.onload = res; el.onerror = (e) => { el.remove(); rej(e); }; document.head.appendChild(el);
       });
     }
-  })();
+  })().catch(e => { delete _libs[key]; throw e; });
   return _libs[key];
 }
 async function renderRichBlocks(root) {
@@ -6334,13 +6347,20 @@ async function _rewriteTag(tag, replacer, doneMsg) {
   document.getElementById('modalContainer').innerHTML = '';
   /* translators: %d is the number of notes being updated */
   showToast(sprintf( _n( 'Updating %d note…', 'Updating %d notes…', hits.length, 'noodled' ), hits.length ));
+  let ok = 0, skipped = 0;
   for (const n of hits) {
-    const body = (n.body || '').replace(_tagRe(tag), replacer);
-    try { await api.save_note(n.notebook, n.id, n.title, body, { force: true }); } catch (e) {}
+    try {
+      // Rewrite the latest copy and send its base, so an edit made elsewhere is never overwritten.
+      const fresh = await api.get_note(null, n.id);
+      const body = (fresh.body || '').replace(_tagRe(tag), replacer);
+      const r = await api.save_note(fresh.notebook, fresh.id, fresh.title, body, { base: fresh.mtime });
+      if (r && r.conflict) skipped++; else if (r && !r.error) ok++;
+    } catch (e) {}
   }
   await loadNotes();
   if (activeNote && hits.some(h => h.id === activeNote.id)) { try { activeNote = await api.get_note(null, activeNote.id); renderContent(); } catch (e) {} }
-  showToast(doneMsg);
+  /* translators: %1$d is the number of notes updated, %2$d is the number of notes skipped because they changed elsewhere */
+  showToast(skipped ? sprintf( _n( 'Updated %1$d note, skipped %2$d changed elsewhere', 'Updated %1$d notes, skipped %2$d changed elsewhere', ok, 'noodled' ), ok, skipped ) : doneMsg);
 }
 async function renameTag(tag) {
   /* translators: %s is the tag name */

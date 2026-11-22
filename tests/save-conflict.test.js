@@ -410,6 +410,42 @@ async function main() {
     check(JSON.stringify(await ev(() => __t.order())) === '[12,11,13]', 'cleared-query order ' + JSON.stringify(await ev(() => __t.order())));
   });
 
+  // 7. saves outside the autosave path also carry the conflict base.
+  await group('7 title-only save, checkbox toggle and lock send base_modified; a stale base opens the conflict dialog', async check => {
+    freshNote({ body: '- [ ] task one\n- [ ] task two' });
+    await ev(() => __t.open(1));
+    const titleSave = () => ev(async () => {
+      const t = document.getElementById('titleInput'); t.value = 'Alpha ' + Date.now();
+      await saveTitleOnly();
+    });
+    let server = fake.rows[1].modified_at;
+    await titleSave();
+    check(lastSave().payload.base_modified === server && !lastSave().response.conflict, 'title-only save base ' + lastSave().payload.base_modified + ' vs ' + server);
+    server = fake.rows[1].modified_at;
+    await ev(async () => { document.querySelector('#noteBody input[type=checkbox]').click(); await new Promise(r => setTimeout(r, 100)); });
+    check(lastSave().payload.base_modified === server && !lastSave().response.conflict, 'checkbox save base ' + lastSave().payload.base_modified + ' vs ' + server);
+    server = fake.rows[1].modified_at;
+    // Lock with a stand-in cipher: the harness is not a secure context, so WebCrypto is unavailable.
+    await ev(async () => {
+      window.__realEncrypt = encryptBody; window._protectPass = 'test-pass';
+      encryptBody = async (plain) => 'noodled:enc:v1:' + btoa(unescape(encodeURIComponent(plain)));
+      try { await lockCurrentNote(); } finally { encryptBody = window.__realEncrypt; window._protectPass = ''; }
+    });
+    check(lastSave().payload.body.startsWith('noodled:enc:v1:'), 'lock did not save the locked body');
+    // lockCurrentNote flushes pending edits first, so its base is the mtime the save before it returned.
+    server = fake.saves[fake.saves.length - 2].response.mtime;
+    check(lastSave().payload.base_modified === server && !lastSave().response.conflict, 'lock save base ' + lastSave().payload.base_modified + ' vs ' + server);
+    // Another device saves behind the client's back; the next title-only save must not overwrite it.
+    fake.rows[1].body = 'from the other device';
+    fake.rows[1].modified_at = fake.tick();
+    const saves = fake.saves.length;
+    await titleSave();
+    check(fake.saves.length === saves + 1 && !!lastSave().payload.base_modified, 'stale title-only save sent no base_modified');
+    check(lastSave().response.conflict === true, 'stale title-only save did not get a conflict response');
+    check(fake.rows[1].body === 'from the other device', 'other device text was overwritten');
+    check((await ev(() => __t.state())).conflictOpen === true, 'conflict dialog not opened');
+  });
+
   const harnessErrors = await page.evaluate(() => window.__pageErrors.slice());
   await browser.close();
   const passed = results.filter(Boolean).length, failed = results.length - passed;

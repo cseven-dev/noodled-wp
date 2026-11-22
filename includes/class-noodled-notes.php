@@ -399,7 +399,7 @@ class Noodled_Notes {
 			'notebook_id' => $notebook_id,
 			'title'       => $title,
 			'slug'        => $slug,
-			'sha'         => null,
+			'sha'         => '',
 			'modified_at' => current_time( 'mysql', true ),
 		], [ 'id' => $id ] );
 
