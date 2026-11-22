@@ -3248,25 +3248,33 @@ function renderMarkdown(text) {
   }
   function attrText(s) { return s.replace(/"/g, '&quot;'); }
   function inlineFormat(s) {
+    // Tags built by the early passes are swapped for a NUL-delimited token and put
+    // back at the end. Otherwise the later passes (bare URL, emphasis, code, #tag)
+    // would rewrite text INSIDE an attribute value (an image alt, a link href, a
+    // wiki link's preview title) and inject markup that breaks out of the attribute.
+    const kept = [];
+    const keep = html => '\u0000' + (kept.push(html) - 1) + '\u0000';
     return s
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => `<img src="${safeUrl(url)}" alt="${attrText(alt)}">`)
+      .replace(/\u0000/g, '')
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => keep(`<img src="${safeUrl(url)}" alt="${attrText(alt)}">`))
       .replace(/\[\[([^\]]+)\]\]/g, (match, title) => {
         // The line is already escLine'd: undo that for the lookup and the data-title.
         const raw = title.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
         const target = findNoteByTitle(raw);
-        if (target) return `<a href="#" class="wikilink" title="${escAttr((target.preview || target.title || '').slice(0, 140))}" onclick="event.preventDefault(); selectNote(${target.id})">${esc(title)}</a>`;
-        return `<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), title.trim() ))}" data-title="${escAttr(raw)}" onclick="event.preventDefault(); createLinkedNote(this.dataset.title)">${esc(title)}</a>`;
+        if (target) return keep(`<a href="#" class="wikilink" title="${escAttr((target.preview || target.title || '').slice(0, 140))}" onclick="event.preventDefault(); selectNote(${target.id})">`) + `${esc(title)}</a>`;
+        return keep(`<a href="#" class="wikilink broken" title="${escAttr(sprintf( __( 'No note named "%s" yet', 'noodled' ), title.trim() ))}" data-title="${escAttr(raw)}" onclick="event.preventDefault(); createLinkedNote(this.dataset.title)">`) + `${esc(title)}</a>`;
       })
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${txt}</a>`)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => keep(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">`) + `${txt}</a>`)
       // Autolink bare URLs (not already inside a markdown link's href/text).
-      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">${url}</a>`)
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, url) => `${pre}` + keep(`<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="${escAttr(__( 'Opens in a new tab', 'noodled' ))}">`) + `${url}</a>`)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\[(\d+:\d+(?::\d+)?)\]\s*/g, '<span class="timestamp">[$1]</span> ')
       /* translators: %s is the tag name */
-      .replace(/(^|\s)#([a-zA-Z][\w-]*)/g, (m, pre, tag) => `${pre}<span class="tag" role="button" tabindex="0" aria-label="${escAttr(sprintf( __( 'Filter by tag %s', 'noodled' ), tag ))}" onclick="filterByTag('${tag}')">#${tag}</span>`);
+      .replace(/(^|\s)#([a-zA-Z][\w-]*)/g, (m, pre, tag) => `${pre}<span class="tag" role="button" tabindex="0" aria-label="${escAttr(sprintf( __( 'Filter by tag %s', 'noodled' ), tag ))}" onclick="filterByTag('${tag}')">#${tag}</span>`)
+      .replace(/\u0000(\d+)\u0000/g, (m, i) => kept[+i] || '');
   }
 
   for (let i = 0; i < lines.length; i++) {

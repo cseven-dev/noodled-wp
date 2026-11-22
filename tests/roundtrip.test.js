@@ -55,6 +55,9 @@ const ORIGIN = 'http://noodled.test';
 // resolve to a real note (the other wiki link in the cases is deliberately broken).
 const OTHER_NOTES = [
   { id: 901, title: 'Note Title', body: 'Embedded **body** text.', notebook: 'General', preview: 'Embedded body text.', modified: '' },
+  // A preview that would be rewritten by the later inline passes (bare URL, #tag,
+  // emphasis, code) if it were not protected inside the wiki link's title attribute.
+  { id: 902, title: 'Tricky Preview', body: '', notebook: 'General', preview: 'see #home and https://x.test/onmouseover=location=/javascript:alert%281%29/.source// **b** `c`', modified: '' },
 ];
 
 const MERMAID = '```mermaid\ngraph TD\n  A[Start] --> B{"x < 1 & y > 2"}\n  B -->|yes| C\n\n  %% comment *not italic*\n```';
@@ -62,6 +65,11 @@ const MATH = '```math\n\\frac{a_1}{b_2} < c & d \\\\\n  \\sum_{i=1}^{n} x_i^2\n`
 const CODE = '```js\nfunction f(a, b) {\n  // compare <a> & "b"\n  if (a < b) {\n\n    return \'*not* _md_\';\n  }\n\treturn null;\n}\n```';
 
 const CASES = [
+  // Attribute safety: text placed in an attribute (wiki link preview, image alt,
+  // link href) must never be rewritten into markup by a later inline pass.
+  ['wiki link whose target preview holds a URL, a tag and emphasis', 'See [[Tricky Preview]] now.', { clean: { links: 1, tags: 0 } }],
+  ['image alt holding a tag and a URL', '![a #tag https://x.test/onerror=1// b](https://example.com/files/diagram.png)', { clean: { links: 0, tags: 0 } }],
+  ['link target holding a space and a tag', '[text](https://a.test/ #frag)', { clean: { links: 1, tags: 0 } }],
   ['headings with inline formatting', '# Title with **bold**\n## Sub with *italic*\n### Third with [a link](https://example.com/page)'],
   // Accepted normalization: the blank line right after a heading is dropped.
   // The link target lives in another notebook: only the cross-notebook title
@@ -217,8 +225,15 @@ async function main() {
       renderContent();
       await new Promise(r => setTimeout(r, 30));
       const broken = document.querySelectorAll('#noteBody .wikilink.broken').length;
+      const nb = document.getElementById('noteBody');
+      const leak = nb ? {
+        links: nb.querySelectorAll('a').length,
+        tags: nb.querySelectorAll('.tag').length,
+        handlers: nb.querySelectorAll('[onmouseover], [onerror], [onfocus]').length,
+        text: /="|onclick|noopener/.test(nb.textContent),
+      } : null;
       const body = currentBody();
-      return body === null ? { body: md, skipped: true, broken } : { body, skipped: false, broken };
+      return body === null ? { body: md, skipped: true, broken, leak } : { body, skipped: false, broken, leak };
     }, { md, others: OTHER_NOTES, map: map || {}, index: index || null });
   }
 
@@ -240,6 +255,13 @@ async function main() {
       if (b !== a) problems.push(['round trip changed the markdown', a, b]);
       if (c !== b) problems.push(['second round trip differs from first (not idempotent)', b, c]);
       if (opts.noBroken && (first.broken || second.broken)) problems.push('a wiki link rendered as broken');
+      if (opts.clean) for (const r of [first, second]) {
+        const l = r.leak;
+        if (!l) { problems.push('no editor to inspect'); break; }
+        if (l.links !== opts.clean.links || l.tags !== opts.clean.tags || l.handlers || l.text) {
+          problems.push('attribute text leaked into markup: ' + JSON.stringify(l)); break;
+        }
+      }
     }
     const isKnown = Object.prototype.hasOwnProperty.call(KNOWN_FAILURES, name);
     const note = (!err && first.skipped) ? ' (no editor mounted, save skipped, body untouched)' : '';
