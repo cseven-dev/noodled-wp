@@ -6042,16 +6042,22 @@ function calloutHtml(type, title, bodyParts, collapsible, src) {
 }
 
 // Lazy-load an external lib (scripts + css), once, from a CDN. Fails gracefully
-// offline, in which case rich blocks keep showing their source.
+// offline (or on an integrity mismatch), in which case rich blocks keep showing
+// their source. Versions are pinned and each file carries a Subresource
+// Integrity hash: when bumping a version, update the URL AND its sha384 hash
+// together (every file of that lib), or the browser will refuse to load it.
 const _libs = {};
 function loadLib(key, urls) {
   if (_libs[key]) return _libs[key];
   _libs[key] = (async () => {
-    for (const u of urls) {
+    for (const entry of urls) {
+      const u = typeof entry === 'string' ? entry : entry.url;
+      const sri = typeof entry === 'string' ? '' : entry.integrity;
       await new Promise((res, rej) => {
         let el;
         if (u.endsWith('.css')) { el = document.createElement('link'); el.rel = 'stylesheet'; el.href = u; }
         else { el = document.createElement('script'); el.src = u; }
+        if (sri) { el.integrity = sri; el.crossOrigin = 'anonymous'; }
         el.onload = res; el.onerror = rej; document.head.appendChild(el);
       });
     }
@@ -6065,7 +6071,7 @@ async function renderRichBlocks(root) {
   const mat = [...root.querySelectorAll('.math-block:not([data-done])')];
   if (mer.length) {
     try {
-      await loadLib('mermaid', ['https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js']);
+      await loadLib('mermaid', [{ url: 'https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js', integrity: 'sha384-N3QqR/7q+xm3BGX+CBbNI8AUmRRqcsDzToy+0z1NLDI0QmTKW8zvwLvqulJgk3dP' }]);
       if (window.mermaid) {
         const light = document.documentElement.getAttribute('data-theme') === 'light';
         window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: light ? 'default' : 'dark' });
@@ -6079,7 +6085,10 @@ async function renderRichBlocks(root) {
   }
   if (mat.length) {
     try {
-      await loadLib('katex', ['https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css', 'https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js']);
+      await loadLib('katex', [
+        { url: 'https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css', integrity: 'sha384-nH0MfJ44wi1dd7w6jinlyBgljjS8EJAh2JBoRad8a3VDw2K69vfaaqm4WnR+gXtA' },
+        { url: 'https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.js', integrity: 'sha384-CwjPRVHTvLiMBFjEoij+QZViMV5rhTOIp7CJzl24JEqpRDA1sJFHVXXLURktbYYp' },
+      ]);
       if (window.katex) {
         mat.forEach(el => {
           el.setAttribute('data-done', '1');

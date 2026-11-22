@@ -33,14 +33,6 @@ $noodled_og_desc = esc_attr__( 'A fast, private, local-first markdown notes app.
 <meta name="twitter:title" content="<?php echo esc_attr( $noodled_brand ); ?>">
 <meta name="twitter:description" content="<?php echo $noodled_og_desc; ?>">
 <meta name="twitter:image" content="<?php echo $noodled_og_img; ?>">
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-HMPWDP2MTN"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-HMPWDP2MTN');
-</script>
 <link rel="icon" type="image/png" sizes="32x32" href="<?php echo esc_url( NOODLED_URL . 'assets/icon-192.png' ); ?>">
 <link rel="manifest" href="<?php echo esc_url( NOODLED_URL . 'assets/manifest.json' ); ?>">
 <!-- Fraunces (noodled display serif) is self-hosted in assets/fonts and declared

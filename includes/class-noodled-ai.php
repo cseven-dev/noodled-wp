@@ -16,10 +16,10 @@ class Noodled_AI {
 
 	public static function default_model( string $provider ): string {
 		switch ( $provider ) {
-			case 'openai': return 'gpt-4o-mini';
-			case 'google': return 'gemini-2.0-flash';
+			case 'openai': return 'gpt-6-luna';
+			case 'google': return 'gemini-3.6-flash';
 			case 'anthropic':
-			default:       return 'claude-sonnet-4-6';
+			default:       return 'claude-sonnet-5-5';
 		}
 	}
 
@@ -113,7 +113,7 @@ class Noodled_AI {
 
 	private static function call_anthropic( string $system, string $user ): array {
 		$res = wp_remote_post( 'https://api.anthropic.com/v1/messages', [
-			'timeout' => 45,
+			'timeout' => 60,
 			'headers' => [
 				'content-type'      => 'application/json',
 				'x-api-key'         => self::api_key(),
@@ -121,28 +121,35 @@ class Noodled_AI {
 			],
 			'body' => wp_json_encode( [
 				'model'      => self::model(),
-				'max_tokens' => 1024,
+				'max_tokens' => 4096,
 				'system'     => $system,
 				'messages'   => [ [ 'role' => 'user', 'content' => $user ] ],
 			] ),
 		] );
 		$data = self::http_json( $res );
 		if ( isset( $data['error'] ) ) return $data;
-		$text = $data['content'][0]['text'] ?? '';
+		if ( ( $data['stop_reason'] ?? '' ) === 'refusal' ) {
+			return [ 'error' => __( 'The AI provider declined this request.', 'noodled' ) ];
+		}
+		// Newer models may return a thinking block first: join every text block.
+		$text = '';
+		foreach ( (array) ( $data['content'] ?? [] ) as $block ) {
+			if ( is_array( $block ) && ( $block['type'] ?? '' ) === 'text' ) $text .= (string) ( $block['text'] ?? '' );
+		}
 		return $text !== '' ? [ 'text' => $text ] : [ 'error' => __( 'No response from the AI provider.', 'noodled' ) ];
 	}
 
 	private static function call_openai( string $system, string $user ): array {
 		$res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
-			'timeout' => 45,
+			'timeout' => 60,
 			'headers' => [
 				'content-type'  => 'application/json',
 				'authorization' => 'Bearer ' . self::api_key(),
 			],
 			'body' => wp_json_encode( [
-				'model'      => self::model(),
-				'max_tokens' => 1024,
-				'messages'   => [
+				'model'                 => self::model(),
+				'max_completion_tokens' => 4096,
+				'messages'              => [
 					[ 'role' => 'system', 'content' => $system ],
 					[ 'role' => 'user',   'content' => $user ],
 				],
@@ -158,7 +165,7 @@ class Noodled_AI {
 		$url = 'https://generativelanguage.googleapis.com/v1beta/models/'
 			. rawurlencode( self::model() ) . ':generateContent';
 		$res = wp_remote_post( $url, [
-			'timeout' => 45,
+			'timeout' => 60,
 			'headers' => [
 				'content-type'     => 'application/json',
 				'x-goog-api-key'   => self::api_key(),
@@ -170,7 +177,11 @@ class Noodled_AI {
 		] );
 		$data = self::http_json( $res );
 		if ( isset( $data['error'] ) ) return $data;
-		$text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+		// Skip thought-summary parts and join the rest.
+		$text = '';
+		foreach ( (array) ( $data['candidates'][0]['content']['parts'] ?? [] ) as $part ) {
+			if ( is_array( $part ) && empty( $part['thought'] ) ) $text .= (string) ( $part['text'] ?? '' );
+		}
 		return $text !== '' ? [ 'text' => $text ] : [ 'error' => __( 'No response from the AI provider.', 'noodled' ) ];
 	}
 

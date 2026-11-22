@@ -423,7 +423,7 @@ class Noodled_Settings {
 					<tr>
 						<th><label for="noodled-ai-model"><?php esc_html_e( 'AI Model', 'noodled' ); ?></label></th>
 						<td>
-							<input type="text" id="noodled-ai-model" name="<?php echo self::$option_key; ?>[ai_model]" value="<?php echo esc_attr( $opts['ai_model'] ?? '' ); ?>" class="regular-text" placeholder="claude-sonnet-4-6 / gpt-4o-mini / gemini-2.0-flash">
+							<input type="text" id="noodled-ai-model" name="<?php echo self::$option_key; ?>[ai_model]" value="<?php echo esc_attr( $opts['ai_model'] ?? '' ); ?>" class="regular-text" placeholder="<?php echo esc_attr( implode( ' / ', array_map( [ 'Noodled_AI', 'default_model' ], Noodled_AI::PROVIDERS ) ) ); ?>">
 							<p class="description"><?php esc_html_e( 'Optional. Leave blank to use a sensible default for the selected provider.', 'noodled' ); ?></p>
 						</td>
 					</tr>

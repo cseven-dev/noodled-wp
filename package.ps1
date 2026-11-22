@@ -60,7 +60,7 @@ if (!(Test-Path "$pluginDir\dist")) { New-Item -ItemType Directory -Path "$plugi
 if (Test-Path $zipPath) { Remove-Item $zipPath }
 
 # Create zip excluding dev files
-$exclude = @("dist", ".git", ".claude", ".env", "CLAUDE.md", "package.ps1", "*.zip")
+$exclude = @("dist", ".git", ".claude", ".env", "CLAUDE.md", "package.ps1", "*.zip", "COACH.md", "ROADMAP.md", "SPEC.md", "MOBILE-IOS-SCOPE.md", "tests", "noodled_dropbox.json")
 $tempDir = "$env:TEMP\noodled-pkg"
 if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
 New-Item -ItemType Directory -Path "$tempDir\$pluginName" | Out-Null

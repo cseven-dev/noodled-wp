@@ -142,6 +142,19 @@ class Noodled_App {
 	/* ── Core request handler ── */
 
 	private static function serve_request(): void {
+		// Force HTTPS when the site is configured for it. Only checked here, so REST,
+		// cron, CLI and admin-ajax are untouched. The host comes from home_url(),
+		// never the request Host header, so this cannot redirect off-site; installs
+		// with an http home URL (local dev, no certificate) are never redirected.
+		if ( ! is_ssl() && wp_parse_url( home_url(), PHP_URL_SCHEME ) === 'https' ) {
+			$host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+			$port = wp_parse_url( home_url(), PHP_URL_PORT );
+			$uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+			if ( ! is_string( $uri ) || $uri === '' || $uri[0] !== '/' || strpos( $uri, '//' ) === 0 ) $uri = '/';
+			wp_safe_redirect( esc_url_raw( 'https://' . $host . ( $port ? ':' . $port : '' ) . $uri ), 301 );
+			exit;
+		}
+
 		// Public legal pages (Privacy / Terms) — reachable by anyone, no session needed.
 		if ( isset( $_GET['noodled_legal'] ) ) {
 			self::serve_legal( sanitize_key( wp_unslash( $_GET['noodled_legal'] ) ) );
