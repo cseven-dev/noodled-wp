@@ -12,6 +12,9 @@
  * persists). A null from currentBody() means doSave() skips the save, so the
  * stored body is unchanged. Each case is checked twice: original == first round
  * trip, and first round trip == second round trip (idempotence).
+ * A case is [name, markdown] or [name, markdown, opts]: opts.expect is the exact
+ * first-round-trip output when it is an accepted normalization of the input, and
+ * opts.map is set as noodledConfig.map (location-note map provider) for the case.
  *
  * Dependency: Playwright is NOT installed in this repo. It is loaded from
  *   C:\Users\simon\.claude\skills\gauntlet\node_modules
@@ -29,25 +32,6 @@
 // Cases that fail today because of a real bug in noodled.js. Remove an entry once
 // the bug is fixed (the run prints a notice when a listed case starts passing).
 const KNOWN_FAILURES = {
-  // renderMarkdown post-pass (L3017) deletes the <br> after </h1-3>, so the blank line after every heading is lost.
-  'heading followed by blank line': 'blank line after a heading is dropped',
-  // renderMarkdown matches bullets on the trimmed line (L2955) and never opens a nested <ul>, so indentation is lost.
-  'nested bullets 2 levels': 'child items flattened to top level',
-  'nested bullets 3 levels': 'level 2 and 3 items flattened to top level',
-  // renderMarkdown emits <ol> with no start attr (L2957-L2958) and listToMd numbers from 1 (L2499).
-  'ordered list starting at 3': 'list renumbered from 1 (3., 4. become 1., 2.)',
-  // Same flattening as nested bullets: the indented 1./2. become a sibling top-level <ol> (L2957).
-  'ordered list nested in bullets': 'nested ordered list flattened to top level',
-  // renderMarkdown merges adjacent blockquotes with <br> (L3016); htmlToMarkdown writes one "> " prefix (L2475) and BR as a bare newline (L2532).
-  'multi-line blockquote': 'second and later quote lines lose their "> " prefix (become a plain paragraph line)',
-  // tableToMd always writes the short canonical marker (L2512). Cosmetic: alignment is kept, separator text changes.
-  'table with long GFM separator': 'separator |:-----|:------:|------:| rewritten as | :-- | :-: | --: |',
-  // inlineFormat autolinks bare URLs (L2919) and inlineHtmlToMd always writes [text](href) (L2529).
-  'bare URL': 'bare URL rewritten as [url](url)',
-  // embedMedia (L4903) replaces the URL line with an iframe; htmlToMarkdown has no branch for .embed-container (falls through at L2481), so the line is deleted.
-  'standalone YouTube URL': 'the YouTube URL line is deleted on save',
-  // Same as YouTube: mapEmbedHtml (L4923) iframe is unknown to htmlToMarkdown; only the "Directions" button text survives.
-  'location note (OpenStreetMap link)': 'OSM link replaced by the map button label text',
 };
 
 const path = require('path');
@@ -79,7 +63,8 @@ const CODE = '```js\nfunction f(a, b) {\n  // compare <a> & "b"\n  if (a < b) {\
 
 const CASES = [
   ['headings with inline formatting', '# Title with **bold**\n## Sub with *italic*\n### Third with [a link](https://example.com/page)'],
-  ['heading followed by blank line', '# Title\n\nFirst paragraph.\n\n## Section\n\nSecond paragraph.'],
+  // Accepted normalization: the blank line right after a heading is dropped.
+  ['heading followed by blank line', '# Title\n\nFirst paragraph.\n\n## Section\n\nSecond paragraph.', { expect: '# Title\nFirst paragraph.\n\n## Section\nSecond paragraph.' }],
   ['paragraphs with inline formatting', 'Plain **bold** and *italic* and `inline code` here.\n\nA [link](https://example.com/a?b=1&c=2) and ***bold italic*** too.'],
   ['strikethrough', 'Some ~~struck out~~ words.'],
   ['bullet list with bold and links', '- plain item\n- item with **bold** text\n- item with [a link](https://example.com)\n- *italic* and `code`'],
@@ -89,14 +74,26 @@ const CASES = [
   ['ordered list starting at 3', '3. third\n4. fourth'],
   ['ordered list nested in bullets', '- shopping\n  1. eggs\n  2. milk\n- errands'],
   ['checklist', '- [ ] todo item\n- [x] done item\n- [ ] read [the docs](https://example.com/docs)\n- [x] **bold** done'],
+  ['nested checklist', '- [ ] parent open\n  - [x] child done\n  - [ ] child open\n- [x] parent done\n  - [ ] child of done'],
+  ['nested bullets with bold and link', '- top\n  - child with **bold** and [a link](https://example.com/x)\n  - plain child'],
+  // Accepted normalization: a tab-indented child is written back with the 2-space indent.
+  ['tab-indented child', '- parent\n\t- child\n- next', { expect: '- parent\n  - child\n- next' }],
+  // Accepted normalization: a 4-space indent is one level, written back as 2 spaces.
+  ['4-space-indented children', '- parent\n    - child\n        - grandchild', { expect: '- parent\n  - child\n    - grandchild' }],
+  ['list followed by paragraph', '- item one\n  - nested\nA paragraph after the list.'],
+  ['ordered list starting at 1', '1. one\n2. two'],
+  ['checklist nested in ordered list', '1. step\n  - [ ] sub task\n  - [x] sub done\n2. next step'],
+  ['back out two levels then a type change', '- a\n  - b\n    - c\n1. d'],
   ['blockquote with inline formatting', '> A quote with **bold**, *italic* and a [link](https://example.com).'],
   ['multi-line blockquote', '> line one of the quote\n> line two of the quote'],
+  ['two blockquotes separated by blank line', '> first quote\n\n> second quote'],
   ['fenced code block with language', 'Before the code.\n' + CODE + '\nAfter the code.'],
   ['fenced code block without language', 'Text\n```\nplain   spaced\n  indented\n```\nMore text'],
   ['code note', '```python\ndef f(x):\n    if x < 1 and x > -1:\n\n        return "a & b"\n    return None\n```'],
   ['table with alignment', '| Left | Centre | Right |\n| :-- | :-: | --: |\n| a | **b** | [c](https://example.com) |\n| d | `e` | f |'],
   ['table without alignment', '| A | B |\n| --- | --- |\n| 1 | 2 |'],
-  ['table with long GFM separator', '| Left | Centre | Right |\n|:-----|:------:|------:|\n| a | b | c |'],
+  // Accepted normalization: the separator is rewritten in short form (alignment kept).
+  ['table with long GFM separator', '| Left | Centre | Right |\n|:-----|:------:|------:|\n| a | b | c |', { expect: '| Left | Centre | Right |\n| :-- | :-: | --: |\n| a | b | c |' }],
   ['callout', '> [!warning] Careful now\n> Body with **bold** and a [link](https://example.com)\n> second body line'],
   ['collapsible callout', '> [!note]- Click to expand\n> Hidden body text'],
   ['callout followed by paragraph', '> [!tip]\n> Short tip\n\nNormal paragraph after.'],
@@ -111,8 +108,13 @@ const CASES = [
   ['special characters', 'Tom & Jerry <tag> "double" \'single\' 2 < 3 > 1\nsnake_case_name and file_name_here.txt\na * b and 5*3 and 2 * 3 * 4\n__dunder__ and **unbalanced bold'],
   ['tags and timestamps', 'Meeting #project-x notes\n[12:30] Kickoff\n[1:02:03] Wrap up #done'],
   ['bare URL', 'Visit https://example.com/path today.'],
+  ['link text differs from href', 'A [named link](https://example.com/page) and [https://a.example](https://b.example).'],
+  ['YouTube URL mid-sentence', 'See https://www.youtube.com/watch?v=dQw4w9WgXcQ for the clip.'],
+  ['standalone Vimeo URL', 'Watch:\nhttps://vimeo.com/76979871\nDone'],
   ['standalone YouTube URL', 'Watch this:\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ\nThanks'],
   ['location note (OpenStreetMap link)', '\u{1F4CD} 43.6532, -79.3832\n\nhttps://www.openstreetmap.org/?mlat=43.6532&mlon=-79.3832#map=16/43.6532/-79.3832'],
+  ['location note (Mapbox provider)', '\u{1F4CD} 43.6532, -79.3832\n\nhttps://www.openstreetmap.org/?mlat=43.6532&mlon=-79.3832#map=16/43.6532/-79.3832', { map: { provider: 'mapbox', mapboxToken: 'pk.test' } }],
+  ['location note (Google provider)', '\u{1F4CD} 43.6532, -79.3832\n\nhttps://www.openstreetmap.org/?mlat=43.6532&mlon=-79.3832#map=16/43.6532/-79.3832', { map: { provider: 'gmaps', gmapsKey: 'test-key' } }],
   ['heading level 4 stays literal', '#### Not a rendered heading'],
   ['multiple blank lines', 'one\n\n\ntwo'],
   ['long mixed document', [
@@ -191,8 +193,9 @@ async function main() {
     .then(() => true, () => false);
   await page.waitForTimeout(300);
 
-  async function roundTrip(md) {
-    return page.evaluate(async ({ md, others }) => {
+  async function roundTrip(md, map) {
+    return page.evaluate(async ({ md, others, map }) => {
+      noodledConfig.map = map;
       showRawMarkdown = false;
       notes = others.map(n => ({ ...n }));
       activeNote = { id: 900, title: 'Round trip', body: md, notebook: 'General', modified: '', attachments: [], tags: [] };
@@ -200,7 +203,7 @@ async function main() {
       await new Promise(r => setTimeout(r, 30));
       const body = currentBody();
       return body === null ? { body: md, skipped: true } : { body, skipped: false };
-    }, { md, others: OTHER_NOTES });
+    }, { md, others: OTHER_NOTES, map: map || {} });
   }
 
   let failed = 0, known = 0, passed = 0;
@@ -208,16 +211,16 @@ async function main() {
   const names = new Set(CASES.map(c => c[0]));
   for (const k of Object.keys(KNOWN_FAILURES)) if (!names.has(k)) console.log('WARNING: KNOWN_FAILURES entry "' + k + '" matches no case');
 
-  for (const [name, md] of CASES) {
+  for (const [name, md, opts = {}] of CASES) {
     let first, second, err = null;
     try {
-      first = await roundTrip(md);
-      second = await roundTrip(first.body);
+      first = await roundTrip(md, opts.map);
+      second = await roundTrip(first.body, opts.map);
     } catch (e) { err = e.message.split('\n')[0]; }
     const problems = [];
     if (err) problems.push('threw: ' + err);
     else {
-      const a = normalize(md), b = normalize(first.body), c = normalize(second.body);
+      const a = normalize(opts.expect !== undefined ? opts.expect : md), b = normalize(first.body), c = normalize(second.body);
       if (b !== a) problems.push(['round trip changed the markdown', a, b]);
       if (c !== b) problems.push(['second round trip differs from first (not idempotent)', b, c]);
     }

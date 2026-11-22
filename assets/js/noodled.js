@@ -2459,6 +2459,8 @@ function htmlToMarkdown(el) {
     if (node.classList && node.classList.contains('mermaid-block')) { lines.push('```mermaid'); lines.push(_b64dec(node.getAttribute('data-code') || '')); lines.push('```'); return; }
     if (node.classList && node.classList.contains('math-block')) { lines.push('```' + (node.getAttribute('data-lang') || 'math')); lines.push(_b64dec(node.getAttribute('data-code') || '')); lines.push('```'); return; }
     if (node.classList && node.classList.contains('callout')) { lines.push(_b64dec(node.getAttribute('data-callout') || '')); return; }
+    // Video/map embeds keep the original URL line in data-url.
+    if (node.classList && node.classList.contains('embed-container') && node.hasAttribute('data-url')) { lines.push(node.getAttribute('data-url')); return; }
     // Code blocks: lang from data-lang, live source from the <pre> (still editable).
     if (node.classList && node.classList.contains('code-block')) {
       const pre = node.querySelector('pre');
@@ -2472,7 +2474,16 @@ function htmlToMarkdown(el) {
     if (tag === 'H3') { lines.push('### ' + inlineHtmlToMd(node)); return; }
     if (tag === 'HR') { lines.push('---'); return; }
     if (tag === 'BR') { lines.push(''); return; }
-    if (tag === 'BLOCKQUOTE') { lines.push('> ' + inlineHtmlToMd(node)); return; }
+    if (tag === 'BLOCKQUOTE') {
+      // Two separate quotes stay separate: keep a blank line between them
+      // (adjacent quote lines are merged into one quote on render).
+      let prev = node.previousSibling;
+      while (prev && prev.nodeType === 3 && !prev.textContent.trim()) prev = prev.previousSibling;
+      if (prev && prev.nodeName === 'BLOCKQUOTE' && lines.length && lines[lines.length - 1] !== '') lines.push('');
+      // Every quote line keeps its "> " prefix (lines are joined with <br> on render).
+      inlineHtmlToMd(node).split('\n').forEach(l => lines.push(l === '' ? '' : '> ' + l));
+      return;
+    }
     if (tag === 'PRE') { lines.push('```'); lines.push(node.textContent); lines.push('```'); return; }
     if (tag === 'UL' || tag === 'OL') { listToMd(node, ''); return; }
     if (tag === 'P') { lines.push(inlineHtmlToMd(node)); return; }
@@ -2484,7 +2495,8 @@ function htmlToMarkdown(el) {
   // were flattened to plain text by textContent) and nested lists (2-space indent).
   function listToMd(node, indent) {
     const isChecklist = node.classList.contains('checklist');
-    let num = 1;
+    const start = parseInt(node.getAttribute('start'), 10);
+    let num = isNaN(start) ? 1 : start;
     for (const li of node.children) {
       if (li.nodeName !== 'LI') continue;
       const nested = Array.from(li.children).filter(c => c.nodeName === 'UL' || c.nodeName === 'OL');
@@ -2526,6 +2538,7 @@ function htmlToMarkdown(el) {
         else if (t === 'CODE') result += '`' + inner + '`';
         else if (t === 'A') {
           if (child.classList.contains('wikilink')) result += `[[${inner}]]`;
+          else if (/^https?:\/\//.test(inner) && inner === child.getAttribute('href')) result += inner; // bare (autolinked) URL
           else result += `[${inner}](${child.getAttribute('href') || ''})`;
         }
         else if (t === 'SPAN') result += inner;
@@ -2893,9 +2906,24 @@ function renderMarkdown(text) {
   if (!text) return '';
   const lines = text.split('\n');
   const out = [];
-  let inCodeBlock = false, codeBuffer = [], inList = false, listType = '', codeLang = '';
+  let inCodeBlock = false, codeBuffer = [], listStack = [], codeLang = '';
 
-  function closeList() { if (inList) { out.push(listType === 'check' ? '</ul>' : `</${listType}>`); inList = false; listType = ''; } }
+  // listStack holds the open list levels, outermost first: { type: 'ul'|'ol'|'check', indent }.
+  // A nested list sits inside its parent <li> (the shape listToMd serializes).
+  function listCloseTag(t) { return t === 'check' ? '</ul>' : `</${t}>`; }
+  function closeList() { while (listStack.length) { const l = listStack.pop(); out.push(listCloseTag(l.type) + (listStack.length ? '</li>' : '')); } }
+  // Put the list at the right nesting level for an item indented by `indent`
+  // columns (tab = 4), opening/closing levels as needed. Deeper than the current
+  // level = child of the previous item (any amount: 2 spaces, 4 spaces or a tab).
+  function openListLevel(type, indent, start) {
+    while (listStack.length > 1 && indent < listStack[listStack.length - 1].indent) { const l = listStack.pop(); out.push(listCloseTag(l.type) + '</li>'); }
+    const top = listStack[listStack.length - 1];
+    if (top && indent > top.indent) out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, '');
+    else if (top && top.type === type) return;
+    else if (top) { listStack.pop(); out.push(listCloseTag(top.type)); }
+    out.push(type === 'check' ? '<ul class="checklist">' : (type === 'ol' && start !== 1) ? `<ol start="${start}">` : `<${type}>`);
+    listStack.push({ type, indent });
+  }
   function escLine(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   // Markdown URLs land in href/src attributes — block script-bearing schemes and
   // escape the quote char so a crafted URL can't break out of the attribute.
@@ -2939,9 +2967,10 @@ function renderMarkdown(text) {
     if (/^-{3,}$/.test(trimmed) || /^\*{3,}$/.test(trimmed)) { closeList(); out.push('<hr>'); continue; }
     const hMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
     if (hMatch) { closeList(); out.push(`<h${hMatch[1].length}>${inlineFormat(escLine(hMatch[2]))}</h${hMatch[1].length}>`); continue; }
+    const listIndent = raw.match(/^[ \t]*/)[0].replace(/\t/g, '    ').length;
     const checkMatch = trimmed.match(/^-\s+\[([ xX])\]\s*(.*)$/);
     if (checkMatch) {
-      if (!inList || listType !== 'check') { closeList(); out.push('<ul class="checklist">'); inList = true; listType = 'check'; }
+      openListLevel('check', listIndent, 1);
       const checked = checkMatch[1].toLowerCase() === 'x';
       const checkIdx = out.filter(l => l.includes('type="checkbox"')).length;
       // preventDefault stops the browser's native toggle so toggleCheck() is the
@@ -2953,9 +2982,9 @@ function renderMarkdown(text) {
       continue;
     }
     const bulletMatch = trimmed.match(/^-\s+(.+)$/);
-    if (bulletMatch) { if (!inList || listType !== 'ul') { closeList(); out.push('<ul>'); inList = true; listType = 'ul'; } out.push(`<li>${inlineFormat(escLine(bulletMatch[1]))}</li>`); continue; }
-    const numMatch = trimmed.match(/^\d+\.\s+(.+)$/);
-    if (numMatch) { if (!inList || listType !== 'ol') { closeList(); out.push('<ol>'); inList = true; listType = 'ol'; } out.push(`<li>${inlineFormat(escLine(numMatch[1]))}</li>`); continue; }
+    if (bulletMatch) { openListLevel('ul', listIndent, 1); out.push(`<li>${inlineFormat(escLine(bulletMatch[1]))}</li>`); continue; }
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    if (numMatch) { openListLevel('ol', listIndent, parseInt(numMatch[1], 10)); out.push(`<li>${inlineFormat(escLine(numMatch[2]))}</li>`); continue; }
     // Callouts: > [!type] Title  (use [!type]- for a collapsible one). Consumes
     // following > lines as the body.
     const calloutMatch = trimmed.match(/^>\s*\[!([a-zA-Z]+)\](-?)\s*(.*)$/);
@@ -4903,10 +4932,10 @@ async function runAsk() {
 function embedMedia(url) {
   // YouTube
   let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-  if (m) return `<div class="embed-container"><iframe title="${escAttr(__( 'Embedded YouTube video', 'noodled' ))}" src="https://www.youtube.com/embed/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  if (m) return `<div class="embed-container" data-url="${escAttr(url)}"><iframe title="${escAttr(__( 'Embedded YouTube video', 'noodled' ))}" src="https://www.youtube.com/embed/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
   // Vimeo
   m = url.match(/vimeo\.com\/(\d+)/);
-  if (m) return `<div class="embed-container"><iframe title="${escAttr(__( 'Embedded Vimeo video', 'noodled' ))}" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
+  if (m) return `<div class="embed-container" data-url="${escAttr(url)}"><iframe title="${escAttr(__( 'Embedded Vimeo video', 'noodled' ))}" src="https://player.vimeo.com/video/${m[1]}" frameborder="0" allowfullscreen style="width:100%;aspect-ratio:16/9;border-radius:8px"></iframe></div>`;
   // OpenStreetMap location link (e.g. a location note) → embedded map with a pin,
   // rendered with whichever provider the admin chose in WordPress settings.
   if (/openstreetmap\.org/i.test(url)) {
@@ -4929,18 +4958,18 @@ function mapEmbedHtml(lat, lng, linkUrl) {
 
   if (provider === 'gmaps' && cfg.gmapsKey) {
     const src = `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(cfg.gmapsKey)}&q=${lat},${lng}&zoom=16`;
-    return `<div class="embed-container map-embed"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" allowfullscreen style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
+    return `<div class="embed-container map-embed" data-url="${escAttr(linkUrl)}"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" allowfullscreen style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
   }
   if (provider === 'mapbox' && cfg.mapboxToken) {
     const tok = encodeURIComponent(cfg.mapboxToken);
     const src = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+e5484d(${lng},${lat})/${lng},${lat},15,0/640x400@2x?access_token=${tok}`;
-    return `<div class="embed-container map-embed"><img class="map-static" src="${src}" alt="${title}" loading="lazy" style="width:100%;border-radius:8px">${openLink}</div>`;
+    return `<div class="embed-container map-embed" data-url="${escAttr(linkUrl)}"><img class="map-static" src="${src}" alt="${title}" loading="lazy" style="width:100%;border-radius:8px">${openLink}</div>`;
   }
   // Default: OpenStreetMap embed iframe with a marker (no key required).
   const d = 0.008; // ~1 km box around the pin
   const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
   const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-  return `<div class="embed-container map-embed"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
+  return `<div class="embed-container map-embed" data-url="${escAttr(linkUrl)}"><iframe title="${title}" src="${src}" frameborder="0" loading="lazy" style="width:100%;aspect-ratio:16/10;border-radius:8px"></iframe>${openLink}</div>`;
 }
 
 // Tapping a location-note map's Directions button: choose which app to open the
