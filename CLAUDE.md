@@ -64,7 +64,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **What it is:** A WordPress plugin that replicates the noodled desktop note-taking app as a full web version with family sharing.
 
-**Version:** 1.1.156, with 1.1.157 built on branch `v1.1.157-hardening` (`Version:` header + `NOODLED_VERSION` in `noodled.php`; changelog in `metadata.json`).
+**Version:** 1.1.161, packaged 2026-11-23 from branch `v1.2-polish-features` (`Version:` header + `NOODLED_VERSION` in `noodled.php`; changelog in `metadata.json`).
 
 **Stack:**
 - WordPress plugin (PHP 8.2+)
