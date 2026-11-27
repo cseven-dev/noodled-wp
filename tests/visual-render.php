@@ -31,6 +31,7 @@ function wp_json_encode( $v ) { return json_encode( $v, JSON_UNESCAPED_SLASHES )
 function includes_url( $path = '' ) { global $origin; return $origin . '/wp-includes/' . ltrim( $path, '/' ); }
 function rest_url( $path = '' ) { global $origin; return $origin . '/wp-json/' . ltrim( $path, '/' ); }
 function get_locale() { return 'en_US'; }
+function language_attributes() { echo 'lang="en-US"'; }
 function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 function add_query_arg( $key, $value, $url ) { return $url . ( strpos( $url, '?' ) === false ? '?' : '&' ) . $key . '=' . $value; }
 
@@ -38,6 +39,7 @@ class Noodled_Settings {
 	public static function get_brand_name() { return 'noodled'; }
 	public static function get_brand_tagline() { return 'Your notes, everywhere.'; }
 	public static function get_accent_color() { return '#0078d4'; }
+	public static function get_on_accent_color() { return '#ffffff'; }
 	public static function allow_registration() { return false; }
 }
 class Noodled_Plaud {

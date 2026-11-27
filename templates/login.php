@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html <?php language_attributes(); ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -21,6 +21,7 @@
   --text-muted: #9a9aac; /* >= 4.5:1 on the dark cards (was #5a5a68, ~2.9:1) */
   --text-bright: #e8e8ef;
   --accent: <?php echo esc_attr( Noodled_Settings::get_accent_color() ); ?>;
+  --on-accent: <?php echo esc_attr( Noodled_Settings::get_on_accent_color() ); ?>;
   --accent-hover: #2563eb;
   --accent-glow: rgba(59, 130, 246, 0.15);
   --border: #2a2a35;
@@ -165,7 +166,7 @@ body::before {
   border: none;
   border-radius: var(--r-md);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent, #fff);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -273,7 +274,7 @@ body::before {
       </div>
     </div>
 
-    <div class="login-msg" id="loginMsg">
+    <div class="login-msg" id="loginMsg" role="alert">
       <?php if ( ! empty( $login_error ) ) : ?>
         <span class="error"><?php echo esc_html( $login_error ); ?></span>
       <?php endif; ?>

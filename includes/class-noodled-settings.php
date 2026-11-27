@@ -811,6 +811,29 @@ class Noodled_Settings {
 		return $val ?: '#0078d4';
 	}
 
+	/**
+	 * Text colour for content drawn on the accent: white, unless the accent is
+	 * light enough that near-black reads better (WCAG 1.4.3). The default
+	 * #0078d4 gives white 4.53:1, so it stays white.
+	 */
+	public static function get_on_accent_color(): string {
+		$hex = ltrim( self::get_accent_color(), '#' );
+		if ( 3 === strlen( $hex ) ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		if ( ! preg_match( '/^[0-9a-f]{6}$/i', $hex ) ) {
+			return '#ffffff';
+		}
+		$lum = 0.0;
+		foreach ( [ 0 => 0.2126, 2 => 0.7152, 4 => 0.0722 ] as $i => $w ) {
+			$c    = hexdec( substr( $hex, $i, 2 ) ) / 255;
+			$lum += $w * ( $c <= 0.03928 ? $c / 12.92 : pow( ( $c + 0.055 ) / 1.055, 2.4 ) );
+		}
+		$white = 1.05 / ( $lum + 0.05 );
+		$dark  = ( $lum + 0.05 ) / ( 0.0137 + 0.05 ); // #111111
+		return $white >= $dark ? '#ffffff' : '#111111';
+	}
+
 	public static function allow_registration(): bool {
 		return ! empty( get_option( self::$option_key, [] )['allow_registration'] );
 	}

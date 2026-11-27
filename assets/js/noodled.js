@@ -3455,7 +3455,12 @@ function dismissToast(t, now) {
 }
 function showToast(msg) {
   let stack = document.getElementById('toastStack');
-  if (!stack) { stack = document.createElement('div'); stack.id = 'toastStack'; document.body.appendChild(stack); }
+  if (!stack) {
+    stack = document.createElement('div'); stack.id = 'toastStack';
+    // Live region so screen readers announce each toast (WCAG 4.1.3).
+    stack.setAttribute('role', 'status'); stack.setAttribute('aria-live', 'polite');
+    document.body.appendChild(stack);
+  }
   // If the newest toast is the same message, just refresh its timer (no clutter).
   const last = stack.lastElementChild;
   if (last && last.dataset.msg === msg && last.classList.contains('show')) {

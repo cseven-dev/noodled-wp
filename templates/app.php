@@ -10,7 +10,7 @@ $noodled_asset = function ( $rel ) {
 $noodled_icon = function ( $n ) { return '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-' . esc_attr( $n ) . '"></use></svg>'; };
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php language_attributes(); ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -57,7 +57,7 @@ body{background:#1e1e1e;color:#cccccc;height:100vh;overflow:hidden;display:flex;
 <link rel="preload" href="<?php echo $noodled_css; ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="<?php echo $noodled_css; ?>"></noscript>
 <?php $accent = Noodled_Settings::get_accent_color(); if ( $accent && $accent !== '#0078d4' ) : ?>
-<style>:root { --accent: <?php echo esc_attr( $accent ); ?>; --accent-hover: <?php echo esc_attr( $accent ); ?>cc; }</style>
+<style>:root { --accent: <?php echo esc_attr( $accent ); ?>; --accent-hover: <?php echo esc_attr( $accent ); ?>cc; --on-accent: <?php echo esc_attr( Noodled_Settings::get_on_accent_color() ); ?>; }</style>
 <?php endif; ?>
 </head>
 <body>
